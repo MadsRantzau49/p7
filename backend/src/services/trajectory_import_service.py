@@ -100,28 +100,28 @@ def create_uniformed_data_structure(batch_size: int):
     beijing_total = 0
 
     try:
-        # Porto
-        # last_source_id = None
+        #Porto
+        last_source_id = None
 
-        # while True:
-        #     porto_data = database.queries.retrieve_porto_dataset_batch(context, batch_size, last_source_id)
+        while True:
+            porto_data = database.queries.retrieve_porto_dataset_batch(context, batch_size, last_source_id)
 
-        #     if not porto_data:
-        #         break
+            if not porto_data:
+                break
 
-        #     uniformed_trajectories = []
+            uniformed_trajectories = []
 
-        #     for data in porto_data:
-        #         uniformed_trajectories.append(convert_porto_trajectory(data))
+            for data in porto_data:
+                uniformed_trajectories.append(convert_porto_trajectory(data))
 
-        #     database.queries.insert_data_uniformed_trajectories(context, uniformed_trajectories)
+            database.queries.insert_data_uniformed_trajectories(context, uniformed_trajectories)
 
-        #     context.commit()
+            context.commit()
 
-        #     porto_total += len(uniformed_trajectories)
-        #     last_source_id = porto_data[-1]["source_id"]
+            porto_total += len(uniformed_trajectories)
+            last_source_id = porto_data[-1]["source_id"]
 
-        #     print(f"Created {porto_total} trajectories from Porto")
+            print(f"Created {porto_total} trajectories from Porto")
 
         last_source_id = None
 
@@ -160,8 +160,3 @@ def create_uniformed_data_structure(batch_size: int):
 
     finally:
         context.close()
-  
-
-
-if __name__ == "__main__":
-    create_uniformed_data_structure(5000)

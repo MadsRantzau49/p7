@@ -5,7 +5,7 @@ from database.queries import get_trajectories_from_db
 from models.UniformedTrajectories import UniformedTrajectories
 
 
-async def get_trajectories(city: str, start_date: datetime | None, end_date: datetime | None, limit: int | None) -> UniformedTrajectories:
+async def get_trajectories(city: str, start_date: datetime | None, end_date: datetime | None, limit: int | None):
     context = create_db_connection()
 
     try:

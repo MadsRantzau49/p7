@@ -164,7 +164,7 @@ def insert_data_uniformed_trajectories(context, trajectories: list[UniformedTraj
     finally:
         cursor.close() 
 
-async def get_trajectories_from_db(context, city: str, start_date: datetime | None, end_date: datetime | None, limit: int | None) -> UniformedTrajectories:
+async def get_trajectories_from_db(context, city: str, start_date: datetime | None, end_date: datetime | None, limit: int | None) -> list[UniformedTrajectories]:
     cursor = context.cursor(dictionary=True)
 
     try:
@@ -180,11 +180,11 @@ async def get_trajectories_from_db(context, city: str, start_date: datetime | No
             values.append(end_date)
 
         sql = f"""
-        SELECT trajectory_id, taxi_id, trajectory_date, city, points, source_id FROM uniformed_trajectories WHERE {" AND ".join(conditions)} ORDER BY trajectory_id
+        SELECT trajectory_id, taxi_id, trajectory_date, city, points, source_id FROM uniformed_trajectories WHERE {" AND ".join(conditions)} ORDER BY trajectory_date
         """
 
         if limit is not None:
-            sql += "LIMIT %s"
+            sql += " LIMIT %s"
             values.append(limit)
 
         cursor.execute(sql, values)
