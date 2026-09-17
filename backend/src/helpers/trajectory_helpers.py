@@ -10,8 +10,6 @@ from datetime import datetime, timedelta
 def create_uuid_key():
     return str(uuid.uuid4())
 
-
-
 def convert_porto_trajectory(porto_trajectory: dict) -> UniformedTrajectoryPoint:
     polyline = porto_trajectory["polyline"]
 

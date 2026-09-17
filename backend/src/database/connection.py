@@ -1,6 +1,6 @@
 import os
-from mysql.connector import pooling
 
+from mysql.connector import pooling
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -18,7 +18,7 @@ database_pool_cfg = pooling.MySQLConnectionPool(
         password = os.getenv("DATABASE_PASSWORD")
 )
 
-def create_db_connection():
+def create_db_connection() -> pooling:
     return database_pool_cfg.get_connection()
     
 

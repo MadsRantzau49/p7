@@ -3,8 +3,8 @@ import sys
 
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
-
 from datetime import datetime, timedelta
+
 from models.beijing_trajectory import beijing_trajectory, trajectory_point
 from models.porto_trajectory import porto_trajectory
 
