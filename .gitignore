@@ -144,3 +144,4 @@ data/
 logs/
 outputs/
 runs/
+docs/rendered/*
