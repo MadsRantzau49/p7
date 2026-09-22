@@ -1,3 +1,9 @@
+# SETUP AND RUN
+Ensure to have node.js installed first.
+
+1. run "npm install"
+2. then run "npm run dev" to start the frontend
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
