@@ -203,5 +203,32 @@ async def get_trajectories_from_db(context, city: str, start_date: datetime | No
     finally:
         cursor.close()
 
+def dataset_name_taken(context, name: str) -> bool:
+    cursor = context.cursor()
 
-    
+    try:
+        cursor.execute(
+            "SELECT EXISTS(SELECT 1 FROM datasets WHERE name = %s) "
+            "OR EXISTS(SELECT 1 FROM uniformed_trajectories WHERE city = %s)",
+            (name, name),
+        )
+        (taken,) = cursor.fetchone()
+        return bool(taken)
+    except Exception as error:
+        print(f"Failed to check dataset name: {error}")
+        raise
+    finally:
+        cursor.close()
+
+def create_dataset(context, name: str) -> int:
+    cursor = context.cursor()
+
+    try:
+        cursor.execute("INSERT INTO datasets (name) VALUES (%s)", (name,))
+        return cursor.lastrowid
+
+    except Exception as error:
+        print(f"Failed to create dataset: {error}")
+        raise
+    finally:
+        cursor.close()
