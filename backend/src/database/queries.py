@@ -203,5 +203,17 @@ async def get_trajectories_from_db(context, city: str, start_date: datetime | No
     finally:
         cursor.close()
 
+async def get_trajectories_cities_from_db(context):
+    cursor = context.cursor(dictionary=True)
 
+    try:
+        cursor.execute("SELECT * FROM datasets ORDER BY name")
+
+        return cursor.fetchall()
+    
+    except Exception as error:
+        print(f"Failed to retrieve cities from database: {error}")
+        raise
+    finally:
+        cursor.close()
     
