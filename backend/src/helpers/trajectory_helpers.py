@@ -1,5 +1,8 @@
 import json, uuid, sys
 from pathlib import Path
+
+from models.upload_row import VehicleType
+
 sys.path.append(str(Path(__file__).parent.parent))
 
 from models.UniformedTrajectories import UniformedTrajectoryPoint, UniformedTrajectories
@@ -10,7 +13,7 @@ from datetime import datetime, timedelta
 def create_uuid_key():
     return str(uuid.uuid4())
 
-def convert_porto_trajectory(porto_trajectory: dict) -> UniformedTrajectoryPoint:
+def convert_porto_trajectory(porto_trajectory: dict) -> UniformedTrajectories:
     polyline = porto_trajectory["polyline"]
 
     while isinstance(polyline, str):
@@ -29,7 +32,8 @@ def convert_porto_trajectory(porto_trajectory: dict) -> UniformedTrajectoryPoint
         current_time += timedelta(seconds=15) # Stated on kaggle, each point is recorded after 15 seconds from the start, so we need to keep track of the time.
 
     return UniformedTrajectories(
-        taxi_id=porto_trajectory["taxi_id"],
+        vehicle_id=porto_trajectory["taxi_id"],
+        vehicle_type=VehicleType.CAR,
         trajectory_date=datetime.fromtimestamp(porto_trajectory["timestamp"]),
         points=points,
         city="Porto",
@@ -61,7 +65,8 @@ def convert_beijing_trajectory(beijing_trajectory: dict) -> UniformedTrajectorie
     first_datetime = datetime.strptime(beijing_points[0]["date_time"], "%Y-%m-%d %H:%M:%S")
 
     return UniformedTrajectories(
-        taxi_id=int(beijing_trajectory["taxi_id"]), 
+        vehicle_id=int(beijing_trajectory["taxi_id"]),
+        vehicle_type=VehicleType.CAR,
         trajectory_date=first_datetime, 
         city="Beijing", 
         source_id=beijing_trajectory["source_id"],

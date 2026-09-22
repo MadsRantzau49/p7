@@ -154,9 +154,9 @@ def insert_data_uniformed_trajectories(context, trajectories: list[UniformedTraj
                     "point_timestamp": point.point_timestamp.isoformat()
                 })
 
-            values.append((trajectory.taxi_id, trajectory.trajectory_date, trajectory.city, json.dumps(points), trajectory.source_id))
+            values.append((trajectory.vehicle_id, trajectory.vehicle_type, trajectory.trajectory_date, trajectory.city, json.dumps(points), trajectory.source_id))
 
-        cursor.executemany("INSERT INTO uniformed_trajectories (taxi_id, trajectory_date, city, points, source_id) VALUES (%s, %s, %s, %s, %s)", values)
+        cursor.executemany("INSERT INTO uniformed_trajectories (vehicle_id, vehicle_type, trajectory_date, city, points, source_id) VALUES (%s, %s, %s, %s, %s, %s)", values)
         
     except Exception as error:
         print(f"Failed to insert data to uniformed schema")
@@ -180,7 +180,7 @@ async def get_trajectories_from_db(context, city: str, start_date: datetime | No
             values.append(end_date)
 
         sql = f"""
-        SELECT trajectory_id, taxi_id, trajectory_date, city, points, source_id FROM uniformed_trajectories WHERE {" AND ".join(conditions)} ORDER BY trajectory_date
+        SELECT trajectory_id, vehicle_id, trajectory_date, city, points, source_id FROM uniformed_trajectories WHERE {" AND ".join(conditions)} ORDER BY trajectory_date
         """
 
         if limit is not None:
