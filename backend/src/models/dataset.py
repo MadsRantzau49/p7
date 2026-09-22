@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
-class dataset:
+@dataclass
+class DataSet:
     dataset_id: int
     name: str

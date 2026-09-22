@@ -5,6 +5,7 @@ from datetime import datetime
 from models.porto_trajectory import porto_trajectory
 from models.beijing_trajectory import beijing_trajectory
 from models.UniformedTrajectories import UniformedTrajectories
+from models.dataset import DataSet
 
 
 def get_dataset_id(context, dataset_name: str) -> int:
@@ -203,7 +204,7 @@ async def get_trajectories_from_db(context, city: str, start_date: datetime | No
     finally:
         cursor.close()
 
-async def get_trajectories_cities_from_db(context):
+async def get_trajectories_cities_from_db(context) -> list[DataSet]:
     cursor = context.cursor(dictionary=True)
 
     try:

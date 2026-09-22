@@ -3,6 +3,7 @@ from datetime import datetime
 from database.connection import create_db_connection
 from database.queries import get_trajectories_from_db, get_trajectories_cities_from_db
 from models.UniformedTrajectories import UniformedTrajectories
+from models.dataset import DataSet
 
 
 async def get_trajectories(city: str, start_date: datetime | None, end_date: datetime | None, limit: int | None) -> list[UniformedTrajectories]:
@@ -16,7 +17,7 @@ async def get_trajectories(city: str, start_date: datetime | None, end_date: dat
     finally:
         context.close()
 
-async def get_trajectories_cities():
+async def get_trajectories_cities() -> list[DataSet]:
     context = create_db_connection()
     
     try:

@@ -1,5 +1,5 @@
 export interface trajectoryPoint{
     latitude: number;
-    date_time: string;
+    point_timestamp: string;
     longitude: number;
 }
