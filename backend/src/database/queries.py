@@ -9,9 +9,9 @@ from models.dataset import DataSet
 
 
 def get_dataset_id(context, dataset_name: str) -> int:
+    cursor = context.cursor(dictionary=True)
 
     try:
-        cursor = context.cursor(dictionary=True)
 
         cursor.execute("SELECT dataset_id FROM datasets WHERE name = %s", (dataset_name,))
         result = cursor.fetchone()
@@ -141,6 +141,7 @@ def retrieve_beijing_data_batch(context, batch_size: int, last_source_id: str) -
         cursor.close()
 
 def insert_data_uniformed_trajectories(context, trajectories: list[UniformedTrajectories]) -> None:
+    vehicle_type_ids = get_vehicle_type_ids(context)
     cursor = context.cursor()
 
     try:
@@ -155,9 +156,9 @@ def insert_data_uniformed_trajectories(context, trajectories: list[UniformedTraj
                     "point_timestamp": point.point_timestamp.isoformat()
                 })
 
-            values.append((trajectory.taxi_id, trajectory.trajectory_date, trajectory.city, json.dumps(points), trajectory.source_id))
+            values.append((trajectory.vehicle_id, vehicle_type_ids[trajectory.vehicle_type], trajectory.trajectory_date, trajectory.city, json.dumps(points), trajectory.source_id))
 
-        cursor.executemany("INSERT INTO uniformed_trajectories (taxi_id, trajectory_date, city, points, source_id) VALUES (%s, %s, %s, %s, %s)", values)
+        cursor.executemany("INSERT INTO uniformed_trajectories (vehicle_id, vehicle_type_id, trajectory_date, city, points, source_id) VALUES (%s, %s, %s, %s, %s, %s)", values)
         
     except Exception as error:
         print(f"Failed to insert data to uniformed schema")
@@ -181,7 +182,7 @@ async def get_trajectories_from_db(context, city: str, start_date: datetime | No
             values.append(end_date)
 
         sql = f"""
-        SELECT trajectory_id, taxi_id, trajectory_date, city, points, source_id FROM uniformed_trajectories WHERE {" AND ".join(conditions)} ORDER BY trajectory_date
+        SELECT trajectory_id, vehicle_id, trajectory_date, city, points, source_id FROM uniformed_trajectories WHERE {" AND ".join(conditions)} ORDER BY trajectory_date
         """
 
         if limit is not None:
@@ -204,6 +205,36 @@ async def get_trajectories_from_db(context, city: str, start_date: datetime | No
     finally:
         cursor.close()
 
+def dataset_name_taken(context, name: str) -> bool:
+    cursor = context.cursor()
+
+    try:
+        cursor.execute(
+            "SELECT EXISTS(SELECT 1 FROM datasets WHERE name = %s) "
+            "OR EXISTS(SELECT 1 FROM uniformed_trajectories WHERE city = %s)",
+            (name, name),
+        )
+        (taken,) = cursor.fetchone()
+        return bool(taken)
+    except Exception as error:
+        print(f"Failed to check dataset name: {error}")
+        raise
+    finally:
+        cursor.close()
+
+def create_dataset(context, name: str) -> int:
+    cursor = context.cursor()
+
+    try:
+        cursor.execute("INSERT INTO datasets (name) VALUES (%s)", (name,))
+        return cursor.lastrowid
+
+    except Exception as error:
+        print(f"Failed to create dataset: {error}")
+        raise
+    finally:
+        cursor.close()
+
 async def get_trajectories_cities_from_db(context) -> list[DataSet]:
     cursor = context.cursor(dictionary=True)
 
@@ -217,4 +248,15 @@ async def get_trajectories_cities_from_db(context) -> list[DataSet]:
         raise
     finally:
         cursor.close()
-    
+
+def get_vehicle_type_ids(context) -> dict[str, int]:
+    cursor = context.cursor()
+
+    try:
+        cursor.execute("SELECT name, vehicle_type_id FROM vehicle_types")
+        return dict(cursor.fetchall())
+    except Exception as error:
+        print(f"Failed to retrieve vehicle types from database: {error}")
+        raise
+    finally:
+        cursor.close()
