@@ -10,9 +10,7 @@ def test_imports_template_and_generates_timestamps():
     trajectory = load_trajectory(fixture)
 
     assert trajectory.trajectory_id is None
-    assert trajectory.trajectory_date == datetime.datetime(
-        2026, 9, 21, 8, 0, tzinfo=datetime.timezone.utc
-    )
+    assert trajectory.trajectory_date == datetime.datetime(2026, 9, 21, 8, 0, tzinfo=datetime.timezone.utc)
     assert [(point.latitude, point.longitude) for point in trajectory.points] == [
         (57.0252, 9.8981),
         (57.0294, 9.9018),

@@ -1,13 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-from routers.trajectory_router import router as trajectory_router
 from routers.dataset_router import router as dataset_router
+from routers.trajectory_router import router as trajectory_router
 
-app = FastAPI(
-    title="Trajectory API",
-    version="0.0.1"
-)
+app = FastAPI(title="Trajectory API", version="0.0.1")
 
 origins = [
     "http://localhost:5173",
@@ -25,6 +21,7 @@ app.add_middleware(
 app.include_router(trajectory_router)
 app.include_router(dataset_router)
 
+
 @app.get("/")
 def root():
     return {"message": "Test"}
@@ -32,9 +29,5 @@ def root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(
-        "main:app",
-        host="127.0.0.1",
-        port=8000,
-        reload=True
-    )
+
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

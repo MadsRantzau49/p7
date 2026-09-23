@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+
 @dataclass
 class DataSet:
     dataset_id: int

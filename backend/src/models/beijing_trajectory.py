@@ -1,10 +1,12 @@
 from dataclasses import dataclass
 
+
 @dataclass
 class trajectory_point:
     date_time: str
     longitude: str
     latitude: str
+
 
 @dataclass
 class beijing_trajectory:
