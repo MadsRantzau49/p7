@@ -1,23 +1,34 @@
 import csv
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
-
-from pydantic import ValidationError
 
 from models.upload_row import UploadRow
+from pydantic import ValidationError
 
-EXPECTED_HEADER = ["trajectory_id", "vehicle_id", "vehicle_type", "timestamp", "longitude", "latitude"]
+EXPECTED_HEADER = [
+    "trajectory_id",
+    "vehicle_id",
+    "vehicle_type",
+    "timestamp",
+    "longitude",
+    "latitude",
+]
 MAX_ERRORS = 100
+
 
 @dataclass
 class UploadError:
     line: int
     message: str
 
-def parse_upload(lines: Iterable[str]) -> tuple[dict[str, list[tuple[int, UploadRow]]], list[UploadError]]:
+
+def parse_upload(
+    lines: Iterable[str],
+) -> tuple[dict[str, list[tuple[int, UploadRow]]], list[UploadError]]:
     """Read an uploaded CSV and group its valid rows into trajectories.
 
-    The first row must match EXPECTED_HEADER. All other rows are validated with UploadRow, blank lines are skipped.
+    The first row must match EXPECTED_HEADER.
+    All other rows are validated with UploadRow, blank lines are skipped.
 
     Args:
         lines: The file's text.

@@ -1,20 +1,20 @@
 from collections.abc import Iterable
 
-from mysql.connector import errorcode
-from mysql.connector.errors import IntegrityError
-
 from database.connection import create_db_connection
 from database.queries import (
     create_dataset,
     create_source_trajectories,
     dataset_name_taken,
-    insert_data_uniformed_trajectories
+    insert_data_uniformed_trajectories,
 )
 from helpers.trajectory_helpers import convert_upload_trajectory
 from helpers.upload_checks import sort_and_check_trajectories
 from helpers.upload_parser import MAX_ERRORS, UploadError, parse_upload
+from mysql.connector import errorcode
+from mysql.connector.errors import IntegrityError
 
 BATCH_SIZE = 200
+
 
 class UploadRejected(Exception):
     """The file broke the format rules. Nothing was stored"""
@@ -23,8 +23,10 @@ class UploadRejected(Exception):
         super().__init__(f"{len(errors)} problems in the uploaded file")
         self.errors = errors
 
+
 class DatasetNameTaken(Exception):
     """A dataset, or a city, already uses that name"""
+
 
 def upload_dataset(dataset_name: str, lines: Iterable[str]) -> int:
     """Validate an uploaded CSV and store it as a new dataset.
@@ -62,7 +64,7 @@ def upload_dataset(dataset_name: str, lines: Iterable[str]) -> int:
             uniformed.append(convert_upload_trajectory(rows, dataset_name))
 
         for start in range(0, len(uniformed), BATCH_SIZE):
-            batch = uniformed[start:start + BATCH_SIZE]
+            batch = uniformed[start : start + BATCH_SIZE]
 
             source_ids = []
             for trajectory in batch:

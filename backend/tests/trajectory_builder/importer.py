@@ -2,7 +2,8 @@ import datetime
 import json
 from pathlib import Path
 
-from models.UniformedTrajectories import UniformedTrajectories, UniformedTrajectoryPoint
+from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint
+from models.upload_row import VehicleType
 
 
 def load_trajectory(path: str | Path) -> UniformedTrajectories:
@@ -24,7 +25,8 @@ def load_trajectory(path: str | Path) -> UniformedTrajectories:
     ]
 
     return UniformedTrajectories(
-        taxi_id=0,
+        vehicle_id=0,
+        vehicle_type=VehicleType.UNKNOWN,
         trajectory_date=start,
         points=points,
         city="Test",

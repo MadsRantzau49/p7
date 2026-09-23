@@ -1,17 +1,20 @@
-import json, uuid, sys
+import json
+import sys
+import uuid
 from pathlib import Path
 
-from models.upload_row import VehicleType, UploadRow
+from models.upload_row import UploadRow, VehicleType
 
 sys.path.append(str(Path(__file__).parent.parent))
 
-from models.UniformedTrajectories import UniformedTrajectoryPoint, UniformedTrajectories
-from models.porto_trajectory import porto_trajectory
 from datetime import datetime, timedelta
+
+from backend.src.models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint
 
 
 def create_uuid_key():
     return str(uuid.uuid4())
+
 
 def convert_porto_trajectory(porto_trajectory: dict) -> UniformedTrajectories:
     polyline = porto_trajectory["polyline"]
@@ -19,17 +22,20 @@ def convert_porto_trajectory(porto_trajectory: dict) -> UniformedTrajectories:
     while isinstance(polyline, str):
         polyline = json.loads(polyline)
 
-    start_time = datetime.fromtimestamp(
-        int(porto_trajectory["timestamp"])
-    )
+    start_time = datetime.fromtimestamp(int(porto_trajectory["timestamp"]))
 
     current_time = start_time
     points = []
 
     for longitude, latitude in polyline:
-        points.append(UniformedTrajectoryPoint(longitude=float(longitude), latitude=float(latitude), point_timestamp=current_time))
-
-        current_time += timedelta(seconds=15) # Stated on kaggle, each point is recorded after 15 seconds from the start, so we need to keep track of the time.
+        points.append(
+            UniformedTrajectoryPoint(
+                longitude=float(longitude), latitude=float(latitude), point_timestamp=current_time
+            )
+        )
+        # Stated on kaggle, each point is recorded after 15 seconds from the start,
+        # so we need to keep track of the time.
+        current_time += timedelta(seconds=15)
 
     return UniformedTrajectories(
         vehicle_id=porto_trajectory["taxi_id"],
@@ -37,8 +43,9 @@ def convert_porto_trajectory(porto_trajectory: dict) -> UniformedTrajectories:
         trajectory_date=datetime.fromtimestamp(porto_trajectory["timestamp"]),
         points=points,
         city="Porto",
-        source_id=porto_trajectory["source_id"]
+        source_id=porto_trajectory["source_id"],
     )
+
 
 def convert_beijing_trajectory(beijing_trajectory: dict) -> UniformedTrajectories:
     beijing_points = beijing_trajectory["points"]
@@ -47,18 +54,15 @@ def convert_beijing_trajectory(beijing_trajectory: dict) -> UniformedTrajectorie
         beijing_points = json.loads(beijing_points)
 
     points = []
-    
+
     for point in beijing_points:
-        point_datetime = datetime.strptime(
-            point["date_time"],
-            "%Y-%m-%d %H:%M:%S"
-        )
+        point_datetime = datetime.strptime(point["date_time"], "%Y-%m-%d %H:%M:%S")
 
         points.append(
             UniformedTrajectoryPoint(
                 longitude=float(point["longitude"]),
                 latitude=float(point["latitude"]),
-                point_timestamp=point_datetime
+                point_timestamp=point_datetime,
             )
         )
 
@@ -67,11 +71,12 @@ def convert_beijing_trajectory(beijing_trajectory: dict) -> UniformedTrajectorie
     return UniformedTrajectories(
         vehicle_id=int(beijing_trajectory["taxi_id"]),
         vehicle_type=VehicleType.TAXI,
-        trajectory_date=first_datetime, 
-        city="Beijing", 
+        trajectory_date=first_datetime,
+        city="Beijing",
         source_id=beijing_trajectory["source_id"],
-        points=points
-        )
+        points=points,
+    )
+
 
 def convert_upload_trajectory(rows: list[tuple[int, UploadRow]], city: str) -> UniformedTrajectories:
     """Convert one uploaded trajectory into the uniform model
@@ -86,11 +91,13 @@ def convert_upload_trajectory(rows: list[tuple[int, UploadRow]], city: str) -> U
     points = []
 
     for line, row in rows:
-        points.append(UniformedTrajectoryPoint(
-            longitude=row.longitude,
-            latitude=row.latitude,
-            point_timestamp=row.timestamp,
-        ))
+        points.append(
+            UniformedTrajectoryPoint(
+                longitude=row.longitude,
+                latitude=row.latitude,
+                point_timestamp=row.timestamp,
+            )
+        )
 
     first_line, first_row = rows[0]
 

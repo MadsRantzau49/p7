@@ -5,8 +5,10 @@ from helpers.upload_parser import EXPECTED_HEADER, MAX_ERRORS, parse_upload
 
 HEADER = ",".join(EXPECTED_HEADER)
 
+
 def parse(text: str):
     return parse_upload(io.StringIO(text, newline=""))
+
 
 def test_rows_are_grouped_by_trajectory_id():
     trajectories, errors = parse(
@@ -20,6 +22,7 @@ def test_rows_are_grouped_by_trajectory_id():
     assert list(trajectories) == ["t1", "t2"]
     assert [line for line, _ in trajectories["t1"]] == [2, 4]
 
+
 def test_values_are_converted_to_real_types():
     trajectories, _ = parse(f"{HEADER}\nt1,7,CAR,2024-01-31 14:05:00,12.5,55.7\n")
     line, row = trajectories["t1"][0]
@@ -29,6 +32,7 @@ def test_values_are_converted_to_real_types():
     assert row.vehicle_type == "CAR"
     assert row.timestamp == datetime(2024, 1, 31, 14, 5)
     assert row.longitude == 12.5
+
 
 def test_wrong_header_stops_parsing():
     trajectories, errors = parse("a,b,c\nt1,7,CAR,2024-01-31 14:05:00,12.5,55.7\n")
@@ -69,7 +73,7 @@ def test_every_invalid_field_is_reported():
 
 
 def test_parsing_stops_after_the_error_limit():
-    trajectories, errors = parse(f"{HEADER}\n" + "t1,7,CAR,2024-01-31 14:05:00,12.5,95\n" * 500)
+    _, errors = parse(f"{HEADER}\n" + "t1,7,CAR,2024-01-31 14:05:00,12.5,95\n" * 500)
 
     assert len(errors) <= MAX_ERRORS + 1
     assert errors[-1].message == f"stopped after {MAX_ERRORS} errors"

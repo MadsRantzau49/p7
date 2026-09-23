@@ -1,22 +1,27 @@
-import os, sys
+import os
+import sys
 import uuid
 from pathlib import Path
+
 sys.path.append(str(Path(__file__).parent.parent))
 
-from database.connection import create_db_connection
 import database.queries
+from database.connection import create_db_connection
 from dotenv import load_dotenv
-from helpers.parsers import parse_porto_trajectories, parse_beijing_trajectories
-from helpers.trajectory_helpers import convert_porto_trajectory, convert_beijing_trajectory
-from models.porto_trajectory import porto_trajectory
+from helpers.parsers import parse_beijing_trajectories, parse_porto_trajectories
+from helpers.trajectory_helpers import (
+    convert_beijing_trajectory,
+    convert_porto_trajectory,
+)
 
 load_dotenv()
 
-def save_porto_trajectories(dataset_name: str, batch_size:int) -> None:
+
+def save_porto_trajectories(dataset_name: str, batch_size: int) -> None:
     context = create_db_connection()
 
     try:
-        dataset_id = database.queries.get_dataset_id(context,dataset_name)
+        dataset_id = database.queries.get_dataset_id(context, dataset_name)
 
         trajectories = parse_porto_trajectories(os.getenv("PORTO_DATASET_PATH"))
 
@@ -24,13 +29,12 @@ def save_porto_trajectories(dataset_name: str, batch_size:int) -> None:
 
         for start in range(0, total, batch_size):
             print("Batch started")
-            batch = trajectories[start:start + batch_size]
+            batch = trajectories[start : start + batch_size]
 
             # Generate source IDs ourselves
             for trajectory in batch:
                 trajectory.source_id = str(uuid.uuid4())
 
-            
             source_ids = []
 
             for trajectory in batch:
@@ -66,7 +70,7 @@ def save_dataset_trajectories(dataset_name: str, batch_size) -> None:
 
         for start in range(0, total, batch_size):
             print("batch started")
-            batch = trajectories[start:start + batch_size]
+            batch = trajectories[start : start + batch_size]
 
             for trajectory in batch:
                 trajectory.source_id = str(uuid.uuid4())
@@ -82,7 +86,6 @@ def save_dataset_trajectories(dataset_name: str, batch_size) -> None:
 
             context.commit()
             print("Batch ended")
-            
 
     except Exception as error:
         context.rollback()
@@ -100,7 +103,7 @@ def create_uniformed_data_structure(batch_size: int):
     beijing_total = 0
 
     try:
-        #Porto
+        # Porto
         last_source_id = None
 
         while True:
@@ -127,7 +130,6 @@ def create_uniformed_data_structure(batch_size: int):
 
         # Beijing
         while True:
-
             beijing_data = database.queries.retrieve_beijing_data_batch(context, batch_size, last_source_id)
 
             if not beijing_data:
