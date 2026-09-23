@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Trajectory Builder</title>
+
+    <!-- Leaflet CSS -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+
+  <body>
+    <main class="tool">
+      <section class="controls">
+        <h1>Trajectory builder</h1>
+
+        <p>
+          Click the map in travel order, then export the route as a test
+          fixture.
+        </p>
+
+        <label for="trajectory-name">Route name</label>
+        <input
+          id="trajectory-name"
+          type="text"
+          value="path_south_aalborg"
+          pattern="[a-z0-9_-]+"
+          title="Use lowercase letters, numbers, underscores, or hyphens"
+          required
+        />
+
+        <label for="start-timestamp">Start time</label>
+        <input
+          id="start-timestamp"
+          type="datetime-local"
+          step="1"
+          required
+        />
+
+        <label for="point-interval">Point interval in seconds</label>
+        <input
+          id="point-interval"
+          type="number"
+          min="0.001"
+          step="0.001"
+          value="15"
+          required
+        />
+
+        <p class="count">
+          <strong id="point-count">0</strong> route points
+        </p>
+
+        <ol id="point-list">
+          <li>No points yet.</li>
+        </ol>
+
+        <div class="buttons">
+          <button id="undo-button" type="button" disabled>
+            Undo
+          </button>
+
+          <button id="clear-button" type="button" disabled>
+            Clear
+          </button>
+
+          <button
+            id="export-button"
+            class="primary"
+            type="button"
+            disabled
+          >
+            Export JSON
+          </button>
+        </div>
+
+        <small id="status"></small>
+      </section>
+
+      <section class="map-panel">
+        <div id="map"></div>
+      </section>
+    </main>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script src="app.js"></script>
+  </body>
+</html>

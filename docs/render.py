@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-
 import os
 import subprocess
 import sys
 from pathlib import Path
-
 
 IMAGE = "ghcr.io/mermaid-js/mermaid-cli/mermaid-cli:11.17.0"
 

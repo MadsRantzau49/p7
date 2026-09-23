@@ -129,6 +129,8 @@ yarn-error.log*
 
 data/
 !data/.gitkeep
+!backend/tests/data/
+!backend/tests/data/**
 *.parquet
 *.feather
 *.pkl

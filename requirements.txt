@@ -2,7 +2,8 @@ fastapi
 uvicorn
 mysql-connector-python
 python-dotenv
+pytest
+ruff
 pydantic
 python-multipart
-pytest
 haversine

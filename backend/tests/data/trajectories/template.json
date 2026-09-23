@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "name": "template",
+  "start_timestamp": "2026-09-21T08:00:00Z",
+  "interval_seconds": 15,
+  "points": [
+    { "latitude": 57.0252, "longitude": 9.8981 },
+    { "latitude": 57.0294, "longitude": 9.9018 },
+    { "latitude": 57.0337, "longitude": 9.9062 },
+    { "latitude": 57.0381, "longitude": 9.9116 },
+    { "latitude": 57.0426, "longitude": 9.9174 }
+  ]
+}
