@@ -1,16 +1,13 @@
-import math
+from haversine import haversine, Unit
 
 from helpers.upload_parser import MAX_ERRORS, UploadError
 from models.upload_row import UploadRow
 
 MAX_SPEED_KMH = 300
-EARTH_RADIUS_KM = 6371.0
 
 def distance_km(a: UploadRow, b: UploadRow) -> float:
-    """Great-circle distance between two points, using the haversine formula"""
-    lat1, lon1, lat2, lon2 = map(math.radians, (a.latitude, a.longitude, b.latitude, b.longitude))
-    h = math.sin((lat2 - lat1) / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2
-    return 2 * EARTH_RADIUS_KM * math.asin(math.sqrt(h))
+    """Great-circle distance between two points, using the haversine library"""
+    return haversine((a.latitude, a.longitude), (b.latitude, b.longitude), unit=Unit.KILOMETERS)
 
 def sort_and_check_trajectories(trajectories: dict[str, list[tuple[int, UploadRow]]]) -> list[UploadError]:
     """Check that trajectories are in line with the rules set, e.g. MAX_SPEED_KMH

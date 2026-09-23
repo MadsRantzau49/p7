@@ -33,7 +33,7 @@ def convert_porto_trajectory(porto_trajectory: dict) -> UniformedTrajectories:
 
     return UniformedTrajectories(
         vehicle_id=porto_trajectory["taxi_id"],
-        vehicle_type=VehicleType.CAR,
+        vehicle_type=VehicleType.TAXI,
         trajectory_date=datetime.fromtimestamp(porto_trajectory["timestamp"]),
         points=points,
         city="Porto",
@@ -66,7 +66,7 @@ def convert_beijing_trajectory(beijing_trajectory: dict) -> UniformedTrajectorie
 
     return UniformedTrajectories(
         vehicle_id=int(beijing_trajectory["taxi_id"]),
-        vehicle_type=VehicleType.CAR,
+        vehicle_type=VehicleType.TAXI,
         trajectory_date=first_datetime, 
         city="Beijing", 
         source_id=beijing_trajectory["source_id"],

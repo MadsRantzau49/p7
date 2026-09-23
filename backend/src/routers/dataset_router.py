@@ -23,7 +23,8 @@ def upload_dataset_endpoint(
     try:
         dataset_id = upload_dataset(name.strip(), lines)
     except UploadRejected as error:
-        raise HTTPException(status_code=422, detail=[asdict(item) for item in error.errors]) from error
+        errors = [{"line": item.line, "message": item.message} for item in error.errors]
+        raise HTTPException(status_code=422, detail=errors) from error
     except DatasetNameTaken as error:
         raise HTTPException(status_code=409, detail=f"a dataset or city named '{name}' already exists") from error
     except UnicodeDecodeError as error:

@@ -9,6 +9,7 @@ TIMESTAMP_FORMAT = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}:
 
 class VehicleType(StrEnum):
     CAR = "CAR"
+    TAXI = "TAXI"
     UNKNOWN = "UNKNOWN"
 
 def check_timestamp_format(value):
