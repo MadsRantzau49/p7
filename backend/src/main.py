@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from routers.trajectory_router import router as trajectory_router
-
+from routers.dataset_router import router as dataset_router
 
 app = FastAPI(
     title="Trajectory API",
@@ -23,6 +23,7 @@ app.add_middleware(
 )
 
 app.include_router(trajectory_router)
+app.include_router(dataset_router)
 
 @app.get("/")
 def root():

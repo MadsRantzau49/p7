@@ -1,6 +1,7 @@
-import datetime
+from datetime import datetime
 from dataclasses import dataclass
 
+from models.upload_row import VehicleType
 
 @dataclass
 class UniformedTrajectoryPoint:
@@ -8,13 +9,15 @@ class UniformedTrajectoryPoint:
     point_timestamp: datetime
     latitude: float
 
-
-@dataclass 
+@dataclass
 class UniformedTrajectories:  
-    taxi_id: int
+    vehicle_id: int
+    vehicle_type: VehicleType
     trajectory_date: datetime
     points: list[UniformedTrajectoryPoint]
 
     trajectory_id: int | None = None
     city: str | None = None
     source_id: str | None = None
+    
+

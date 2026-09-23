@@ -1,0 +1,381 @@
+body {
+  margin: 0;
+}
+
+#root {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.trajectory-page,
+.trajectory-page * {
+  box-sizing: border-box;
+}
+
+.trajectory-page {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  min-height: 100vh;
+  background: #f5f7fb;
+  color: #182333;
+  font-family: Inter, system-ui, sans-serif;
+  color-scheme: light;
+}
+
+.trajectory-sidebar {
+  padding: 32px 24px;
+  background: #fff;
+  border-right: 1px solid #e1e7ef;
+}
+
+.trajectory-eyebrow {
+  margin: 0 0 12px;
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.trajectory-sidebar h1 {
+  margin: 0;
+  font-size: 25px;
+  line-height: 1.3;
+}
+
+.trajectory-description {
+  margin: 12px 0 28px;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.trajectory-sidebar fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.trajectory-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.trajectory-field label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.trajectory-field input,
+.trajectory-field select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #182333;
+  font: inherit;
+  font-size: 14px;
+}
+
+.trajectory-field input:focus-visible,
+.trajectory-field select:focus-visible,
+.trajectory-submit:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+.trajectory-field small {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.trajectory-submit {
+  width: 100%;
+  min-height: 44px;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.trajectory-submit:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.trajectory-page :disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.trajectory-error {
+  padding: 12px;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.trajectory-content {
+  min-width: 0;
+  padding: 32px;
+}
+
+.trajectory-results-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.trajectory-results-header h2 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.trajectory-results-header span {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.trajectory-empty {
+  padding: 64px 24px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  color: #64748b;
+  text-align: center;
+}
+
+.trajectory-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.trajectory-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px;
+  border: 1px solid #e1e7ef;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.trajectory-list p {
+  margin: 5px 0 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.trajectory-list span {
+  color: #64748b;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 700px) {
+  .trajectory-page {
+    grid-template-columns: 1fr;
+  }
+
+  .trajectory-sidebar {
+    border-right: 0;
+    border-bottom: 1px solid #e1e7ef;
+  }
+
+  .trajectory-content {
+    padding: 24px 16px;
+  }
+}
+
+.trajectory-page {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.trajectory-map-panel {
+  min-width: 0;
+  height: 100vh;
+}
+
+.trajectory-map {
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
+}
+
+@media (max-width: 700px) {
+  .trajectory-page {
+    grid-template-columns: 1fr;
+  }
+
+  .trajectory-map-panel {
+    height: 65vh;
+    min-height: 500px;
+  }
+}
+
+.trajectory-workspace {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100vh;
+}
+
+/* Override the previous map height so the bar fits below it. */
+.trajectory-workspace .trajectory-map-panel {
+  flex: 1;
+  min-height: 250px;
+  height: auto;
+}
+
+.trajectory-workspace .trajectory-map-wrapper,
+.trajectory-workspace .trajectory-map {
+  min-height: 0;
+  height: 100%;
+}
+
+.trajectory-bottom-bar {
+  flex-shrink: 0;
+  padding: 12px 16px;
+  border-top: 1px solid #e1e7ef;
+  background: #fff;
+}
+
+.trajectory-list-toggle {
+  padding: 10px 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #182333;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.trajectory-list-toggle:hover {
+  background: #e2e8f0;
+}
+
+.trajectory-list-toggle:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+.trajectory-list-panel {
+  max-height: 30vh;
+  margin-top: 12px;
+  overflow: auto;
+}
+
+.trajectory-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+}
+
+.trajectory-table-caption {
+  padding: 0 0 10px;
+  text-align: left;
+  font-weight: 600;
+}
+
+.trajectory-table th,
+.trajectory-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.trajectory-table th {
+  position: sticky;
+  top: 0;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.trajectory-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+@media (max-width: 700px) {
+  .trajectory-workspace {
+    height: 80vh;
+    min-height: 500px;
+  }
+}
+
+.trajectory-table tbody tr {
+  cursor: pointer;
+}
+
+.trajectory-table tbody tr.trajectory-row-selected {
+  background: #dbeafe;
+}
+
+.trajectory-select-button {
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #1d4ed8;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.trajectory-select-button:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+.trajectory-list-toggle + .trajectory-list-toggle {
+  margin-left: 8px;
+}
+
+.trajectory-points-button {
+  margin-left: 12px;
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #1d4ed8;
+  font: inherit;
+  cursor: pointer;
+}
+
+.trajectory-points-button:hover {
+  background: #eff6ff;
+}
+
+.trajectory-points-button[aria-pressed="true"] {
+  border-color: #2563eb;
+  background: #dbeafe;
+}
+
+.trajectory-points-button:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
+}
