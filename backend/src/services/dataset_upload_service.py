@@ -11,7 +11,7 @@ from database.queries import (
     insert_data_uniformed_trajectories
 )
 from helpers.trajectory_helpers import convert_upload_trajectory
-# from helpers.upload_checks import sort_and_check_trajectories
+from helpers.upload_checks import sort_and_check_trajectories
 from helpers.upload_parser import MAX_ERRORS, UploadError, parse_upload
 
 BATCH_SIZE = 200
@@ -41,7 +41,7 @@ def upload_dataset(dataset_name: str, lines: Iterable[str]) -> int:
         DatasetNameTaken: The name is already in use. Nothing was written.
     """
     trajectories, errors = parse_upload(lines)
-    # errors += sort_and_check_trajectories(trajectories)
+    errors += sort_and_check_trajectories(trajectories)
 
     if not errors and not trajectories:
         errors.append(UploadError(1, "the file has a header but no data rows"))

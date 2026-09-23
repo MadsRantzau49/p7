@@ -1,6 +1,8 @@
 import io
 
-from helpers.upload_checks import MAX_SPEED_KMH, sort_and_check_trajectories
+import pytest
+
+from helpers.upload_checks import sort_and_check_trajectories, speed_kmh
 from helpers.upload_parser import EXPECTED_HEADER, parse_upload
 
 HEADER = ",".join(EXPECTED_HEADER)
@@ -59,23 +61,34 @@ def test_two_points_may_not_share_a_timestamp():
     assert "same timestamp as line 2" in errors[0].message
 
 
-def test_moving_too_fast_is_rejected():
+def test_moving_too_fast_is_accepted():
     trajectories, errors = check(
         f"t1,7,CAR,2024-01-31 14:00:00,{COPENHAGEN}\n"
         f"t1,7,CAR,2024-01-31 14:10:00,{AARHUS}\n"
     )
 
-    assert len(errors) == 1
-    assert f"max is {MAX_SPEED_KMH}" in errors[0].message
+    assert errors == []
 
 
-def test_the_same_journey_at_a_realistic_speed_is_accepted():
+def test_speed_is_distance_divided_by_time():
     trajectories, errors = check(
         f"t1,7,CAR,2024-01-31 14:00:00,{COPENHAGEN}\n"
         f"t1,7,CAR,2024-01-31 16:00:00,{AARHUS}\n"
     )
+    (_, copenhagen), (_, aarhus) = trajectories["t1"]
 
-    assert errors == []
+    assert speed_kmh(copenhagen, aarhus) == pytest.approx(157 / 2, abs=1)
+
+
+def test_speed_with_the_same_timestamp_raises():
+    trajectories, errors = check(
+        "t1,7,CAR,2024-01-31 14:00:00,12.5,55.7\n"
+        "t1,7,CAR,2024-01-31 14:00:00,12.6,55.7\n"
+    )
+    (_, first), (_, second) = trajectories["t1"]
+
+    with pytest.raises(ZeroDivisionError):
+        speed_kmh(first, second)
 
 
 def test_each_trajectory_is_checked_on_its_own():

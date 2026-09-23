@@ -9,6 +9,16 @@ def distance_km(a: UploadRow, b: UploadRow) -> float:
     """Great-circle distance between two points, using the haversine library"""
     return haversine((a.latitude, a.longitude), (b.latitude, b.longitude), unit=Unit.KILOMETERS)
 
+def speed_kmh(a: UploadRow, b: UploadRow) -> float:
+    """Average speed in km/h from point a to point b
+
+    Raises:
+        ZeroDivisionError: a and b have the same timestamp
+    """
+    seconds = (b.timestamp - a.timestamp).total_seconds()
+    hours = seconds / 3600
+    return distance_km(a, b) / hours
+
 def sort_and_check_trajectories(trajectories: dict[str, list[tuple[int, UploadRow]]]) -> list[UploadError]:
     """Check that trajectories are in line with the rules set, e.g. MAX_SPEED_KMH
 
@@ -40,7 +50,6 @@ def sort_and_check_one_trajectory(rows: list[tuple[int, UploadRow]]) -> list[Upl
         - at least 2 points
         - the same vehicle_id and vehicle_type on every point
         - no points have the same exact timestamp
-        - no movement faster than MAX_SPEED_KMH between two points in a row
 
     Args:
         rows: The trajectory's points, as (line number, row) pairs.
@@ -73,13 +82,6 @@ def sort_and_check_one_trajectory(rows: list[tuple[int, UploadRow]]) -> list[Upl
         if seconds == 0:
             errors.append(UploadError(line, f"same timestamp as line {previous_line} in trajectory {trajectory_id}"))
             continue
-
-        hours = seconds / 3600
-        speed = distance_km(previous_row, row) / hours
-
-        if speed > MAX_SPEED_KMH:
-            errors.append(UploadError(line, f"moving {speed:.0f} km/h since line {previous_line}, "
-                                            f"max is {MAX_SPEED_KMH}"))
 
     return errors
 
