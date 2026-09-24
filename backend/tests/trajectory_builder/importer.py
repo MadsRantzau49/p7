@@ -7,6 +7,7 @@ from models.upload_row import VehicleType
 
 
 def load_trajectory(path: str | Path) -> UniformedTrajectories:
+    """Load a trajectory fixture and generate timestamps for its points."""
     with Path(path).open(encoding="utf-8") as fixture_file:
         data = json.load(fixture_file)
 

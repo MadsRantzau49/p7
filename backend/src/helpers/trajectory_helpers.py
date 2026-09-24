@@ -13,10 +13,12 @@ from backend.src.models.uniformed_trajectories import UniformedTrajectories, Uni
 
 
 def create_uuid_key():
+    """Create key"""
     return str(uuid.uuid4())
 
 
 def convert_porto_trajectory(porto_trajectory: dict) -> UniformedTrajectories:
+    """Convert a Porto trajectory to the uniform trajectory format."""
     polyline = porto_trajectory["polyline"]
 
     while isinstance(polyline, str):
@@ -48,6 +50,7 @@ def convert_porto_trajectory(porto_trajectory: dict) -> UniformedTrajectories:
 
 
 def convert_beijing_trajectory(beijing_trajectory: dict) -> UniformedTrajectories:
+    """Convert a Beijing trajectory to the uniform trajectory format."""
     beijing_points = beijing_trajectory["points"]
 
     while isinstance(beijing_points, str):
@@ -90,7 +93,7 @@ def convert_upload_trajectory(rows: list[tuple[int, UploadRow]], city: str) -> U
     """
     points = []
 
-    for line, row in rows:
+    for _line, row in rows:
         points.append(
             UniformedTrajectoryPoint(
                 longitude=row.longitude,

@@ -11,4 +11,14 @@ line-length = 110
 target-version = "py310"
 
 [tool.ruff.lint]
-select = ["E", "F", "I"]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # Pyflakes
+    "I",    # import sorting
+    "UP",   # modern Python syntax
+    "B",    # common bugs / bad practices
+    "N",    # Python naming conventions
+    "D102", # public methods require docstrings
+    "D103", # public functions require docstrings
+]

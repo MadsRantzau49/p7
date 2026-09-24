@@ -24,6 +24,7 @@ app.include_router(dataset_router)
 
 @app.get("/")
 def root():
+    """Simple endpoint"""
     return {"message": "Test"}
 
 

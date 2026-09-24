@@ -16,7 +16,7 @@ from mysql.connector.errors import IntegrityError
 BATCH_SIZE = 200
 
 
-class UploadRejected(Exception):
+class UploadRejectedError(Exception):
     """The file broke the format rules. Nothing was stored"""
 
     def __init__(self, errors: list[UploadError]):
@@ -24,7 +24,7 @@ class UploadRejected(Exception):
         self.errors = errors
 
 
-class DatasetNameTaken(Exception):
+class DatasetNameTakenError(Exception):
     """A dataset, or a city, already uses that name"""
 
 
@@ -39,8 +39,8 @@ def upload_dataset(dataset_name: str, lines: Iterable[str]) -> int:
         The new dataset_id
 
     Raises:
-        UploadRejected: The file broke a rule. Nothing was written.
-        DatasetNameTaken: The name is already in use. Nothing was written.
+        UploadRejectedError: The file broke a rule. Nothing was written.
+        DatasetNameTakenError: The name is already in use. Nothing was written.
     """
     trajectories, errors = parse_upload(lines)
     errors += sort_and_check_trajectories(trajectories)
@@ -49,13 +49,13 @@ def upload_dataset(dataset_name: str, lines: Iterable[str]) -> int:
         errors.append(UploadError(1, "the file has a header but no data rows"))
 
     if errors:
-        raise UploadRejected(errors[:MAX_ERRORS])
+        raise UploadRejectedError(errors[:MAX_ERRORS])
 
     context = create_db_connection()
 
     try:
         if dataset_name_taken(context, dataset_name):
-            raise DatasetNameTaken(dataset_name)
+            raise DatasetNameTakenError(dataset_name)
 
         dataset_id = create_dataset(context, dataset_name)
 
@@ -79,7 +79,7 @@ def upload_dataset(dataset_name: str, lines: Iterable[str]) -> int:
     except IntegrityError as error:
         context.rollback()
         if error.errno == errorcode.ER_DUP_ENTRY:
-            raise DatasetNameTaken(dataset_name) from error
+            raise DatasetNameTakenError(dataset_name) from error
         raise
 
     except Exception:

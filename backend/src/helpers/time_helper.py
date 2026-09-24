@@ -4,6 +4,7 @@ TIMESTAMP_FORMAT = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}:
 
 
 def check_timestamp_format(value):
+    """Check that the timestamp uses the expected format."""
     if isinstance(value, str):
         value = value.strip()
         if not TIMESTAMP_FORMAT.fullmatch(value):

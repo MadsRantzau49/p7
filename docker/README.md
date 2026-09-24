@@ -18,8 +18,6 @@ Start only the API and its database:
 docker compose -f docker/compose.yml up --build -d api
 ```
 
-Open <http://localhost:5173> for the trajectory builder or <http://localhost:8000/docs> for the API.
-
 Stop everything:
 
 ```bash
