@@ -15,6 +15,7 @@ VALID_FORMATS = {"all", "svg", "pdf", "png"}
 
 
 def render(source: Path, output_format: str) -> None:
+    """Render a Mermaid diagram to the selected output format."""
     output = RENDERED_DIR / f"{source.stem}.{output_format}"
 
     command = [
@@ -44,6 +45,7 @@ def render(source: Path, output_format: str) -> None:
 
 
 def main() -> None:
+    """Render all Mermaid diagrams in the selected output format."""
     output_format = sys.argv[1] if len(sys.argv) > 1 else "all"
 
     if output_format not in VALID_FORMATS:

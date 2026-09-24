@@ -65,7 +65,7 @@ def parse_upload(
             continue
 
         try:
-            row = UploadRow(**dict(zip(EXPECTED_HEADER, values)))
+            row = UploadRow(**dict(zip(EXPECTED_HEADER, values, strict=True)))
         except ValidationError as error:
             for detail in error.errors():
                 field = detail["loc"][0]

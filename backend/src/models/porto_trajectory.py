@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 
 @dataclass
-class porto_trajectory:
+class PortoTrajectory:
     trip_id: int
     call_type: str | None
     origin_call: str | None

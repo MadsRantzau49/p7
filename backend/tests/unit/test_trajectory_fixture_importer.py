@@ -5,6 +5,7 @@ from trajectory_builder.importer import load_trajectory
 
 
 def test_imports_template_and_generates_timestamps():
+    """Check that the template is imported and timestamps are generated correctly."""
     fixture = Path(__file__).parent.parent / "data" / "trajectories" / "template.json"
 
     trajectory = load_trajectory(fixture)

@@ -21,4 +21,5 @@ database_pool_cfg = pooling.MySQLConnectionPool(
 
 
 def create_db_connection() -> pooling:
+    """Create and return a database connection."""
     return database_pool_cfg.get_connection()

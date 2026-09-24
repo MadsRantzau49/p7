@@ -40,7 +40,7 @@ def sort_and_check_trajectories(
     """
     errors: list[UploadError] = []
 
-    for trajectory_id, rows in trajectories.items():
+    for _trajectory_id, rows in trajectories.items():
         errors += sort_and_check_one_trajectory(rows)
 
         if len(errors) >= MAX_ERRORS:
@@ -102,5 +102,6 @@ def sort_and_check_one_trajectory(rows: list[tuple[int, UploadRow]]) -> list[Upl
 
 
 def get_timestamp(pair: tuple[int, UploadRow]):
+    """Return the timestamp from a trajectory row."""
     line, row = pair
     return row.timestamp

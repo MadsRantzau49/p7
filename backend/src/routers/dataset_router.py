@@ -3,8 +3,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from services.dataset_upload_service import (
-    DatasetNameTaken,
-    UploadRejected,
+    DatasetNameTakenError,
+    UploadRejectedError,
     upload_dataset,
 )
 
@@ -17,6 +17,7 @@ MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 def upload_dataset_endpoint(
     name: Annotated[str, Form(min_length=1, max_length=50)], file: Annotated[UploadFile, File()]
 ):
+    """Upload and save a trajectory dataset."""
     if file.size is not None and file.size > MAX_UPLOAD_BYTES:
         raise HTTPException(
             status_code=413, detail=f"file is larger than {MAX_UPLOAD_BYTES // (1024 * 1024)} MB"
@@ -26,10 +27,10 @@ def upload_dataset_endpoint(
 
     try:
         dataset_id = upload_dataset(name.strip(), lines)
-    except UploadRejected as error:
+    except UploadRejectedError as error:
         errors = [{"line": item.line, "message": item.message} for item in error.errors]
         raise HTTPException(status_code=422, detail=errors) from error
-    except DatasetNameTaken as error:
+    except DatasetNameTakenError as error:
         raise HTTPException(
             status_code=409, detail=f"a dataset or city named '{name}' already exists"
         ) from error

@@ -18,6 +18,7 @@ load_dotenv()
 
 
 def save_porto_trajectories(dataset_name: str, batch_size: int) -> None:
+    """Save Porto trajectories to the database in batches."""
     context = create_db_connection()
 
     try:
@@ -59,6 +60,7 @@ def save_porto_trajectories(dataset_name: str, batch_size: int) -> None:
 
 
 def save_dataset_trajectories(dataset_name: str, batch_size) -> None:
+    """Save trajectory data to the database in batches."""
     context = create_db_connection()
     source_ids = []
     try:
@@ -97,6 +99,7 @@ def save_dataset_trajectories(dataset_name: str, batch_size) -> None:
 
 
 def create_uniformed_data_structure(batch_size: int):
+    """Convert Porto and Beijing data into the uniform trajectory format."""
     context = create_db_connection()
 
     porto_total = 0

@@ -2,14 +2,14 @@ from dataclasses import dataclass
 
 
 @dataclass
-class trajectory_point:
+class TrajectoryPoint:
     date_time: str
     longitude: str
     latitude: str
 
 
 @dataclass
-class beijing_trajectory:
+class BeijingTrajectory:
     taxi_id: int
-    points: list[trajectory_point]
+    points: list[TrajectoryPoint]
     source_id: int | None = None

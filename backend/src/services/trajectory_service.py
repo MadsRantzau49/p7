@@ -10,6 +10,7 @@ from backend.src.models.uniformed_trajectories import UniformedTrajectories
 async def get_trajectories(
     city: str, start_date: datetime | None, end_date: datetime | None, limit: int | None
 ) -> list[UniformedTrajectories]:
+    """Fetch trajectories from the database using the given filters."""
     context = create_db_connection()
 
     try:
@@ -26,6 +27,7 @@ async def get_trajectories(
 
 
 async def get_trajectories_cities() -> list[DataSet]:
+    """Fetch the available trajectory cities from the database."""
     context = create_db_connection()
 
     try:
