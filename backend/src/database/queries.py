@@ -4,8 +4,7 @@ from datetime import datetime
 from models.beijing_trajectory import BeijingTrajectory
 from models.dataset import DataSet
 from models.porto_trajectory import PortoTrajectory
-
-from backend.src.models.uniformed_trajectories import UniformedTrajectories
+from models.uniformed_trajectories import UniformedTrajectories
 
 
 def get_dataset_id(context, dataset_name: str) -> int:
@@ -144,7 +143,7 @@ def retrieve_porto_dataset_batch(context, batch_size: int, last_source_id: str |
         cursor.close()
 
 
-def retrieve_beijing_data_batch(context, batch_size: int, last_source_id: str) -> dict:
+def retrieve_beijing_data_batch(context, batch_size: int, last_source_id: str | None) -> dict:
     """Fetch a batch of Beijing trajectories from the database."""
     cursor = context.cursor(dictionary=True)
 
@@ -220,7 +219,7 @@ async def get_trajectories_from_db(
 
     try:
         conditions = ["city = %s"]
-        values = [city]
+        values: list[str | datetime | int] = [city]
 
         if start_date is not None:
             conditions.append("trajectory_date >= %s")
@@ -231,11 +230,14 @@ async def get_trajectories_from_db(
             values.append(end_date)
 
         sql = f"""
-        SELECT trajectory_id, vehicle_id, trajectory_date, city, points, source_id
-        FROM uniformed_trajectories
-        WHERE {" AND ".join(conditions)}
-        ORDER BY trajectory_date
-        """
+            SELECT t.trajectory_id, t.vehicle_id, vt.name AS vehicle_type,
+            t.trajectory_date, t.city, t.points, t.source_id
+            FROM uniformed_trajectories AS t
+            LEFT JOIN vehicle_types AS vt
+                ON t.vehicle_type_id = vt.vehicle_type_id
+            WHERE {" AND ".join(conditions)}
+            ORDER BY t.trajectory_date, t.trajectory_id
+            """
 
         if limit is not None:
             sql += " LIMIT %s"

@@ -1,4 +1,5 @@
 import csv
+import json
 import sys
 from pathlib import Path
 
@@ -20,12 +21,12 @@ def parse_beijing_trajectories(file_path: str):
     dataset_folder = Path(file_path)
     trajectories = []
 
-    for file_path in dataset_folder.iterdir():
+    for trajectory_file in dataset_folder.iterdir():
         trajectory_points = []
         previous_time = None
         taxi_id = None
 
-        with open(file_path, encoding="utf-8") as file:
+        with open(trajectory_file, encoding="utf-8") as file:
             for line in file:
                 values = line.strip().split(",")
 
@@ -33,9 +34,7 @@ def parse_beijing_trajectories(file_path: str):
 
                 current_time = datetime.strptime(values[1], "%Y-%m-%d %H:%M:%S")
 
-                point = TrajectoryPoint(
-                    date_time=values[1], longitude=float(values[2]), latitude=float(values[3])
-                )
+                point = TrajectoryPoint(date_time=values[1], longitude=values[2], latitude=values[3])
 
                 if previous_time is not None:
                     date_changed = current_time.date() != previous_time.date()
@@ -54,6 +53,8 @@ def parse_beijing_trajectories(file_path: str):
                 previous_time = current_time
 
         if trajectory_points:
+            if taxi_id is None:
+                raise ValueError("Taxi ID is missing")
             trajectory = BeijingTrajectory(taxi_id=taxi_id, points=trajectory_points)
 
             trajectories.append(trajectory)
@@ -70,17 +71,15 @@ def parse_porto_trajectories(file_path: str) -> list[PortoTrajectory]:
 
         for row in reader:
             trajectory = PortoTrajectory(
-                trip_id=row["TRIP_ID"],
+                trip_id=int(row["TRIP_ID"]),
                 call_type=row["CALL_TYPE"] or None,
                 origin_call=row["ORIGIN_CALL"] or None,
                 origin_stand=row["ORIGIN_STAND"] or None,
-                taxi_id=row["TAXI_ID"],
-                timestamp=row[
-                    "TIMESTAMP"
-                ],  # Important that this is translated to datetime instead of timestamp
+                taxi_id=int(row["TAXI_ID"]),
+                timestamp=int(row["TIMESTAMP"]),
                 day_type=row["DAY_TYPE"] or None,
-                missing_data=row["MISSING_DATA"],
-                polyline=row["POLYLINE"],
+                missing_data=row["MISSING_DATA"].strip().lower() == "true",
+                polyline=json.loads(row["POLYLINE"]),
             )
 
             trajectories.append(trajectory)
