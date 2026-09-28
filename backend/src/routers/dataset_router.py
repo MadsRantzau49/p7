@@ -2,9 +2,9 @@ import io
 from typing import Annotated
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from helpers.trajectory_csv_parser import InvalidTrajectoryCsvError
 from services.dataset_upload_service import (
     DatasetNameTakenError,
-    UploadRejectedError,
     upload_dataset,
 )
 
@@ -27,7 +27,7 @@ def upload_dataset_endpoint(
 
     try:
         dataset_id = upload_dataset(name.strip(), lines)
-    except UploadRejectedError as error:
+    except InvalidTrajectoryCsvError as error:
         errors = [{"line": item.line, "message": item.message} for item in error.errors]
         raise HTTPException(status_code=422, detail=errors) from error
     except DatasetNameTakenError as error:

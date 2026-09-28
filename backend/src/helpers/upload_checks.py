@@ -90,6 +90,22 @@ def sort_and_check_one_trajectory(rows: list[tuple[int, UploadRow]]) -> list[Upl
                 )
             )
 
+        if (
+            row.city,
+            row.source_id,
+            row.database_trajectory_id,
+        ) != (
+            first_row.city,
+            first_row.source_id,
+            first_row.database_trajectory_id,
+        ):
+            errors.append(
+                UploadError(
+                    line,
+                    f"trajectory {trajectory_id} has different optional metadata than line {first_line}",
+                )
+            )
+
         seconds = (row.timestamp - previous_row.timestamp).total_seconds()
 
         if seconds == 0:
