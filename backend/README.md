@@ -33,14 +33,14 @@ You can also try it in the browser at http://localhost:8000/docs.
 
 ### File format
 
-The first line must be exactly this header:
+The first line must be exactly this header. Every column must be present, even when a nullable value is empty:
 
 ```csv
-trajectory_id,vehicle_id,vehicle_type,timestamp,longitude,latitude
-t1,7,CAR,2024-01-31 14:05:00,12.5683,55.6761
-t1,7,CAR,2024-01-31 14:05:30,12.5701,55.6770
-t2,8,TAXI,2024-01-31T09:00:00,12.4500,55.6100
-t2,8,TAXI,2024-01-31T09:00:15,12.4512,55.6108
+trajectory_id,vehicle_id,vehicle_type,timestamp,longitude,latitude,city,source_id,database_trajectory_id
+t1,7,CAR,2024-01-31 14:05:00,12.5683,55.6761,Copenhagen,fixture-source,42
+t1,7,CAR,2024-01-31 14:05:30,12.5701,55.6770,Copenhagen,fixture-source,42
+t2,8,TAXI,2024-01-31T09:00:00,12.4500,55.6100,Aarhus,,
+t2,8,TAXI,2024-01-31T09:00:15,12.4512,55.6108,Aarhus,,
 ```
 
 Each row is one GPS point. All rows with the same `trajectory_id` form one trajectory.
@@ -53,6 +53,9 @@ Each row is one GPS point. All rows with the same `trajectory_id` form one traje
 | `timestamp` | `YYYY-MM-DD HH:MM:SS` or `YYYY-MM-DDTHH:MM:SS`, local time where the point was recorded. No time zone. |
 | `longitude` | −180 to 180. |
 | `latitude` | −90 to 90. |
+| `city` | Optional text. Must be the same on every row in a trajectory. |
+| `source_id` | Optional text. Must be the same on every row in a trajectory. |
+| `database_trajectory_id` | Optional non-negative whole number corresponding to `UniformedTrajectories.trajectory_id`. Must be the same on every row in a trajectory. |
 
 Each trajectory must:
 - have at least 2 points

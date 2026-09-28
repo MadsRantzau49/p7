@@ -1,0 +1,6 @@
+trajectory_id,vehicle_id,vehicle_type,timestamp,longitude,latitude,city,source_id,database_trajectory_id
+template,0,UNKNOWN,2026-09-21 08:00:00,9.8981,57.0252,Test,,
+template,0,UNKNOWN,2026-09-21 08:00:15,9.9018,57.0294,Test,,
+template,0,UNKNOWN,2026-09-21 08:00:30,9.9062,57.0337,Test,,
+template,0,UNKNOWN,2026-09-21 08:00:45,9.9116,57.0381,Test,,
+template,0,UNKNOWN,2026-09-21 08:01:00,9.9174,57.0426,Test,,
