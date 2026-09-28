@@ -22,3 +22,6 @@ select = [
     "D102", # public methods require docstrings
     "D103", # public functions require docstrings
 ]
+
+[tool.pyright]
+extraPaths = ["backend/src", "backend/tests"]

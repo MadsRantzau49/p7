@@ -24,7 +24,12 @@ def save_porto_trajectories(dataset_name: str, batch_size: int) -> None:
     try:
         dataset_id = database.queries.get_dataset_id(context, dataset_name)
 
-        trajectories = parse_porto_trajectories(os.getenv("PORTO_DATASET_PATH"))
+        porto_path = os.getenv("PORTO_DATASET_PATH")
+
+        if porto_path is None:
+            raise ValueError("Path for Porto dataset is None!")
+
+        trajectories = parse_porto_trajectories(porto_path)
 
         total = len(trajectories)
 
@@ -66,7 +71,12 @@ def save_dataset_trajectories(dataset_name: str, batch_size) -> None:
     try:
         dataset_id = database.queries.get_dataset_id(context, dataset_name)
 
-        trajectories = parse_beijing_trajectories(os.getenv("BEIJING_DATASET_PATH"))
+        beijing_path = os.getenv("BEIJING_DATASET_PATH")
+
+        if beijing_path is None:
+            raise ValueError("Path for Beijing dataset is None!")
+
+        trajectories = parse_beijing_trajectories(beijing_path)
 
         total = len(trajectories)
 

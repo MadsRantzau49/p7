@@ -226,7 +226,8 @@ export default function TrajectoryPage() {
                   <thead>
                     <tr>
                       <th scope="col">Trajectory ID</th>
-                      <th scope="col">Taxi ID</th>
+                      <th scope="col">Vehicle ID</th>
+                      <th scope="col">Vehicle Type</th>
                       <th scope="col">City</th>
                       <th scope="col">Date</th>
                       <th scope="col">Points</th>
@@ -260,7 +261,8 @@ export default function TrajectoryPage() {
                               {trajectory.trajectory_id}
                             </button>
                           </td>
-                          <td>{trajectory.taxi_id}</td>
+                          <td>{trajectory.vehicle_id}</td>
+                          <td>{trajectory.vehicle_type ?? "ERROR"}</td>
                           <td>{trajectory.city}</td>
                           <td>{trajectory.trajectory_date}</td>
                           <td>{trajectory.points.length}

@@ -22,12 +22,6 @@ app.include_router(trajectory_router)
 app.include_router(dataset_router)
 
 
-@app.get("/")
-def root():
-    """Simple endpoint"""
-    return {"message": "Test"}
-
-
 if __name__ == "__main__":
     import uvicorn
 

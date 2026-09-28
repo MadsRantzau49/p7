@@ -3,8 +3,7 @@ from datetime import datetime
 from database.connection import create_db_connection
 from database.queries import get_trajectories_cities_from_db, get_trajectories_from_db
 from models.dataset import DataSet
-
-from backend.src.models.uniformed_trajectories import UniformedTrajectories
+from models.uniformed_trajectories import UniformedTrajectories
 
 
 async def get_trajectories(
@@ -33,8 +32,8 @@ async def get_trajectories_cities() -> list[DataSet]:
     try:
         return await get_trajectories_cities_from_db(context)
 
-    except Exception as Error:
-        print(f"Failed to retrieve cities from database: {Error}")
+    except Exception as error:
+        print(f"Failed to retrieve cities from database: {error}")
         raise
     finally:
         context.close()
