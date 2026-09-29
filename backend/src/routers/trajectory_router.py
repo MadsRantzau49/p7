@@ -21,8 +21,7 @@ async def get_trajectories_endpoint(
     limit: int | None = None,
 ):
     """Return trajectories using the given filters."""
-    return await get_trajectories(city, start_date, end_date, start_time,
-        end_time, limit)
+    return await get_trajectories(city, start_date, end_date, start_time, end_time, limit)
 
 
 @router.get("/get/cities")

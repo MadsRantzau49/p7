@@ -19,7 +19,7 @@ async def get_trajectories(
     context = create_db_connection()
 
     try:
-        #No time = 24 hours
+        # No time = 24 hours
         start_time = start_time or time.min
         end_time = end_time or time.max
         return await get_trajectories_from_db(
@@ -46,6 +46,7 @@ async def get_trajectories(
 
     finally:
         context.close()
+
 
 async def get_trajectories_cities() -> list[DataSet]:
     """Fetch the available trajectory cities from the database."""

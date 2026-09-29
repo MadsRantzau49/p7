@@ -211,8 +211,6 @@ def insert_data_uniformed_trajectories(context, trajectories: list[UniformedTraj
         cursor.close()
 
 
- 
- 
 async def get_trajectories_from_db(
     context,
     city: str,
@@ -222,51 +220,49 @@ async def get_trajectories_from_db(
     end_time: time | None,
     limit: int | None,
 ) -> list[UniformedTrajectories]:
-
-    
     """Fetch trajectories for a city, with only the points inside the date range and time window.
     Trips are first picked by city, date, and whether their start and end times can
     overlap the time window. Their points are then filtered in the database, and the
     rows are grouped back into one dict per trajectory.
     """
- 
-    cursor = context.cursor(dictionary=True)
- 
-    try:
-        #Get the end time of the trajectory
-        TRAJECTORY_END = "CAST(JSON_UNQUOTE(JSON_EXTRACT(points, '$[last].point_timestamp')) AS DATETIME)"
 
-        #conditions for the trajectories, the city, and it started before the window ends and ended after the window starts
+    cursor = context.cursor(dictionary=True)
+
+    try:
+        # Get the end time of the trajectory
+        trajectory_end = "CAST(JSON_UNQUOTE(JSON_EXTRACT(points, '$[last].point_timestamp')) AS DATETIME)"
+
+        # conditions for the trajectories, the city,
+        # and it started before the window ends and ended after the window starts
         conditions = [
             "city = %s",
-            f"(DATE({TRAJECTORY_END}) <> DATE(trajectory_date)"
-            f" OR (TIME(trajectory_date) <= %s AND TIME({TRAJECTORY_END}) >= %s))",
+            f"(DATE({trajectory_end}) <> DATE(trajectory_date)"
+            f" OR (TIME(trajectory_date) <= %s AND TIME({trajectory_end}) >= %s))",
         ]
 
         values: list = [city, end_time, start_time]
- 
+
         if start_date is not None:
             conditions.append("trajectory_date >= %s")
             values.append(start_date)
- 
+
         if end_date is not None:
             conditions.append("trajectory_date < %s")
             values.append(end_date)
- 
+
         trip_limit = ""
         if limit is not None:
             trip_limit = "LIMIT %s"
             values.append(limit)
- 
 
         point_conditions = ["TIME(jt.point_timestamp) BETWEEN %s AND %s"]
         point_values: list = [start_time, end_time]
- 
-        #Trips starting before end_date can still have points after it
+
+        # Trips starting before end_date can still have points after it
         if end_date is not None:
             point_conditions.append("jt.point_timestamp < %s")
             point_values.append(end_date)
- 
+
         sql = f"""
             SELECT t.trajectory_id, t.vehicle_id, vt.name AS vehicle_type,
                    t.trajectory_date, t.city, t.source_id,
@@ -295,7 +291,7 @@ async def get_trajectories_from_db(
 
         result = []
         current = None
- 
+
         for row in cursor.fetchall():
             if current is None or current["trajectory_id"] != row["trajectory_id"]:
                 current = {
@@ -308,7 +304,7 @@ async def get_trajectories_from_db(
                     "points": [],
                 }
                 result.append(current)
- 
+
             current["points"].append(
                 {
                     "latitude": row["latitude"],
@@ -316,16 +312,14 @@ async def get_trajectories_from_db(
                     "point_timestamp": row["point_timestamp"].isoformat(),
                 }
             )
- 
+
         return result
- 
+
     except Exception as error:
         print(f"Failed to get trajectories from database: {error}")
         raise
     finally:
         cursor.close()
-
-
 
 
 def dataset_name_taken(context, name: str) -> bool:
