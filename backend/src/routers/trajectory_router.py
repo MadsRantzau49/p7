@@ -1,5 +1,5 @@
 import sys
-from datetime import datetime
+from datetime import datetime, time
 from pathlib import Path
 
 from fastapi import APIRouter
@@ -16,10 +16,13 @@ async def get_trajectories_endpoint(
     city: str,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
+    start_time: time | None = None,
+    end_time: time | None = None,
     limit: int | None = None,
 ):
     """Return trajectories using the given filters."""
-    return await get_trajectories(city, start_date, end_date, limit)
+    return await get_trajectories(city, start_date, end_date, start_time,
+        end_time, limit)
 
 
 @router.get("/get/cities")
