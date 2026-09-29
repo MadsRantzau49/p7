@@ -1,3 +1,4 @@
+import uuid
 from collections.abc import Iterable
 
 from database.connection import create_db_connection
@@ -7,21 +8,11 @@ from database.queries import (
     dataset_name_taken,
     insert_data_uniformed_trajectories,
 )
-from helpers.trajectory_helpers import convert_upload_trajectory
-from helpers.upload_checks import sort_and_check_trajectories
-from helpers.upload_parser import MAX_ERRORS, UploadError, parse_upload
+from helpers.trajectory_csv_parser import parse_trajectory_csv
 from mysql.connector import errorcode
 from mysql.connector.errors import IntegrityError
 
 BATCH_SIZE = 200
-
-
-class UploadRejectedError(Exception):
-    """The file broke the format rules. Nothing was stored"""
-
-    def __init__(self, errors: list[UploadError]):
-        super().__init__(f"{len(errors)} problems in the uploaded file")
-        self.errors = errors
 
 
 class DatasetNameTakenError(Exception):
@@ -39,17 +30,15 @@ def upload_dataset(dataset_name: str, lines: Iterable[str]) -> int:
         The new dataset_id
 
     Raises:
-        UploadRejectedError: The file broke a rule. Nothing was written.
+        InvalidTrajectoryCsvError: The file broke a rule. Nothing was written.
         DatasetNameTakenError: The name is already in use. Nothing was written.
     """
-    trajectories, errors = parse_upload(lines)
-    errors += sort_and_check_trajectories(trajectories)
+    trajectories = parse_trajectory_csv(lines)
 
-    if not errors and not trajectories:
-        errors.append(UploadError(1, "the file has a header but no data rows"))
-
-    if errors:
-        raise UploadRejectedError(errors[:MAX_ERRORS])
+    for trajectory in trajectories:
+        trajectory.city = dataset_name
+        if trajectory.source_id is None:
+            trajectory.source_id = str(uuid.uuid4())
 
     context = create_db_connection()
 
@@ -59,12 +48,8 @@ def upload_dataset(dataset_name: str, lines: Iterable[str]) -> int:
 
         dataset_id = create_dataset(context, dataset_name)
 
-        uniformed = []
-        for rows in trajectories.values():
-            uniformed.append(convert_upload_trajectory(rows, dataset_name))
-
-        for start in range(0, len(uniformed), BATCH_SIZE):
-            batch = uniformed[start : start + BATCH_SIZE]
+        for start in range(0, len(trajectories), BATCH_SIZE):
+            batch = trajectories[start : start + BATCH_SIZE]
 
             source_ids = []
             for trajectory in batch:

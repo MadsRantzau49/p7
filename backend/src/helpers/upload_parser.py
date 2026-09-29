@@ -12,6 +12,9 @@ EXPECTED_HEADER = [
     "timestamp",
     "longitude",
     "latitude",
+    "city",
+    "source_id",
+    "database_trajectory_id",
 ]
 MAX_ERRORS = 100
 

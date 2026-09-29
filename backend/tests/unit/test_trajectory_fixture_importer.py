@@ -5,13 +5,16 @@ from trajectory_builder.importer import load_trajectory
 
 
 def test_imports_template_and_generates_timestamps():
-    """Check that the template is imported and timestamps are generated correctly."""
-    fixture = Path(__file__).parent.parent / "data" / "trajectories" / "template.json"
+    """Check that the CSV template is imported as a uniformed trajectory."""
+    fixture = Path(__file__).parent.parent / "data" / "trajectories" / "template.csv"
 
     trajectory = load_trajectory(fixture)
 
     assert trajectory.trajectory_id is None
-    assert trajectory.trajectory_date == datetime.datetime(2026, 9, 21, 8, 0, tzinfo=datetime.timezone.utc)
+    assert trajectory.vehicle_id == 0
+    assert trajectory.vehicle_type == "UNKNOWN"
+    assert trajectory.city == "Test"
+    assert trajectory.trajectory_date == datetime.datetime(2026, 9, 21, 8, 0)
     assert [(point.latitude, point.longitude) for point in trajectory.points] == [
         (57.0252, 9.8981),
         (57.0294, 9.9018),
@@ -20,6 +23,5 @@ def test_imports_template_and_generates_timestamps():
         (57.0426, 9.9174),
     ]
     assert [point.point_timestamp for point in trajectory.points] == [
-        datetime.datetime(2026, 9, 21, 8, 0, seconds, tzinfo=datetime.timezone.utc)
-        for seconds in (0, 15, 30, 45)
-    ] + [datetime.datetime(2026, 9, 21, 8, 1, tzinfo=datetime.timezone.utc)]
+        datetime.datetime(2026, 9, 21, 8, 0, seconds) for seconds in (0, 15, 30, 45)
+    ] + [datetime.datetime(2026, 9, 21, 8, 1)]

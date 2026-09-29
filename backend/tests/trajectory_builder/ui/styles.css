@@ -29,7 +29,7 @@ body {
   display: grid;
 
   grid-template-columns:
-    300px minmax(0, 1fr);
+    340px minmax(0, 1fr);
 
   width: min(1100px, 100%);
   height: calc(100vh - 48px);
@@ -88,7 +88,62 @@ label {
   font-weight: 700;
 }
 
-input {
+.route-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+
+  padding-bottom: 8px;
+}
+
+.route-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.route-actions button {
+  padding: 6px 8px;
+
+  font-size: 0.72rem;
+}
+
+#route-list {
+  display: grid;
+  gap: 5px;
+
+  max-height: 120px;
+  margin: 0 0 8px;
+  padding: 0;
+
+  overflow-y: auto;
+
+  list-style: none;
+}
+
+#route-list button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 7px 9px;
+
+  color: #52615a;
+
+  font-family: monospace;
+  font-size: 0.72rem;
+  text-align: left;
+}
+
+#route-list button.active {
+  color: #174c3d;
+  border-color: #17644e;
+  background: #e8f2ed;
+}
+
+input,
+select {
   width: 100%;
 
   padding: 9px 10px;
@@ -103,7 +158,8 @@ input {
   font: inherit;
 }
 
-input:focus {
+input:focus,
+select:focus {
   outline:
     2px solid #17644e;
 
