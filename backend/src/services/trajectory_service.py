@@ -1,4 +1,4 @@
-from datetime import datetime, time
+from datetime import time, date
 
 from database.connection import create_db_connection
 from database.queries import get_trajectories_cities_from_db, get_trajectories_from_db
@@ -8,8 +8,8 @@ from models.uniformed_trajectories import UniformedTrajectories
 
 async def get_trajectories(
     city: str,
-    start_date: datetime | None,
-    end_date: datetime | None,
+    start_date: date | None,
+    end_date: date | None,
     start_time: time | None,
     end_time: time | None,
     limit: int | None,
@@ -19,7 +19,7 @@ async def get_trajectories(
     if start_date is not None and end_date is not None and start_date > end_date:
         raise ValueError("start_date must be before end_date")
 
-    same_day = start_date is not None and end_date is not None and start_date.date() == end_date.date()
+    same_day = start_date is not None and end_date is not None and start_date == end_date
 
     if same_day and start_time is not None and end_time is not None and start_time > end_time:
         raise ValueError("start_time must be before end_time when start_date and end_date are the same day")

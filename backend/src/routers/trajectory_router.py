@@ -1,5 +1,5 @@
 import sys
-from datetime import datetime, time
+from datetime import time, date
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
@@ -14,8 +14,8 @@ router = APIRouter(prefix="/api/trajectories")
 @router.get("/get")
 async def get_trajectories_endpoint(
     city: str,
-    start_date: datetime | None = None,
-    end_date: datetime | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
     start_time: time | None = None,
     end_time: time | None = None,
     limit: int | None = None,

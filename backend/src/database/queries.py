@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, time
+from datetime import time, date, timedelta
 
 from models.beijing_trajectory import BeijingTrajectory
 from models.dataset import DataSet
@@ -214,8 +214,8 @@ def insert_data_uniformed_trajectories(context, trajectories: list[UniformedTraj
 async def get_trajectories_from_db(
     context,
     city: str,
-    start_date: datetime | None,
-    end_date: datetime | None,
+    start_date: date | None,
+    end_date: date | None,
     start_time: time | None,
     end_time: time | None,
     limit: int | None,
@@ -223,7 +223,7 @@ async def get_trajectories_from_db(
     """Fetch trajectories that lie completely inside the date range and daily time window.
 
     A trajectory is only returned if all its points are inside the period: it must
-    start on or after start_date and end before end_date, and on every day its first
+    start on or after start_date and end on or before end_date, and on every day its first
     and last point must be inside the time window. Trajectories that are partly
     outside are left out entirely.
 
@@ -251,10 +251,11 @@ async def get_trajectories_from_db(
             values.append(start_date)
 
         if end_date is not None:
+            day_after_end = end_date + timedelta(days=1)
             conditions.append("t.trajectory_date < %s")
-            values.append(end_date)
+            values.append(day_after_end)
             conditions.append(f"{trajectory_end} < %s")
-            values.append(end_date)
+            values.append(day_after_end)
 
         if start_time is not None and end_time is not None and start_time > end_time:
             # Overnight window, e.g. 23:50-02:00

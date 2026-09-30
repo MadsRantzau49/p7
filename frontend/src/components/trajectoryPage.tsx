@@ -99,8 +99,8 @@ export default function TrajectoryPage() {
     try {
       const data = await getTrajectories(
         city,
-        startDate ? `${startDate}T00:00:00` : undefined,
-        endDate ? `${endDate}T23:59:59.999999` : undefined,
+        startDate || undefined,
+        endDate || undefined,
         startTime ? `${startTime}:00` : undefined,
         endTime ? `${endTime}:59` : undefined,
         requestedLimit
@@ -118,6 +118,8 @@ export default function TrajectoryPage() {
   }
 
   const visibleTrajectories = selectedTrajectoryId === null ? trajectories : trajectories.filter( (trajectory) => trajectory.trajectory_id === selectedTrajectoryId);
+
+  const isSameDay = Boolean(startDate && endDate && startDate === endDate);
 
   let statusMessage = "Choose your filters to display trajectories.";
 
@@ -192,7 +194,7 @@ export default function TrajectoryPage() {
                   );
 
                 }}
-                allowOvernight={startDate !== endDate}
+                allowOvernight={!isSameDay}
               />
             </div>
 
