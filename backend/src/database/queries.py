@@ -4,6 +4,7 @@ from datetime import datetime
 from models.beijing_trajectory import BeijingTrajectory
 from models.dataset import DataSet
 from models.porto_trajectory import PortoTrajectory
+from models.trajectory_segments import TrajectorySegments
 from models.uniformed_trajectories import UniformedTrajectories
 
 
@@ -318,6 +319,30 @@ def get_vehicle_type_ids(context) -> dict[str, int]:
         return dict(cursor.fetchall())
     except Exception as error:
         print(f"Failed to retrieve vehicle types from database: {error}")
+        raise
+    finally:
+        cursor.close()
+
+
+def insert_segments_into_db(context, segments: list[TrajectorySegments]) -> None:
+    """Inserts segments into tabel in database"""
+    cursor = context.cursor()
+
+    try:
+        cursor.executemany(
+            """
+        INSERT INTO trajectory_segments (
+            trajectory_id,
+            segment_index,
+            path,
+            start_time,
+            end_time)
+            VALUES (%s, %s, ST_GeomFromText(%s, 4326, 'axis-order=long-lat'), %s, %s)
+            """,
+            segments,
+        )
+    except Exception as error:
+        print(f"Failed to insert segments into database: {error}")
         raise
     finally:
         cursor.close()
