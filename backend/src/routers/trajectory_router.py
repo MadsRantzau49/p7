@@ -1,5 +1,5 @@
 import sys
-from datetime import time, date
+from datetime import date, time
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException

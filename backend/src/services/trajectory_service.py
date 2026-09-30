@@ -1,4 +1,4 @@
-from datetime import time, date
+from datetime import date, time
 
 from database.connection import create_db_connection
 from database.queries import get_trajectories_cities_from_db, get_trajectories_from_db

@@ -1,5 +1,5 @@
 import json
-from datetime import time, date, timedelta
+from datetime import date, time, timedelta
 
 from models.beijing_trajectory import BeijingTrajectory
 from models.dataset import DataSet
