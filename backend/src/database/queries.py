@@ -324,9 +324,16 @@ def get_vehicle_type_ids(context) -> dict[str, int]:
         cursor.close()
 
 
-def insert_segments_into_db(context, segments: list[TrajectorySegments]) -> None:
+async def insert_segments_into_db(context, segments: list[TrajectorySegments]) -> None:
     """Inserts segments into tabel in database"""
     cursor = context.cursor()
+
+    values = []
+
+    for segment in segments:
+        values.append(
+            (segment.trajectory_id, segment.segment_index, segment.path, segment.start_time, segment.end_time)
+        )
 
     try:
         cursor.executemany(
@@ -339,7 +346,7 @@ def insert_segments_into_db(context, segments: list[TrajectorySegments]) -> None
             end_time)
             VALUES (%s, %s, ST_GeomFromText(%s, 4326, 'axis-order=long-lat'), %s, %s)
             """,
-            segments,
+            values,
         )
     except Exception as error:
         print(f"Failed to insert segments into database: {error}")

@@ -44,44 +44,60 @@ async def get_trajectories_cities() -> list[DataSet]:
         context.close()
 
 
-def insert_trajectory_segments(trajectories: list[UniformedTrajectories]):
+async def insert_trajectory_segments(trajectories) -> bool:
     """Creates segments from cleaned trajectory data"""
-    rows = []
     segments: list[TrajectorySegments] = []
 
-    context = create_db_connection()
-
     for trajectory in trajectories:
-        points = trajectory.points
+        if trajectory["trajectory_id"] is None:
+            raise ValueError("Trajectory_id is none!")
+
+        points = trajectory["points"]
 
         for segment_index in range(len(points) - 1):
             start = points[segment_index]
             end = points[segment_index + 1]
 
-            path = f"LINESTRING({start.longitude} {start.latitude}, {end.longitude} {end.latitude})"
-
-            if trajectory.trajectory_id is None:
-                raise ValueError("Trajectory_id is none!")
+            path = f"""LINESTRING(
+                {start["longitude"]}
+                {start["latitude"]},
+                {end["longitude"]}
+                {end["latitude"]}
+            )"""
 
             segments.append(
                 TrajectorySegments(
-                    trajectory_id=trajectory.trajectory_id,
+                    trajectory_id=trajectory["trajectory_id"],
                     segment_index=segment_index,
                     path=path,
-                    start_time=start.point_timestamp,
-                    end_time=end.point_timestamp,
+                    start_time=start["point_timestamp"],
+                    end_time=end["point_timestamp"],
                 )
             )
 
-    if not rows:
-        return 0
+    if not segments:
+        return False
+
+    context = create_db_connection()
 
     try:
-        insert_segments_into_db(context, rows)
+        await insert_segments_into_db(context, segments)
         context.commit()
-        return len(rows)
+        return True
     except Exception as error:
         print(f"Failed to insert trajectories segments: {error}")
+        context.rollback()
         raise
     finally:
         context.close()
+
+
+async def test_insert_trajectory_segments(
+    city: str, start_date: datetime | None = None, end_date: datetime | None = None, limit: int | None = None
+):
+    """This function is for testing purposes"""
+    trajectories = await get_trajectories(city, start_date, end_date, limit)
+
+    result = await insert_trajectory_segments(trajectories)
+
+    return result
