@@ -190,7 +190,9 @@ export default function TrajectoryPage() {
                   setEndTime(
                     newEndTime
                   );
+
                 }}
+                allowOvernight={startDate !== endDate}
               />
             </div>
 

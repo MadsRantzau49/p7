@@ -5,6 +5,8 @@ type TimeRangeSliderProps = {
   startTime: string;
   endTime: string;
   onChange: (startTime: string, endTime: string) => void;
+
+  allowOvernight?: boolean;
 };
 
 function timeToMinutes(time: string): number {
@@ -17,23 +19,19 @@ function minutesToTime(totalMinutes: number): string {
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
 
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
-    2,
-    "0"
-  )}`;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
 export default function TimeRangeSlider({
   startTime,
   endTime,
   onChange,
+  allowOvernight = false,
 }: TimeRangeSliderProps) {
   const min = 0;
   const max = 23 * 60 + 59;
 
-  const [activeThumb, setActiveThumb] = useState<
-    "start" | "end" | null
-  >(null);
+  const [activeThumb, setActiveThumb] = useState<"start" | "end" | null>(null);
 
   const startMinutes = timeToMinutes(startTime);
   const endMinutes = timeToMinutes(endTime);
@@ -41,8 +39,9 @@ export default function TimeRangeSlider({
   const startPercentage = (startMinutes / max) * 100;
   const endPercentage = (endMinutes / max) * 100;
 
-  const middle =
-    (startPercentage + endPercentage) / 2;
+  const isOvernight = startMinutes > endMinutes;
+
+  const middle = (startPercentage + endPercentage) / 2;
 
   let startZIndex = middle <= 50 ? 4 : 5;
   let endZIndex = middle <= 50 ? 5 : 4;
@@ -56,75 +55,53 @@ export default function TimeRangeSlider({
   }
 
   function changeStart(value: number) {
-    const newStart = Math.min(
-      value,
-      endMinutes
-    );
+    const newStart = allowOvernight ? value : Math.min(value, endMinutes);
 
-    onChange(
-      minutesToTime(newStart),
-      endTime
-    );
+    onChange(minutesToTime(newStart), endTime);
   }
 
   function changeEnd(value: number) {
-    const newEnd = Math.max(
-      value,
-      startMinutes
-    );
+    const newEnd = allowOvernight ? value : Math.max(value, startMinutes);
 
-    onChange(
-      startTime,
-      minutesToTime(newEnd)
-    );
+    onChange(startTime, minutesToTime(newEnd));
   }
 
   return (
     <div className="time-slider">
       <div className="time-slider-value-row">
         <div className="time-slider-time-field">
-          <label htmlFor="start-time">
-            Start
-          </label>
+          <label htmlFor="start-time">Start</label>
 
           <input
             id="start-time"
             type="time"
             step={60}
             value={startTime}
-            max={endTime}
+            max={allowOvernight ? undefined : endTime}
             onChange={(event) => {
-              const value =
-                event.target.value;
+              const value = event.target.value;
 
               if (value) {
-                changeStart(
-                  timeToMinutes(value)
-                );
+                changeStart(timeToMinutes(value));
               }
             }}
           />
         </div>
 
         <div className="time-slider-time-field">
-          <label htmlFor="end-time">
-            End
-          </label>
+          <label htmlFor="end-time">End</label>
 
           <input
             id="end-time"
             type="time"
             step={60}
             value={endTime}
-            min={startTime}
+            min={allowOvernight ? undefined : startTime}
             onChange={(event) => {
-              const value =
-                event.target.value;
+              const value = event.target.value;
 
               if (value) {
-                changeEnd(
-                  timeToMinutes(value)
-                );
+                changeEnd(timeToMinutes(value));
               }
             }}
           />
@@ -136,31 +113,38 @@ export default function TimeRangeSlider({
         <div className="time-slider-track" />
 
         <div className="time-slider-ticks">
-          {Array.from({
-            length: 13,
-          }).map((_, index) => (
+          {Array.from({ length: 13 }).map((_, index) => (
             <span
               key={index}
               className="time-slider-tick"
-              style={{
-                left: `${
-                  (index / 12) * 100
-                }%`,
-              }}
+              style={{ left: `${(index / 12) * 100}%` }}
             />
           ))}
         </div>
 
-        <div
-          className="time-slider-selected"
-          style={{
-            left: `${startPercentage}%`,
-            width: `${
-              endPercentage -
-              startPercentage
-            }%`,
-          }}
-        />
+        {isOvernight ? (
+          <>
+            <div
+              className="time-slider-selected time-slider-selected--overnight"
+              style={{ left: "0%", width: `${endPercentage}%` }}
+            />
+            <div
+              className="time-slider-selected time-slider-selected--overnight"
+              style={{
+                left: `${startPercentage}%`,
+                width: `${100 - startPercentage}%`,
+              }}
+            />
+          </>
+        ) : (
+          <div
+            className="time-slider-selected"
+            style={{
+              left: `${startPercentage}%`,
+              width: `${endPercentage - startPercentage}%`,
+            }}
+          />
+        )}
 
         <input
           type="range"
@@ -169,28 +153,12 @@ export default function TimeRangeSlider({
           step={1}
           value={startMinutes}
           className="time-slider-range-input"
-          style={{
-            zIndex: startZIndex,
-          }}
-          onPointerDown={() =>
-            setActiveThumb("start")
-          }
-          onPointerUp={() =>
-            setActiveThumb(null)
-          }
-          onFocus={() =>
-            setActiveThumb("start")
-          }
-          onBlur={() =>
-            setActiveThumb(null)
-          }
-          onChange={(event) =>
-            changeStart(
-              Number(
-                event.target.value
-              )
-            )
-          }
+          style={{ zIndex: startZIndex }}
+          onPointerDown={() => setActiveThumb("start")}
+          onPointerUp={() => setActiveThumb(null)}
+          onFocus={() => setActiveThumb("start")}
+          onBlur={() => setActiveThumb(null)}
+          onChange={(event) => changeStart(Number(event.target.value))}
           aria-label="Start time"
         />
 
@@ -201,28 +169,12 @@ export default function TimeRangeSlider({
           step={1}
           value={endMinutes}
           className="time-slider-range-input"
-          style={{
-            zIndex: endZIndex,
-          }}
-          onPointerDown={() =>
-            setActiveThumb("end")
-          }
-          onPointerUp={() =>
-            setActiveThumb(null)
-          }
-          onFocus={() =>
-            setActiveThumb("end")
-          }
-          onBlur={() =>
-            setActiveThumb(null)
-          }
-          onChange={(event) =>
-            changeEnd(
-              Number(
-                event.target.value
-              )
-            )
-          }
+          style={{ zIndex: endZIndex }}
+          onPointerDown={() => setActiveThumb("end")}
+          onPointerUp={() => setActiveThumb(null)}
+          onFocus={() => setActiveThumb("end")}
+          onBlur={() => setActiveThumb(null)}
+          onChange={(event) => changeEnd(Number(event.target.value))}
           aria-label="End time"
         />
       </div>
@@ -234,6 +186,12 @@ export default function TimeRangeSlider({
         <span>18:00</span>
         <span>23:59</span>
       </div>
+
+      {isOvernight && (
+        <p className="time-slider-overnight-hint">
+          Overnight: {startTime} → {endTime} the next day
+        </p>
+      )}
     </div>
   );
 }

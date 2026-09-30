@@ -2,7 +2,7 @@ import sys
 from datetime import datetime, time
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 sys.path.append(str(Path(__file__).parent.parent))
 
@@ -21,7 +21,10 @@ async def get_trajectories_endpoint(
     limit: int | None = None,
 ):
     """Return trajectories using the given filters."""
-    return await get_trajectories(city, start_date, end_date, start_time, end_time, limit)
+    try:
+        return await get_trajectories(city, start_date, end_date, start_time, end_time, limit)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @router.get("/get/cities")
