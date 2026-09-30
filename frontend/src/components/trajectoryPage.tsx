@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import type { SubmitEvent } from "react";
 import { getTrajectories, getTrajectoryCities } from "../api/trajectoryAPI";
 import type { uniformedTrajectoryResponse } from "../models/uniformedTrajectoryResponse";
 import TrajectoryMap from "./trajectoryMap";
+import DatasetUpload from "./datasetUpload";
 import "../css/TrajectoryPage.css";
 import type { trajectoryCitites } from "../models/trajectoryCities";
 
@@ -68,7 +69,7 @@ export default function TrajectoryPage() {
     setError("");
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
 
@@ -179,6 +180,8 @@ export default function TrajectoryPage() {
         </form>
 
         <p className="trajectory-description" role="status">{statusMessage}</p>
+
+        <DatasetUpload />
       </aside>
 
       <main className="trajectory-workspace">
