@@ -1,8 +1,8 @@
 import sys
-from datetime import datetime
+from datetime import date, time
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 sys.path.append(str(Path(__file__).parent.parent))
 
@@ -14,12 +14,17 @@ router = APIRouter(prefix="/api/trajectories")
 @router.get("/get")
 async def get_trajectories_endpoint(
     city: str,
-    start_date: datetime | None = None,
-    end_date: datetime | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    start_time: time | None = None,
+    end_time: time | None = None,
     limit: int | None = None,
 ):
     """Return trajectories using the given filters."""
-    return await get_trajectories(city, start_date, end_date, limit)
+    try:
+        return await get_trajectories(city, start_date, end_date, start_time, end_time, limit)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @router.get("/get/cities")

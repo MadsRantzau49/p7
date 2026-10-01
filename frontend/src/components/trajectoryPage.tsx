@@ -3,6 +3,7 @@ import type { SubmitEvent } from "react";
 import { getTrajectories, getTrajectoryCities } from "../api/trajectoryAPI";
 import type { uniformedTrajectoryResponse } from "../models/uniformedTrajectoryResponse";
 import TrajectoryMap from "./trajectoryMap";
+import TimeRangeSlider from "./timeRangeSlider.tsx";
 import DatasetUpload from "./datasetUpload";
 import "../css/TrajectoryPage.css";
 import type { trajectoryCitites } from "../models/trajectoryCities";
@@ -13,6 +14,10 @@ export default function TrajectoryPage() {
   const [city, setCity] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+
+  const [startTime, setStartTime] = useState("00:00");
+  const [endTime, setEndTime] = useState("23:59");
+
   const [limit, setLimit] = useState("100");
 
   const [trajectories, setTrajectories] = useState<uniformedTrajectoryResponse[]>([]);
@@ -95,8 +100,10 @@ export default function TrajectoryPage() {
     try {
       const data = await getTrajectories(
         city,
-        startDate ? `${startDate}T00:00:00` : undefined,
-        endDate ? `${endDate}T23:59:59.999999` : undefined,
+        startDate || undefined,
+        endDate || undefined,
+        startTime ? `${startTime}:00` : undefined,
+        endTime ? `${endTime}:59` : undefined,
         requestedLimit
       );
 
@@ -112,6 +119,8 @@ export default function TrajectoryPage() {
   }
 
   const visibleTrajectories = selectedTrajectoryId === null ? trajectories : trajectories.filter( (trajectory) => trajectory.trajectory_id === selectedTrajectoryId);
+
+  const isSameDay = Boolean(startDate && endDate && startDate === endDate);
 
   let statusMessage = "Choose your filters to display trajectories.";
 
@@ -166,6 +175,30 @@ export default function TrajectoryPage() {
               <input id="end-date" type="date" value={endDate} min={startDate || undefined} onChange={(event) => setEndDate(event.target.value)}/>
               <small>Leave dates empty to search all dates.</small>
             </div>
+
+            <div className="trajectory-field">
+              <label>Time range</label>
+
+              <TimeRangeSlider
+                startTime={startTime}
+                endTime={endTime}
+                onChange={(
+                  newStartTime,
+                  newEndTime
+                ) => {
+                  setStartTime(
+                    newStartTime
+                  );
+
+                  setEndTime(
+                    newEndTime
+                  );
+
+                }}
+                allowOvernight={!isSameDay}
+              />
+            </div>
+
 
             <div className="trajectory-field">
               <label htmlFor="limit">Maximum trajectories</label>
