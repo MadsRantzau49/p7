@@ -204,4 +204,55 @@ async def get_trajectories_from_db(context, city: str, start_date: datetime | No
         cursor.close()
 
 
-    
+def retrieve_uniformed_batch(context, city: str, batch_size: int, last_trajectory_id: int | None) -> list[dict]:
+    cursor = context.cursor(dictionary=True)
+    try:
+        base = """
+            SELECT u.trajectory_id, u.taxi_id, u.trajectory_date, u.city,
+                   u.points, u.source_id, s.dataset_id
+            FROM uniformed_trajectories u
+            JOIN source_trajectories s ON s.source_id = u.source_id
+            WHERE u.city = %s
+        """
+        if last_trajectory_id is None:
+            cursor.execute(base + " ORDER BY u.trajectory_id LIMIT %s", (city, batch_size))
+        else:
+            cursor.execute(
+                base + " AND u.trajectory_id > %s ORDER BY u.trajectory_id LIMIT %s",
+                (city, last_trajectory_id, batch_size),
+            )
+        rows = cursor.fetchall()
+        for row in rows:
+            row["points"] = json.loads(row["points"])
+        return rows
+    except Exception as error:
+        print(f"Failed to retrieve uniformed batch: {error}")
+        raise
+    finally:
+        cursor.close()
+
+
+def insert_cleaned_uniformed_trajectories(context, trajectories: list[UniformedTrajectories]) -> None:
+    cursor = context.cursor()
+    try:
+        values = []
+        for trajectory in trajectories:
+            points = [
+                {
+                    "longitude": point.longitude,
+                    "latitude": point.latitude,
+                    "point_timestamp": point.point_timestamp.isoformat(),
+                }
+                for point in trajectory.points
+            ]
+            values.append((trajectory.taxi_id, trajectory.trajectory_date, trajectory.city, json.dumps(points), trajectory.source_id))
+
+        cursor.executemany(
+            "INSERT INTO cleaned_uniformed_trajectories (taxi_id, trajectory_date, city, points, source_id) VALUES (%s, %s, %s, %s, %s)",
+            values,
+        )
+    except Exception as error:
+        print(f"Failed to insert cleaned uniformed trajectories: {error}")
+        raise
+    finally:
+        cursor.close()

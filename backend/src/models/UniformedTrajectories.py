@@ -1,6 +1,14 @@
 import datetime
 from dataclasses import dataclass
 
+
+@dataclass
+class UniformedTrajectoryPoint:
+    longitude: float
+    point_timestamp: datetime
+    latitude: float
+    
+
 @dataclass 
 class UniformedTrajectories:  
     taxi_id: int
@@ -11,10 +19,5 @@ class UniformedTrajectories:
     city: str | None = None
     source_id: str | None = None
 
-@dataclass
-class UniformedTrajectoryPoint:
-    longitude: float
-    point_timestamp: datetime
-    latitude: float
-    
+
 
