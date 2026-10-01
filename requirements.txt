@@ -10,3 +10,6 @@ haversine
 pyright 
 vulture
 pytest-cov
+httpx2
+starlette
+anyio 
