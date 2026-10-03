@@ -373,7 +373,11 @@ def get_vehicle_type_ids(context) -> dict[str, int]:
     finally:
         cursor.close()
 
-def retrieve_uniformed_batch(context, city: str, batch_size: int, last_trajectory_id: int | None) -> list[dict]:
+
+def retrieve_uniformed_batch(
+    context, city: str, batch_size: int, last_trajectory_id: int | None
+) -> list[dict]:
+    """Fetch a batch of a city's uniformed trajectories ordered by trajectory_id."""
     cursor = context.cursor(dictionary=True)
     try:
         base = """
@@ -403,6 +407,7 @@ def retrieve_uniformed_batch(context, city: str, batch_size: int, last_trajector
 
 
 def insert_cleaned_uniformed_trajectories(context, trajectories: list[UniformedTrajectories]) -> None:
+    """Bulk-insert cleaned trajectory runs into the cleaned_uniformed_trajectories table."""
     vehicle_type_ids = get_vehicle_type_ids(context)
     cursor = context.cursor()
     try:
@@ -416,14 +421,16 @@ def insert_cleaned_uniformed_trajectories(context, trajectories: list[UniformedT
                 }
                 for point in trajectory.points
             ]
-            values.append((
-                trajectory.vehicle_id,
-                vehicle_type_ids[trajectory.vehicle_type],
-                trajectory.trajectory_date,
-                trajectory.city,
-                json.dumps(points),
-                trajectory.source_id,
-            ))
+            values.append(
+                (
+                    trajectory.vehicle_id,
+                    vehicle_type_ids[trajectory.vehicle_type],
+                    trajectory.trajectory_date,
+                    trajectory.city,
+                    json.dumps(points),
+                    trajectory.source_id,
+                )
+            )
         cursor.executemany(
             "INSERT INTO cleaned_uniformed_trajectories "
             "(vehicle_id, vehicle_type_id, trajectory_date, city, points, source_id) "

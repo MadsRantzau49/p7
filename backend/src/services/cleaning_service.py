@@ -3,17 +3,24 @@ from dataclasses import replace
 from datetime import datetime
 from typing import cast
 
+import database.queries as queries
 from config.cleaning_config import get_config
 from database.connection import create_db_connection
-import database.queries as queries
-from helpers.cleaners import *
+from helpers.cleaners import (
+    detect_gaps,
+    drop_accel_outliers,
+    drop_bad_timestamps,
+    drop_identical_coords,
+    drop_out_of_bounds,
+    drop_speed_outliers,
+)
+from models.cleaning_reports import DatasetReport, JourneyReport, RejectionReason
 from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint
 from models.upload_row import VehicleType
-from models.cleaning_reports import *
 
 
 def clean_trajectory(trajectory: UniformedTrajectories) -> tuple[list[UniformedTrajectories], JourneyReport]:
-
+    """Clean one journey, split it on gaps, and return the surviving runs with a report."""
     if trajectory.city is None:
         raise ValueError("Cannot clean a trajectory without a city")
 
@@ -23,7 +30,9 @@ def clean_trajectory(trajectory: UniformedTrajectories) -> tuple[list[UniformedT
 
     points, report.removed[RejectionReason.OUT_OF_BOUNDS] = drop_out_of_bounds(points, config.bbox)
     points, report.removed[RejectionReason.BAD_TIMESTAMP] = drop_bad_timestamps(points)
-    points, report.removed[RejectionReason.IDENTICAL_RUN] = drop_identical_coords(points, config.max_identical_coords)
+    points, report.removed[RejectionReason.IDENTICAL_RUN] = drop_identical_coords(
+        points, config.max_identical_coords
+    )
     points, report.removed[RejectionReason.SPEED_OUTLIER] = drop_speed_outliers(points, config.max_speed)
     points, report.removed[RejectionReason.ACCEL_OUTLIER] = drop_accel_outliers(points, config.max_accel)
 
@@ -49,6 +58,7 @@ def clean_trajectory(trajectory: UniformedTrajectories) -> tuple[list[UniformedT
 
 
 def aggregate_report(city: str, reports: list[JourneyReport]) -> DatasetReport:
+    """Run a batch of per-journey reports into a single dataset-level cleaning summary."""
     dataset = DatasetReport(city=city)
     for report in reports:
         dataset.journeys_in += 1
@@ -81,7 +91,9 @@ def _row_to_trajectory(row: dict) -> UniformedTrajectories:
         source_id=row["source_id"],
     )
 
+
 def clean_dataset(city: str, batch_size: int) -> DatasetReport:
+    """Clean a city's uniformed trajectories in batches and return the aggregated report."""
     context = create_db_connection()
     reports: list[JourneyReport] = []
 
