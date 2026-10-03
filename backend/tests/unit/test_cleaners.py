@@ -1,9 +1,15 @@
 from datetime import datetime, timedelta
-import pytest
 
+import pytest
 from helpers.cleaners import (
-    _haversine, detect_gaps, drop_accel_outliers,
-    drop_bad_timestamps, drop_identical_coords, drop_out_of_bounds, drop_speed_outliers)
+    _haversine,
+    detect_gaps,
+    drop_accel_outliers,
+    drop_bad_timestamps,
+    drop_identical_coords,
+    drop_out_of_bounds,
+    drop_speed_outliers,
+)
 from models.uniformed_trajectories import UniformedTrajectoryPoint
 
 BASE = datetime(2026, 1, 1, 8, 0, 0)
@@ -21,7 +27,7 @@ def _point(lat: float, lon: float, seconds: float = 0) -> UniformedTrajectoryPoi
     )
 
 
-# _haversine 
+# _haversine
 
 def test_haversine_one_degree_of_latitude_is_about_111_km():
     """One degree of latitude is roughly 111 km regardless of longitude"""
@@ -56,7 +62,7 @@ def test_out_of_bounds_handles_empty_input():
     assert drop_out_of_bounds([], BBOX) == ([], 0)
 
 
-# drop_bad_timestamps 
+# drop_bad_timestamps
 
 
 def test_bad_timestamps_keeps_strictly_increasing_points():
