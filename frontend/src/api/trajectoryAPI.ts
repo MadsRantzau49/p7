@@ -2,7 +2,8 @@ import { apiclient } from "../api/apiclient";
 import type { uniformedTrajectoryResponse } from "../models/uniformedTrajectoryResponse";
 import type { trajectoryCitites } from "../models/trajectoryCities";
 
-export async function getTrajectories(city: string, startDate?: string, endDate?: string, limit?: number){
+export async function getTrajectories(city: string, startDate?: string, endDate?: string, startTime?: string,
+  endTime?: string, limit?: number){
     const response = await apiclient.get<uniformedTrajectoryResponse[]>(
         "trajectories/get",
         {
@@ -10,6 +11,8 @@ export async function getTrajectories(city: string, startDate?: string, endDate?
                 city,
                 start_date: startDate,
                 end_date: endDate,
+                start_time: startTime,
+                end_time: endTime,
                 limit: limit
             },
         }

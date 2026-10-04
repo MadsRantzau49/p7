@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import date, datetime, time, timedelta
 
 from models.beijing_trajectory import BeijingTrajectory
 from models.dataset import DataSet
@@ -213,26 +213,71 @@ def insert_data_uniformed_trajectories(context, trajectories: list[UniformedTraj
 
 
 async def get_trajectories_from_db(
-    context, city: str, start_date: datetime | None, end_date: datetime | None, limit: int | None
+    context,
+    city: str,
+    start_date: date | None,
+    end_date: date | None,
+    start_time: time | None,
+    end_time: time | None,
+    limit: int | None,
 ) -> list[UniformedTrajectories]:
-    """Fetch trajectories from the database using the given filters."""
+    """Fetch trajectories that lie completely inside the date range and daily time window.
+
+    A trajectory is only returned if all its points are inside the period: it must
+    start on or after start_date and end on or before end_date, and on every day its first
+    and last point must be inside the time window. Trajectories that are partly
+    outside are left out entirely.
+
+    The time window applies to every day in the date range. If start_time is later
+    than end_time, the window crosses midnight (e.g. 23:50-02:00), and trips that
+    run from the evening into the next morning are included.
+
+    Missing dates or times mean no limit on that side.
+    """
     cursor = context.cursor(dictionary=True)
 
     try:
+        trajectory_end = "CAST(JSON_UNQUOTE(JSON_EXTRACT(points, '$[last].point_timestamp')) AS DATETIME)"
         conditions = ["city = %s"]
-        values: list[str | datetime | int] = [city]
+        values: list[str | date | time | int] = [city]
 
         if start_date is not None:
             conditions.append("trajectory_date >= %s")
             values.append(start_date)
 
         if end_date is not None:
-            conditions.append("trajectory_date < %s")
-            values.append(end_date)
+            day_after_end = end_date + timedelta(days=1)
+            conditions.append("t.trajectory_date < %s")
+            values.append(day_after_end)
+            conditions.append(f"{trajectory_end} < %s")
+            values.append(day_after_end)
+
+        if start_time is not None and end_time is not None and start_time > end_time:
+            # Overnight window, e.g. 23:50-02:00
+            conditions.append(
+                f"((DATEDIFF({trajectory_end}, t.trajectory_date) = 0"
+                f" AND (TIME(t.trajectory_date) >= %s OR TIME({trajectory_end}) <= %s))"
+                f" OR (DATEDIFF({trajectory_end}, t.trajectory_date) = 1"
+                f" AND TIME(t.trajectory_date) >= %s AND TIME({trajectory_end}) <= %s))"
+            )
+            values.extend([start_time, end_time, start_time, end_time])
+
+        else:
+            # Normal window, e.g. 14:45-15:00
+            if start_time is not None or end_time is not None:
+                conditions.append(f"DATEDIFF({trajectory_end}, t.trajectory_date) = 0")
+
+            if start_time is not None:
+                conditions.append("TIME(t.trajectory_date) >= %s")
+                values.append(start_time)
+
+            if end_time is not None:
+                conditions.append(f"TIME({trajectory_end}) <= %s")
+                values.append(end_time)
 
         sql = f"""
             SELECT t.trajectory_id, t.vehicle_id, vt.name AS vehicle_type,
-            t.trajectory_date, t.city, t.points, t.source_id
+                   t.trajectory_date, t.city, t.points, t.source_id
             FROM uniformed_trajectories AS t
             LEFT JOIN vehicle_types AS vt
                 ON t.vehicle_type_id = vt.vehicle_type_id
@@ -266,8 +311,8 @@ async def get_trajectories_from_db(
             for trajectory in cursor.fetchall()
         ]
 
-    except Exception:
-        print("Failed to get_trajectories from databae")
+    except Exception as error:
+        print(f"Failed to get trajectories from database: {error}")
         raise
     finally:
         cursor.close()

@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from unittest.mock import MagicMock
 
 import pytest
@@ -56,15 +56,28 @@ def test_queries_against_configured_database():
         assert isinstance(queries.retrieve_porto_dataset_batch(context, 1, ""), list)
         assert isinstance(queries.retrieve_beijing_data_batch(context, 1, None), list)
         assert isinstance(queries.retrieve_beijing_data_batch(context, 1, ""), list)
-        assert len(asyncio.run(queries.get_trajectories_from_db(context, name, None, None, None))) == 1
+        assert (
+            len(asyncio.run(queries.get_trajectories_from_db(context, name, None, None, None, None, None)))
+            == 1
+        )
         result = asyncio.run(
             queries.get_trajectories_from_db(
-                context, name, now - timedelta(days=1), now + timedelta(days=1), 1
+                context,
+                name,
+                (now - timedelta(days=1)).date(),
+                (now + timedelta(days=1)).date(),
+                time.min,
+                time.max,
+                1,
             )
         )
         assert len(result) == 1
         assert isinstance(result[0], UniformedTrajectories)
         assert isinstance(result[0].points[0], UniformedTrajectoryPoint)
+        assert isinstance(
+            asyncio.run(queries.get_trajectories_from_db(context, name, None, None, time(23), time(2), None)),
+            list,
+        )
     finally:
         context.rollback()
         context.close()
@@ -79,7 +92,9 @@ def test_query_errors_are_raised_and_cursors_closed():
         lambda context: queries.insert_beijing_dataset(context, []),
         lambda context: queries.retrieve_porto_dataset_batch(context, 1, None),
         lambda context: queries.retrieve_beijing_data_batch(context, 1, None),
-        lambda context: asyncio.run(queries.get_trajectories_from_db(context, "x", None, None, None)),
+        lambda context: asyncio.run(
+            queries.get_trajectories_from_db(context, "x", None, None, None, None, None)
+        ),
         lambda context: queries.dataset_name_taken(context, "x"),
         lambda context: queries.create_dataset(context, "x"),
         lambda context: asyncio.run(queries.get_trajectories_cities_from_db(context)),
