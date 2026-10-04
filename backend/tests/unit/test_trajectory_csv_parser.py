@@ -1,8 +1,13 @@
 import io
-from datetime import datetime
+import json
+from datetime import datetime, timedelta
 
 import pytest
 from helpers.trajectory_csv_parser import InvalidTrajectoryCsvError, parse_trajectory_csv
+from helpers.trajectory_helpers import (
+    convert_beijing_trajectory,
+    convert_porto_trajectory,
+)
 from helpers.upload_parser import EXPECTED_HEADER
 from models.upload_row import VehicleType
 
@@ -66,16 +71,6 @@ def test_header_without_data_rows_raises_error():
     assert raised.value.errors[0].message == "the file has a header but no data rows"
 
 
-import json
-from datetime import datetime, timedelta
-
-from helpers.trajectory_helpers import (
-    convert_beijing_trajectory,
-    convert_porto_trajectory,
-)
-from models.upload_row import VehicleType
-
-
 def test_convert_porto_trajectory():
     """Convert Porto data into the uniform trajectory model."""
     timestamp = 1700000000
@@ -106,9 +101,7 @@ def test_convert_porto_trajectory():
 
     assert result.points[1].longitude == -8.62
     assert result.points[1].latitude == 41.16
-    assert result.points[1].point_timestamp == (
-        datetime.fromtimestamp(timestamp) + timedelta(seconds=15)
-    )
+    assert result.points[1].point_timestamp == (datetime.fromtimestamp(timestamp) + timedelta(seconds=15))
 
 
 def test_convert_porto_trajectory_with_json_polyline():

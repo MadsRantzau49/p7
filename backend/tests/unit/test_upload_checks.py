@@ -3,6 +3,7 @@ import io
 import pytest
 from helpers.upload_checks import sort_and_check_trajectories, speed_kmh
 from helpers.upload_parser import EXPECTED_HEADER, MAX_ERRORS, parse_upload
+
 HEADER = ",".join(EXPECTED_HEADER)
 
 COPENHAGEN = "12.5683,55.6761"

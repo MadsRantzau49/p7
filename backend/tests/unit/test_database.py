@@ -1,6 +1,5 @@
-from mysql.connector import pooling
-
 from database.connection import create_db_connection
+from mysql.connector import pooling
 
 
 def test_create_db_connection():

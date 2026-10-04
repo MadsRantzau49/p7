@@ -4,7 +4,8 @@ from datetime import datetime
 from models.beijing_trajectory import BeijingTrajectory
 from models.dataset import DataSet
 from models.porto_trajectory import PortoTrajectory
-from models.uniformed_trajectories import UniformedTrajectories
+from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint
+from models.upload_row import VehicleType
 
 
 def get_dataset_id(context, dataset_name: str) -> int:
@@ -245,12 +246,25 @@ async def get_trajectories_from_db(
 
         cursor.execute(sql, values)
 
-        trajectories = cursor.fetchall()
-
-        for trajectory in trajectories:
-            trajectory["points"] = json.loads(trajectory["points"])
-
-        return trajectories
+        return [
+            UniformedTrajectories(
+                trajectory_id=trajectory["trajectory_id"],
+                vehicle_id=trajectory["vehicle_id"],
+                vehicle_type=VehicleType(trajectory["vehicle_type"]),
+                trajectory_date=trajectory["trajectory_date"],
+                city=trajectory["city"],
+                points=[
+                    UniformedTrajectoryPoint(
+                        longitude=point["longitude"],
+                        latitude=point["latitude"],
+                        point_timestamp=datetime.fromisoformat(point["point_timestamp"]),
+                    )
+                    for point in json.loads(trajectory["points"])
+                ],
+                source_id=trajectory["source_id"],
+            )
+            for trajectory in cursor.fetchall()
+        ]
 
     except Exception:
         print("Failed to get_trajectories from databae")

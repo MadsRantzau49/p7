@@ -1,8 +1,6 @@
-from fastapi.testclient import TestClient
-
 import routers.trajectory_router as trajectory_router
+from fastapi.testclient import TestClient
 from main import app
-
 
 client = TestClient(app)
 

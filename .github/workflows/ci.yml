@@ -30,10 +30,7 @@ jobs:
         run: python -m compileall -q backend/src backend/tests
 
       - name: Type check
-        run: |
-          if ! pyright backend/src backend/tests; then
-            echo "::warning::Pyright found type errors"
-          fi
+        run: pyright backend/src backend/tests
 
       - name: Check unused code
         run: |
@@ -44,7 +41,4 @@ jobs:
       - name: Test with coverage
         run: |
           pytest --cov=backend/src --cov-report=term-missing
-
-          if ! coverage report --fail-under=80; then
-            echo "::warning::Test coverage is below 80%"
-          fi
+          coverage report --fail-under=100

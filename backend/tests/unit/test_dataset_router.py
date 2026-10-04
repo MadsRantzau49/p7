@@ -1,11 +1,9 @@
-from fastapi.testclient import TestClient
-
 import routers.dataset_router as dataset_router
+from fastapi.testclient import TestClient
 from helpers.trajectory_csv_parser import InvalidTrajectoryCsvError
 from helpers.upload_parser import UploadError
 from main import app
 from services.dataset_upload_service import DatasetNameTakenError
-
 
 client = TestClient(app)
 
