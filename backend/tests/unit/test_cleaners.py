@@ -29,6 +29,7 @@ def _point(lat: float, lon: float, seconds: float = 0) -> UniformedTrajectoryPoi
 
 # _haversine
 
+
 def test_haversine_one_degree_of_latitude_is_about_111_km():
     """One degree of latitude is roughly 111 km regardless of longitude"""
     distance = _haversine(_point(57.0, 10.0), _point(58.0, 10.0))
@@ -39,7 +40,9 @@ def test_haversine_is_zero_for_identical_points():
     """The distance between a point and itself is zero."""
     assert _haversine(_point(57.0, 10.0), _point(57.0, 10.0)) == pytest.approx(0.0)
 
+
 # drop_out_of_bounds
+
 
 def test_out_of_bounds_keeps_points_inside_the_box():
     """Points strictly inside the bbox are all kept"""

@@ -38,18 +38,23 @@ def clean_trajectory(trajectory: UniformedTrajectories) -> tuple[list[UniformedT
 
     segments, report.gaps_found = detect_gaps(points, config.gap_time, config.gap_distance)
     # drop new segments that are smaller
-    segments = [seg for seg in segments if len(seg) >= config.min_points]
+    long_segments = []
+    for segment in segments:
+        if len(segment) >= config.min_points:
+            long_segments.append(segment)
+    segments = long_segments
 
-    cleaned = [
-        replace(
-            trajectory,
-            trajectory_id=None,
-            source_id=str(uuid.uuid4()),
-            trajectory_date=segment[0].point_timestamp,
-            points=segment,
+    cleaned = []
+    for segment in segments:
+        cleaned.append(
+            replace(
+                trajectory,
+                trajectory_id=None,
+                source_id=str(uuid.uuid4()),
+                trajectory_date=segment[0].point_timestamp,
+                points=segment,
+            )
         )
-        for segment in segments
-    ]
 
     report.segments_out = len(cleaned)
     report.points_out = sum(len(c.points) for c in cleaned)
@@ -111,9 +116,11 @@ def clean_dataset(city: str, batch_size: int) -> DatasetReport:
                 reports.append(report)
 
             dataset_id = batch[0]["dataset_id"]
-            queries.create_source_trajectories(
-                context, dataset_id, [cast(str, run.source_id) for run in cleaned_batch]
-            )
+            source_ids = []
+            for run in cleaned_batch:
+                source_ids.append(cast(str, run.source_id))
+
+            queries.create_source_trajectories(context, dataset_id, source_ids)
             queries.insert_cleaned_uniformed_trajectories(context, cleaned_batch)
             context.commit()
             last_id = batch[-1]["trajectory_id"]

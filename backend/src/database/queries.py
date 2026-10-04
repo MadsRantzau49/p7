@@ -413,14 +413,17 @@ def insert_cleaned_uniformed_trajectories(context, trajectories: list[UniformedT
     try:
         values = []
         for trajectory in trajectories:
-            points = [
-                {
-                    "longitude": point.longitude,
-                    "latitude": point.latitude,
-                    "point_timestamp": point.point_timestamp.isoformat(),
-                }
-                for point in trajectory.points
-            ]
+            points = []
+
+            for point in trajectory.points:
+                points.append(
+                    {
+                        "longitude": point.longitude,
+                        "latitude": point.latitude,
+                        "point_timestamp": point.point_timestamp.isoformat(),
+                    }
+                )
+
             values.append(
                 (
                     trajectory.vehicle_id,
@@ -431,6 +434,7 @@ def insert_cleaned_uniformed_trajectories(context, trajectories: list[UniformedT
                     trajectory.source_id,
                 )
             )
+
         cursor.executemany(
             "INSERT INTO cleaned_uniformed_trajectories "
             "(vehicle_id, vehicle_type_id, trajectory_date, city, points, source_id) "
