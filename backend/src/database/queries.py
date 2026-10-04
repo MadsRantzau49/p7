@@ -372,3 +372,77 @@ def get_vehicle_type_ids(context) -> dict[str, int]:
         raise
     finally:
         cursor.close()
+
+
+def retrieve_uniformed_batch(
+    context, city: str, batch_size: int, last_trajectory_id: int | None
+) -> list[dict]:
+    """Fetch a batch of a city's uniformed trajectories ordered by trajectory_id."""
+    cursor = context.cursor(dictionary=True)
+    try:
+        base = """
+            SELECT u.trajectory_id, u.vehicle_id, vt.name AS vehicle_type,
+                   u.trajectory_date, u.city, u.points, u.source_id, s.dataset_id
+            FROM uniformed_trajectories u
+            JOIN source_trajectories s ON s.source_id = u.source_id
+            LEFT JOIN vehicle_types vt ON u.vehicle_type_id = vt.vehicle_type_id
+            WHERE u.city = %s
+        """
+        if last_trajectory_id is None:
+            cursor.execute(base + " ORDER BY u.trajectory_id LIMIT %s", (city, batch_size))
+        else:
+            cursor.execute(
+                base + " AND u.trajectory_id > %s ORDER BY u.trajectory_id LIMIT %s",
+                (city, last_trajectory_id, batch_size),
+            )
+        rows = cursor.fetchall()
+        for row in rows:
+            row["points"] = json.loads(row["points"])
+        return rows
+    except Exception as error:
+        print(f"Failed to retrieve uniformed batch: {error}")
+        raise
+    finally:
+        cursor.close()
+
+
+def insert_cleaned_uniformed_trajectories(context, trajectories: list[UniformedTrajectories]) -> None:
+    """Bulk-insert cleaned trajectory runs into the cleaned_uniformed_trajectories table."""
+    vehicle_type_ids = get_vehicle_type_ids(context)
+    cursor = context.cursor()
+    try:
+        values = []
+        for trajectory in trajectories:
+            points = []
+
+            for point in trajectory.points:
+                points.append(
+                    {
+                        "longitude": point.longitude,
+                        "latitude": point.latitude,
+                        "point_timestamp": point.point_timestamp.isoformat(),
+                    }
+                )
+
+            values.append(
+                (
+                    trajectory.vehicle_id,
+                    vehicle_type_ids[trajectory.vehicle_type],
+                    trajectory.trajectory_date,
+                    trajectory.city,
+                    json.dumps(points),
+                    trajectory.source_id,
+                )
+            )
+
+        cursor.executemany(
+            "INSERT INTO cleaned_uniformed_trajectories "
+            "(vehicle_id, vehicle_type_id, trajectory_date, city, points, source_id) "
+            "VALUES (%s, %s, %s, %s, %s, %s)",
+            values,
+        )
+    except Exception as error:
+        print(f"Failed to insert cleaned uniformed trajectories: {error}")
+        raise
+    finally:
+        cursor.close()
