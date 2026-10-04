@@ -1,0 +1,22 @@
+name: trajectory-app
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/backend/Dockerfile
+    env_file:
+      - ../.env
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/frontend/Dockerfile
+      args:
+        VITE_BACKEND_API_PATH: http://localhost:8000/api/
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
