@@ -24,11 +24,12 @@ def drop_out_of_bounds(
     """Drop all points not within city limits."""
     lat_min, lat_max, lon_min, lon_max = bbox
 
-    kept = [
-        point
-        for point in points
-        if lat_min < point.latitude < lat_max and lon_min < point.longitude < lon_max
-    ]
+    kept = []
+    for point in points:
+        inside_lat = lat_min < point.latitude < lat_max
+        inside_lon = lon_min < point.longitude < lon_max
+        if inside_lat and inside_lon:
+            kept.append(point)
 
     return kept, len(points) - len(kept)
 
