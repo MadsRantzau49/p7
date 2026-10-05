@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import type { SubmitEvent } from "react";
 import { getTrajectories, getTrajectoryCities } from "../api/trajectoryAPI";
 import type { uniformedTrajectoryResponse } from "../models/uniformedTrajectoryResponse";
 import TrajectoryMap from "./trajectoryMap";
+import TimeRangeSlider from "./timeRangeSlider.tsx";
+import DatasetUpload from "./datasetUpload";
 import "../css/TrajectoryPage.css";
 import type { trajectoryCitites } from "../models/trajectoryCities";
 
@@ -12,6 +14,10 @@ export default function TrajectoryPage() {
   const [city, setCity] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+
+  const [startTime, setStartTime] = useState("00:00");
+  const [endTime, setEndTime] = useState("23:59");
+
   const [limit, setLimit] = useState("100");
 
   const [trajectories, setTrajectories] = useState<uniformedTrajectoryResponse[]>([]);
@@ -68,7 +74,7 @@ export default function TrajectoryPage() {
     setError("");
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
 
@@ -94,8 +100,10 @@ export default function TrajectoryPage() {
     try {
       const data = await getTrajectories(
         city,
-        startDate ? `${startDate}T00:00:00` : undefined,
-        endDate ? `${endDate}T23:59:59.999999` : undefined,
+        startDate || undefined,
+        endDate || undefined,
+        startTime ? `${startTime}:00` : undefined,
+        endTime ? `${endTime}:59` : undefined,
         requestedLimit
       );
 
@@ -111,6 +119,8 @@ export default function TrajectoryPage() {
   }
 
   const visibleTrajectories = selectedTrajectoryId === null ? trajectories : trajectories.filter( (trajectory) => trajectory.trajectory_id === selectedTrajectoryId);
+
+  const isSameDay = Boolean(startDate && endDate && startDate === endDate);
 
   let statusMessage = "Choose your filters to display trajectories.";
 
@@ -167,6 +177,30 @@ export default function TrajectoryPage() {
             </div>
 
             <div className="trajectory-field">
+              <label>Time range</label>
+
+              <TimeRangeSlider
+                startTime={startTime}
+                endTime={endTime}
+                onChange={(
+                  newStartTime,
+                  newEndTime
+                ) => {
+                  setStartTime(
+                    newStartTime
+                  );
+
+                  setEndTime(
+                    newEndTime
+                  );
+
+                }}
+                allowOvernight={!isSameDay}
+              />
+            </div>
+
+
+            <div className="trajectory-field">
               <label htmlFor="limit">Maximum trajectories</label>
 
               <input id="limit" type="number" min="0" step="1" value={limit} onChange={(event) => setLimit(event.target.value)}/>
@@ -179,6 +213,8 @@ export default function TrajectoryPage() {
         </form>
 
         <p className="trajectory-description" role="status">{statusMessage}</p>
+
+        <DatasetUpload />
       </aside>
 
       <main className="trajectory-workspace">

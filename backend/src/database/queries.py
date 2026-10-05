@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import date, time, timedelta
 
 from models.beijing_trajectory import BeijingTrajectory
 from models.dataset import DataSet
@@ -213,26 +213,77 @@ def insert_data_uniformed_trajectories(context, trajectories: list[UniformedTraj
 
 
 async def get_trajectories_from_db(
-    context, city: str, start_date: datetime | None, end_date: datetime | None, limit: int | None
+    context,
+    city: str,
+    start_date: date | None,
+    end_date: date | None,
+    start_time: time | None,
+    end_time: time | None,
+    limit: int | None,
 ) -> list[UniformedTrajectories]:
-    """Fetch trajectories from the database using the given filters."""
+    """Fetch trajectories that lie completely inside the date range and daily time window.
+
+    A trajectory is only returned if all its points are inside the period: it must
+    start on or after start_date and end on or before end_date, and on every day its first
+    and last point must be inside the time window. Trajectories that are partly
+    outside are left out entirely.
+
+    The time window applies to every day in the date range. If start_time is later
+    than end_time, the window crosses midnight (e.g. 23:50-02:00), and trips that
+    run from the evening into the next morning are included.
+
+    Missing dates or times mean no limit on that side.
+    """
+
     cursor = context.cursor(dictionary=True)
 
     try:
-        conditions = ["city = %s"]
-        values: list[str | datetime | int] = [city]
+        # Get the last time stamp of a trajectory
+        trajectory_end = "CAST(JSON_UNQUOTE(JSON_EXTRACT(points, '$[last].point_timestamp')) AS DATETIME)"
+
+        conditions = [
+            "city = %s",
+        ]
+
+        values: list = [city]
 
         if start_date is not None:
             conditions.append("trajectory_date >= %s")
             values.append(start_date)
 
         if end_date is not None:
-            conditions.append("trajectory_date < %s")
-            values.append(end_date)
+            day_after_end = end_date + timedelta(days=1)
+            conditions.append("t.trajectory_date < %s")
+            values.append(day_after_end)
+            conditions.append(f"{trajectory_end} < %s")
+            values.append(day_after_end)
+
+        if start_time is not None and end_time is not None and start_time > end_time:
+            # Overnight window, e.g. 23:50-02:00
+            conditions.append(
+                f"((DATEDIFF({trajectory_end}, t.trajectory_date) = 0"
+                f" AND (TIME(t.trajectory_date) >= %s OR TIME({trajectory_end}) <= %s))"
+                f" OR (DATEDIFF({trajectory_end}, t.trajectory_date) = 1"
+                f" AND TIME(t.trajectory_date) >= %s AND TIME({trajectory_end}) <= %s))"
+            )
+            values.extend([start_time, end_time, start_time, end_time])
+
+        else:
+            # Normal window, e.g. 14:45-15:00
+            if start_time is not None or end_time is not None:
+                conditions.append(f"DATEDIFF({trajectory_end}, t.trajectory_date) = 0")
+
+            if start_time is not None:
+                conditions.append("TIME(t.trajectory_date) >= %s")
+                values.append(start_time)
+
+            if end_time is not None:
+                conditions.append(f"TIME({trajectory_end}) <= %s")
+                values.append(end_time)
 
         sql = f"""
             SELECT t.trajectory_id, t.vehicle_id, vt.name AS vehicle_type,
-            t.trajectory_date, t.city, t.points, t.source_id
+                   t.trajectory_date, t.city, t.points, t.source_id
             FROM uniformed_trajectories AS t
             LEFT JOIN vehicle_types AS vt
                 ON t.vehicle_type_id = vt.vehicle_type_id
@@ -253,8 +304,8 @@ async def get_trajectories_from_db(
 
         return trajectories
 
-    except Exception:
-        print("Failed to get_trajectories from databae")
+    except Exception as error:
+        print(f"Failed to get trajectories from database: {error}")
         raise
     finally:
         cursor.close()
@@ -324,21 +375,98 @@ def get_vehicle_type_ids(context) -> dict[str, int]:
         cursor.close()
 
 
-async def insert_segments_into_db(context, segments: list[TrajectorySegments]) -> None:
+def retrieve_uniformed_batch(
+    context, city: str, batch_size: int, last_trajectory_id: int | None
+) -> list[dict]:
+    """Fetch a batch of a city's uniformed trajectories ordered by trajectory_id."""
+    cursor = context.cursor(dictionary=True)
+    try:
+        base = """
+            SELECT u.trajectory_id, u.vehicle_id, vt.name AS vehicle_type,
+                   u.trajectory_date, u.city, u.points, u.source_id, s.dataset_id
+            FROM uniformed_trajectories u
+            JOIN source_trajectories s ON s.source_id = u.source_id
+            LEFT JOIN vehicle_types vt ON u.vehicle_type_id = vt.vehicle_type_id
+            WHERE u.city = %s
+        """
+        if last_trajectory_id is None:
+            cursor.execute(base + " ORDER BY u.trajectory_id LIMIT %s", (city, batch_size))
+        else:
+            cursor.execute(
+                base + " AND u.trajectory_id > %s ORDER BY u.trajectory_id LIMIT %s",
+                (city, last_trajectory_id, batch_size),
+            )
+        rows = cursor.fetchall()
+        for row in rows:
+            row["points"] = json.loads(row["points"])
+        return rows
+    except Exception as error:
+        print(f"Failed to retrieve uniformed batch: {error}")
+        raise
+    finally:
+        cursor.close()
+
+
+def insert_cleaned_uniformed_trajectories(context, trajectories: list[UniformedTrajectories]) -> None:
+    """Bulk-insert cleaned trajectory runs into the cleaned_uniformed_trajectories table."""
+    vehicle_type_ids = get_vehicle_type_ids(context)
+    cursor = context.cursor()
+    try:
+        values = []
+        for trajectory in trajectories:
+            points = []
+
+            for point in trajectory.points:
+                points.append(
+                    {
+                        "longitude": point.longitude,
+                        "latitude": point.latitude,
+                        "point_timestamp": point.point_timestamp.isoformat(),
+                    }
+                )
+
+            values.append(
+                (
+                    trajectory.vehicle_id,
+                    vehicle_type_ids[trajectory.vehicle_type],
+                    trajectory.trajectory_date,
+                    trajectory.city,
+                    json.dumps(points),
+                    trajectory.source_id,
+                )
+            )
+
+        cursor.executemany(
+            "INSERT INTO cleaned_uniformed_trajectories "
+            "(vehicle_id, vehicle_type_id, trajectory_date, city, points, source_id) "
+            "VALUES (%s, %s, %s, %s, %s, %s)",
+            values,
+        )
+    except Exception as error:
+        print(f"Failed to insert cleaned uniformed trajectories: {error}")
+
+
+def insert_segments_into_db(context, segments: list[TrajectorySegments]) -> None:
     """Inserts segments into tabel in database"""
     cursor = context.cursor()
 
-    values = []
-
-    for segment in segments:
-        values.append(
-            (segment.trajectory_id, segment.segment_index, segment.path, segment.start_time, segment.end_time)
-        )
-
     try:
+        rows = []
+
+        for t_segment in segments:
+            rows.append(
+                (
+                    t_segment.trajectory_id,
+                    t_segment.segment_index,
+                    t_segment.path,
+                    t_segment.start_time,
+                    t_segment.end_time,
+                )
+            )
+
         cursor.executemany(
             """
-        INSERT INTO trajectory_segments (
+        INSERT IGNORE INTO trajectory_segments (
             trajectory_id,
             segment_index,
             path,
@@ -346,10 +474,67 @@ async def insert_segments_into_db(context, segments: list[TrajectorySegments]) -
             end_time)
             VALUES (%s, %s, ST_GeomFromText(%s, 4326, 'axis-order=long-lat'), %s, %s)
             """,
-            values,
+            rows,
         )
     except Exception as error:
         print(f"Failed to insert segments into database: {error}")
         raise
+    finally:
+        cursor.close()
+
+
+async def retrieve_cleaned_uniformed_batch(
+    context, batch_size: int, last_trajectory_id: int | None
+) -> list[dict]:
+    """Fetch a batch of cleaned uniformed trajectories ordered by trajectory_id."""
+    cursor = context.cursor(dictionary=True)
+    try:
+        base = """
+            SELECT u.trajectory_id, u.points
+            FROM cleaned_uniformed_trajectories u
+        """
+
+        if last_trajectory_id is None:
+            query = base + " ORDER BY u.trajectory_id LIMIT %s"
+            params = (batch_size,)
+        else:
+            query = (
+                base
+                + """
+                WHERE u.trajectory_id > %s
+                ORDER BY u.trajectory_id
+                LIMIT %s
+            """
+            )
+            params = (last_trajectory_id, batch_size)
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+
+        for row in rows:
+            row["points"] = json.loads(row["points"])
+
+        return rows
+
+    except Exception as error:
+        print(f"Failed to retrieve cleaned uniformed batch: {error}")
+        raise
+    finally:
+        cursor.close()
+
+
+def get_last_segmented_trajectory_id(context) -> int | None:
+    """Function retrieves the lastest trajectory id from segment table"""
+    cursor = context.cursor(dictionary=True)
+    try:
+        cursor.execute("""
+            SELECT trajectory_id
+            FROM trajectory_segments
+            ORDER BY trajectory_id DESC
+            LIMIT 1
+        """)
+        row = cursor.fetchone()
+
+        return row["trajectory_id"] if row else None
     finally:
         cursor.close()

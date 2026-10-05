@@ -81,7 +81,7 @@ export default function TrajectoryMap({ trajectories, showTrajectoryDataPoints }
               <Popup>
                 <strong>Trajectory {trajectory.trajectory_id}</strong>
                 <br />
-                Taxi {trajectory.taxi_id}
+                Taxi {trajectory.vehicle_id}
                 <br />
                 {trajectory.city}
               </Popup>
