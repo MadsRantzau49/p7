@@ -129,8 +129,9 @@ async def insert_trajectory_segments(trajectories: list[dict]):
 
 async def test_insert_trajectory_segments():
     """This function retrieves cleaned trajectories and inserts into segments"""
-    batch_size = 100
+    batch_size = 500
     context = create_db_connection()
+
     try:
         last_id = get_last_segmented_trajectory_id(context)
         print(f"last_id: {last_id}")
@@ -141,13 +142,18 @@ async def test_insert_trajectory_segments():
             if not current_batch:
                 break
 
-            print(f"Retrieved {len(current_batch)} trajectories")
+            print(
+                f"Retrieved {len(current_batch)} trajectories "
+                f"from {current_batch[0]['trajectory_id']} "
+                f"to {current_batch[-1]['trajectory_id']}"
+            )
 
-            for trajectory in current_batch:
-                await insert_trajectory_segments([trajectory])
-                last_id = trajectory["trajectory_id"]
+            inserted = await insert_trajectory_segments(current_batch)
 
-                print(f"Inserted segments for trajectory_id {last_id}")
+            last_id = current_batch[-1]["trajectory_id"]
+
+            print(f"Inserted {inserted} segments up to trajectory_id {last_id}")
+
     except Exception as error:
         print(f"Failed to insert trajectory segments: {error}")
         context.rollback()
