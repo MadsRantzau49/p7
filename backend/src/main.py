@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers.dataset_router import router as dataset_router
-from routers.trajectory_router import router as trajectory_router
 from routers.test_routers import router as test_router
+from routers.trajectory_router import router as trajectory_router
 
 app = FastAPI(title="Trajectory API", version="0.0.1")
 

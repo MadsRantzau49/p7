@@ -454,13 +454,15 @@ def insert_segments_into_db(context, segments: list[TrajectorySegments]) -> None
         rows = []
 
         for t_segment in segments:
-            rows.append((
-                t_segment.trajectory_id,
-                t_segment.segment_index,
-                t_segment.path,
-                t_segment.start_time,
-                t_segment.end_time
-            ))
+            rows.append(
+                (
+                    t_segment.trajectory_id,
+                    t_segment.segment_index,
+                    t_segment.path,
+                    t_segment.start_time,
+                    t_segment.end_time,
+                )
+            )
 
         cursor.executemany(
             """
@@ -480,6 +482,7 @@ def insert_segments_into_db(context, segments: list[TrajectorySegments]) -> None
     finally:
         cursor.close()
 
+
 async def retrieve_cleaned_uniformed_batch(
     context, batch_size: int, last_trajectory_id: int | None
 ) -> list[dict]:
@@ -495,11 +498,14 @@ async def retrieve_cleaned_uniformed_batch(
             query = base + " ORDER BY u.trajectory_id LIMIT %s"
             params = (batch_size,)
         else:
-            query = base + """
+            query = (
+                base
+                + """
                 WHERE u.trajectory_id > %s
                 ORDER BY u.trajectory_id
                 LIMIT %s
             """
+            )
             params = (last_trajectory_id, batch_size)
 
         cursor.execute(query, params)
@@ -518,6 +524,7 @@ async def retrieve_cleaned_uniformed_batch(
 
 
 def get_last_segmented_trajectory_id(context) -> int | None:
+    """Function retrieves the lastest trajectory id from segment table"""
     cursor = context.cursor(dictionary=True)
     try:
         cursor.execute("""
