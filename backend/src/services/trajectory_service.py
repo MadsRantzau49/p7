@@ -1,8 +1,14 @@
 from datetime import date, time
 
 from database.connection import create_db_connection
-from database.queries import get_trajectories_cities_from_db, get_trajectories_from_db
+from database.queries import (
+    get_trajectories_cities_from_db,
+    get_trajectories_from_db,
+    insert_segments_into_db,
+    retrieve_cleaned_uniformed_batch
+)
 from models.dataset import DataSet
+from models.trajectory_segments import TrajectorySegments
 from models.uniformed_trajectories import UniformedTrajectories
 
 
@@ -67,6 +73,74 @@ async def get_trajectories_cities() -> list[DataSet]:
 
     except Exception as error:
         print(f"Failed to retrieve cities from database: {error}")
+        raise
+    finally:
+        context.close()
+
+
+async def insert_trajectory_segments(trajectories: list[dict]):
+    """Creates segments from cleaned trajectory data"""
+    rows = []
+    segments: list[TrajectorySegments] = []
+
+    context = create_db_connection()
+
+    for trajectory in trajectories:
+        points = trajectory["points"]
+
+        for segment_index in range(len(points) - 1):
+            start = points[segment_index]
+            end = points[segment_index + 1]
+
+            path = f"LINESTRING({start["longitude"]} {start["latitude"]}, {end["longitude"]} {end["latitude"]})"
+
+            if trajectory["trajectory_id"] is None:
+                raise ValueError("Trajectory_id is none!")
+
+            segments.append(
+                TrajectorySegments(
+                    trajectory_id=trajectory["trajectory_id"],
+                    segment_index=segment_index,
+                    path=path,
+                    start_time=start["point_timestamp"],
+                    end_time=end["point_timestamp"],
+                )
+            )
+
+    if not rows:
+        return 0
+
+    try:
+        insert_segments_into_db(context, rows)
+        context.commit()
+        return len(rows)
+    except Exception as error:
+        print(f"Failed to insert trajectories segments: {error}")
+        raise
+    finally:
+        context.close()
+
+async def test_insert_trajectory_segments():
+    """This function retrieves cleaned trajectories and inserts into segments"""
+    batch_size = 5000
+    context = create_db_connection()
+    try:
+        last_id = None
+
+        while True:
+            current_batch = await retrieve_cleaned_uniformed_batch(context, batch_size, last_id)
+
+            if current_batch is None:
+                break
+
+            await insert_trajectory_segments(current_batch)
+
+            last_id = current_batch[-1]["trajectory_id"]
+
+            return current_batch
+
+    except Exception as error:
+        context.rollback()
         raise
     finally:
         context.close()
