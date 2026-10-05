@@ -451,9 +451,20 @@ def insert_segments_into_db(context, segments: list[TrajectorySegments]) -> None
     cursor = context.cursor()
 
     try:
+        rows = []
+
+        for t_segment in segments:
+            rows.append((
+                t_segment.trajectory_id,
+                t_segment.segment_index,
+                t_segment.path,
+                t_segment.start_time,
+                t_segment.end_time
+            ))
+
         cursor.executemany(
             """
-        INSERT INTO trajectory_segments (
+        INSERT IGNORE INTO trajectory_segments (
             trajectory_id,
             segment_index,
             path,
@@ -461,7 +472,7 @@ def insert_segments_into_db(context, segments: list[TrajectorySegments]) -> None
             end_time)
             VALUES (%s, %s, ST_GeomFromText(%s, 4326, 'axis-order=long-lat'), %s, %s)
             """,
-            segments,
+            rows,
         )
     except Exception as error:
         print(f"Failed to insert segments into database: {error}")
@@ -476,11 +487,8 @@ async def retrieve_cleaned_uniformed_batch(
     cursor = context.cursor(dictionary=True)
     try:
         base = """
-            SELECT u.trajectory_id, u.vehicle_id, vt.name AS vehicle_type,
-                   u.trajectory_date, u.city, u.points, u.source_id, s.dataset_id
+            SELECT u.trajectory_id, u.points
             FROM cleaned_uniformed_trajectories u
-            JOIN source_trajectories s ON s.source_id = u.source_id
-            LEFT JOIN vehicle_types vt ON u.vehicle_type_id = vt.vehicle_type_id
         """
 
         if last_trajectory_id is None:
@@ -499,12 +507,24 @@ async def retrieve_cleaned_uniformed_batch(
 
         for row in rows:
             row["points"] = json.loads(row["points"])
-            print(row)
 
         return rows
 
     except Exception as error:
         print(f"Failed to retrieve cleaned uniformed batch: {error}")
         raise
+    finally:
+        cursor.close()
+
+
+def get_last_segmented_trajectory_id(context) -> int | None:
+    cursor = context.cursor(dictionary=True)
+    try:
+        cursor.execute("""
+            SELECT MAX(trajectory_id) AS last_id
+            FROM trajectory_segments
+        """)
+        row = cursor.fetchone()
+        return row["last_id"] if row and row["last_id"] is not None else None
     finally:
         cursor.close()

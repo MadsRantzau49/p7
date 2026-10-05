@@ -5,7 +5,8 @@ from database.queries import (
     get_trajectories_cities_from_db,
     get_trajectories_from_db,
     insert_segments_into_db,
-    retrieve_cleaned_uniformed_batch
+    retrieve_cleaned_uniformed_batch,
+    get_last_segmented_trajectory_id
 )
 from models.dataset import DataSet
 from models.trajectory_segments import TrajectorySegments
@@ -80,8 +81,8 @@ async def get_trajectories_cities() -> list[DataSet]:
 
 async def insert_trajectory_segments(trajectories: list[dict]):
     """Creates segments from cleaned trajectory data"""
-    rows = []
-    segments: list[TrajectorySegments] = []
+
+    segments = []
 
     context = create_db_connection()
 
@@ -107,13 +108,13 @@ async def insert_trajectory_segments(trajectories: list[dict]):
                 )
             )
 
-    if not rows:
+    if not segments:
         return 0
 
     try:
-        insert_segments_into_db(context, rows)
+        insert_segments_into_db(context, segments)
         context.commit()
-        return len(rows)
+        return len(segments)
     except Exception as error:
         print(f"Failed to insert trajectories segments: {error}")
         raise
@@ -122,23 +123,25 @@ async def insert_trajectory_segments(trajectories: list[dict]):
 
 async def test_insert_trajectory_segments():
     """This function retrieves cleaned trajectories and inserts into segments"""
-    batch_size = 5000
+    batch_size = 100
     context = create_db_connection()
     try:
-        last_id = None
+        last_id = get_last_segmented_trajectory_id(context)
+        print(f"last_id: {last_id}")
 
         while True:
             current_batch = await retrieve_cleaned_uniformed_batch(context, batch_size, last_id)
 
-            if current_batch is None:
+            if not current_batch:
                 break
 
-            await insert_trajectory_segments(current_batch)
+            print(f"Retrieved {len(current_batch)} trajectories")
 
-            last_id = current_batch[-1]["trajectory_id"]
+            for trajectory in current_batch:
+                await insert_trajectory_segments([trajectory])
+                last_id = trajectory["trajectory_id"]
 
-            return current_batch
-
+                print(f"Inserted segments for trajectory_id {last_id}")
     except Exception as error:
         context.rollback()
         raise
