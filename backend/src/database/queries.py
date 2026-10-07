@@ -4,6 +4,7 @@ from datetime import date, datetime, time, timedelta
 from models.beijing_trajectory import BeijingTrajectory
 from models.dataset import DataSet
 from models.porto_trajectory import PortoTrajectory
+from models.trajectory_segments import TrajectorySegments
 from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint
 
 
@@ -448,6 +449,83 @@ def insert_cleaned_uniformed_trajectories(context, trajectories: list[UniformedT
         cursor.close()
 
 
+def insert_segments_into_db(context, segments: list[TrajectorySegments]) -> None:
+    """Inserts segments into tabel in database"""
+    cursor = context.cursor()
+
+    try:
+        rows = []
+
+        for t_segment in segments:
+            rows.append(
+                (
+                    t_segment.trajectory_id,
+                    t_segment.segment_index,
+                    t_segment.path,
+                    t_segment.start_time,
+                    t_segment.end_time,
+                )
+            )
+
+        cursor.executemany(
+            """
+        INSERT IGNORE INTO trajectory_segments (
+            trajectory_id,
+            segment_index,
+            path,
+            start_time,
+            end_time)
+            VALUES (%s, %s, ST_GeomFromText(%s, 4326, 'axis-order=long-lat'), %s, %s)
+            """,
+            rows,
+        )
+    except Exception as error:
+        print(f"Failed to insert segments into database: {error}")
+        raise
+    finally:
+        cursor.close()
+
+
+async def retrieve_cleaned_uniformed_batch(
+    context, batch_size: int, last_trajectory_id: int | None
+) -> list[dict]:
+    """Fetch a batch of cleaned uniformed trajectories ordered by trajectory_id."""
+    cursor = context.cursor(dictionary=True)
+    try:
+        base = """
+            SELECT u.trajectory_id, u.points
+            FROM cleaned_uniformed_trajectories u
+        """
+
+        if last_trajectory_id is None:
+            query = base + " ORDER BY u.trajectory_id LIMIT %s"
+            params = (batch_size,)
+        else:
+            query = (
+                base
+                + """
+                WHERE u.trajectory_id > %s
+                ORDER BY u.trajectory_id
+                LIMIT %s
+            """
+            )
+            params = (last_trajectory_id, batch_size)
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+
+        for row in rows:
+            row["points"] = json.loads(row["points"])
+
+        return rows
+
+    except Exception as error:
+        print(f"Failed to retrieve cleaned uniformed batch: {error}")
+        raise
+    finally:
+        cursor.close()
+
+
 def get_candidate_segments(
     context,
     box_a_bounds: tuple[float, float, float, float],
@@ -558,5 +636,22 @@ def get_trajectory_points(context, trajectory_ids: list[int]) -> dict[int, list[
     except Exception as error:
         print(f"Failed to get trip points: {error}")
         raise
+    finally:
+        cursor.close()
+
+
+def get_last_segmented_trajectory_id(context) -> int | None:
+    """Function retrieves the lastest trajectory id from segment table"""
+    cursor = context.cursor(dictionary=True)
+    try:
+        cursor.execute("""
+            SELECT trajectory_id
+            FROM trajectory_segments
+            ORDER BY trajectory_id DESC
+            LIMIT 1
+        """)
+        row = cursor.fetchone()
+
+        return row["trajectory_id"] if row else None
     finally:
         cursor.close()
