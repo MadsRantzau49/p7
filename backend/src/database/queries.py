@@ -449,44 +449,66 @@ def insert_cleaned_uniformed_trajectories(context, trajectories: list[UniformedT
 
 
 def get_candidate_segments(
-    context, box_a_wkt: str, box_b_wkt: str, start_date: date, end_date: date
+    context,
+    box_a_bounds: tuple[float, float, float, float],
+    box_b_bounds: tuple[float, float, float, float],
+    start_date: date,
+    end_date: date,
 ) -> list[dict]:
-    """Fetch the segments near box A or box B, for trips that come near both, in the date range"""
+    """Fetch the segments near box A or box B, for trips that come near both, in the date range.
+
+    Bounds are (min_longitude, min_latitude, max_longitude, max_latitude)."""
     cursor = context.cursor(dictionary=True)
 
     try:
         day_after_end = end_date + timedelta(days=1)
 
         sql = """
-            WITH in_a AS (
-                SELECT trajectory_id, segment_index, start_time, end_time,
-                       ST_Longitude(ST_StartPoint(path)) AS start_longitude,
-                       ST_Latitude(ST_StartPoint(path))  AS start_latitude,
-                       ST_Longitude(ST_EndPoint(path))   AS end_longitude,
-                       ST_Latitude(ST_EndPoint(path))    AS end_latitude
-                FROM trajectory_segments
-                WHERE MBRIntersects(path, ST_GeomFromText(%s, 4326, 'axis-order=long-lat'))
-                  AND start_time >= %s
-                  AND start_time < %s
+            WITH hits AS (
+                SELECT trajectory_id, segment_index,
+                       (min_longitude <= %(a_max_longitude)s AND max_longitude >= %(a_min_longitude)s
+                        AND min_latitude <= %(a_max_latitude)s AND max_latitude >= %(a_min_latitude)s) AS in_a,
+                       (min_longitude <= %(b_max_longitude)s AND max_longitude >= %(b_min_longitude)s
+                        AND min_latitude <= %(b_max_latitude)s AND max_latitude >= %(b_min_latitude)s) AS in_b
+                FROM trajectory_segments FORCE INDEX (idx_segment_time_bounds)
+                WHERE start_time >= %(start_date)s
+                  AND start_time < %(day_after_end)s
+                  AND ((min_longitude <= %(a_max_longitude)s AND max_longitude >= %(a_min_longitude)s
+                        AND min_latitude <= %(a_max_latitude)s AND max_latitude >= %(a_min_latitude)s)
+                    OR (min_longitude <= %(b_max_longitude)s AND max_longitude >= %(b_min_longitude)s
+                        AND min_latitude <= %(b_max_latitude)s AND max_latitude >= %(b_min_latitude)s))
             ),
-            in_b AS (
-                SELECT trajectory_id, segment_index, start_time, end_time,
-                       ST_Longitude(ST_StartPoint(path)) AS start_longitude,
-                       ST_Latitude(ST_StartPoint(path))  AS start_latitude,
-                       ST_Longitude(ST_EndPoint(path))   AS end_longitude,
-                       ST_Latitude(ST_EndPoint(path))    AS end_latitude
-                FROM trajectory_segments
-                WHERE MBRIntersects(path, ST_GeomFromText(%s, 4326, 'axis-order=long-lat'))
-                  AND start_time >= %s
-                  AND start_time < %s
+            both_boxes AS (
+                SELECT trajectory_id
+                FROM hits
+                GROUP BY trajectory_id
+                HAVING MAX(in_a) = 1 AND MAX(in_b) = 1
             )
-            SELECT * FROM in_a WHERE trajectory_id IN (SELECT trajectory_id FROM in_b)
-            UNION
-            SELECT * FROM in_b WHERE trajectory_id IN (SELECT trajectory_id FROM in_a)
-            ORDER BY trajectory_id, segment_index
+            SELECT s.trajectory_id, s.segment_index, s.start_time, s.end_time,
+                   ST_Longitude(ST_StartPoint(s.path)) AS start_longitude,
+                   ST_Latitude(ST_StartPoint(s.path))  AS start_latitude,
+                   ST_Longitude(ST_EndPoint(s.path))   AS end_longitude,
+                   ST_Latitude(ST_EndPoint(s.path))    AS end_latitude
+            FROM hits h
+            JOIN both_boxes b ON b.trajectory_id = h.trajectory_id
+            JOIN trajectory_segments s
+              ON s.trajectory_id = h.trajectory_id
+             AND s.segment_index = h.segment_index
+            ORDER BY s.trajectory_id, s.segment_index
         """
 
-        values = (box_a_wkt, start_date, day_after_end, box_b_wkt, start_date, day_after_end)
+        values = {
+            "start_date": start_date,
+            "day_after_end": day_after_end,
+            "a_min_longitude": box_a_bounds[0],
+            "a_min_latitude": box_a_bounds[1],
+            "a_max_longitude": box_a_bounds[2],
+            "a_max_latitude": box_a_bounds[3],
+            "b_min_longitude": box_b_bounds[0],
+            "b_min_latitude": box_b_bounds[1],
+            "b_max_longitude": box_b_bounds[2],
+            "b_max_latitude": box_b_bounds[3],
+        }
 
         cursor.execute(sql, values)
 

@@ -36,7 +36,7 @@ def find_subpaths(
     context = create_db_connection()
 
     try:
-        rows = get_candidate_segments(context, box_a.wkt, box_b.wkt, start_date, end_date)
+        rows = get_candidate_segments(context, box_a.bounds, box_b.bounds, start_date, end_date)
         segments_by_trajectory = group_by_trajectory(rows)
 
         pairs_by_trajectory = {}
