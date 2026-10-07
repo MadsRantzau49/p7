@@ -10,3 +10,4 @@ haversine
 pyright 
 vulture
 pytest-cov
+shapely

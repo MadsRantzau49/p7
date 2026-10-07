@@ -1,10 +1,10 @@
 import json
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta
 
 from models.beijing_trajectory import BeijingTrajectory
 from models.dataset import DataSet
 from models.porto_trajectory import PortoTrajectory
-from models.uniformed_trajectories import UniformedTrajectories
+from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint
 
 
 def get_dataset_id(context, dataset_name: str) -> int:
@@ -443,6 +443,98 @@ def insert_cleaned_uniformed_trajectories(context, trajectories: list[UniformedT
         )
     except Exception as error:
         print(f"Failed to insert cleaned uniformed trajectories: {error}")
+        raise
+    finally:
+        cursor.close()
+
+
+def get_candidate_segments(
+    context, box_a_wkt: str, box_b_wkt: str, start_date: date, end_date: date
+) -> list[dict]:
+    """Fetch the segments near box A or box B, for trips that come near both, in the date range"""
+    cursor = context.cursor(dictionary=True)
+
+    try:
+        day_after_end = end_date + timedelta(days=1)
+
+        sql = """
+            WITH in_a AS (
+                SELECT trajectory_id, segment_index, start_time, end_time,
+                       ST_Longitude(ST_StartPoint(path)) AS start_longitude,
+                       ST_Latitude(ST_StartPoint(path))  AS start_latitude,
+                       ST_Longitude(ST_EndPoint(path))   AS end_longitude,
+                       ST_Latitude(ST_EndPoint(path))    AS end_latitude
+                FROM trajectory_segments
+                WHERE MBRIntersects(path, ST_GeomFromText(%s, 4326, 'axis-order=long-lat'))
+                  AND start_time >= %s
+                  AND start_time < %s
+            ),
+            in_b AS (
+                SELECT trajectory_id, segment_index, start_time, end_time,
+                       ST_Longitude(ST_StartPoint(path)) AS start_longitude,
+                       ST_Latitude(ST_StartPoint(path))  AS start_latitude,
+                       ST_Longitude(ST_EndPoint(path))   AS end_longitude,
+                       ST_Latitude(ST_EndPoint(path))    AS end_latitude
+                FROM trajectory_segments
+                WHERE MBRIntersects(path, ST_GeomFromText(%s, 4326, 'axis-order=long-lat'))
+                  AND start_time >= %s
+                  AND start_time < %s
+            )
+            SELECT * FROM in_a WHERE trajectory_id IN (SELECT trajectory_id FROM in_b)
+            UNION
+            SELECT * FROM in_b WHERE trajectory_id IN (SELECT trajectory_id FROM in_a)
+            ORDER BY trajectory_id, segment_index
+        """
+
+        values = (box_a_wkt, start_date, day_after_end, box_b_wkt, start_date, day_after_end)
+
+        cursor.execute(sql, values)
+
+        return cursor.fetchall()
+    except Exception as error:
+        print(f"Failed to get candidate segments: {error}")
+        raise
+    finally:
+        cursor.close()
+
+
+def get_trajectory_points(context, trajectory_ids: list[int]) -> dict[int, list[UniformedTrajectoryPoint]]:
+    """Fetch all points of the given trips, as one list per trip"""
+    if len(trajectory_ids) == 0:
+        return {}
+
+    cursor = context.cursor(dictionary=True)
+
+    try:
+        placeholders = ", ".join(["%s"] * len(trajectory_ids))
+
+        sql = f"""
+            SELECT trajectory_id, points
+            FROM cleaned_uniformed_trajectories
+            WHERE trajectory_id IN ({placeholders})
+        """
+
+        cursor.execute(sql, trajectory_ids)
+
+        points_by_trip: dict[int, list[UniformedTrajectoryPoint]] = {}
+
+        for row in cursor.fetchall():
+            points = []
+
+            for point in json.loads(row["points"]):
+                points.append(
+                    UniformedTrajectoryPoint(
+                        longitude=point["longitude"],
+                        latitude=point["latitude"],
+                        point_timestamp=datetime.fromisoformat(point["point_timestamp"]),
+                    )
+                )
+
+            points_by_trip[row["trajectory_id"]] = points
+
+        return points_by_trip
+    except Exception as error:
+        print(f"Failed to get trip points: {error}")
         raise
     finally:
         cursor.close()

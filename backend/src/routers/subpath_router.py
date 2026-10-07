@@ -1,21 +1,22 @@
 from datetime import date
 
 from fastapi import APIRouter, HTTPException
-from services.subpath_service import find_subpaths
 from models.subpath import Subpath
+from services.subpath_service import find_subpaths
 
 router = APIRouter(prefix="/api/subpaths")
 
+
 @router.get("/get", response_model=list[Subpath])
 def get_subpaths(
-        city: str,
-        a_longitude: float,
-        a_latitude: float,
-        b_longitude: float,
-        b_latitude: float,
-        start_date: date,
-        end_date: date,
-        box_half_width_m: float= 50
+    city: str,
+    a_longitude: float,
+    a_latitude: float,
+    b_longitude: float,
+    b_latitude: float,
+    start_date: date,
+    end_date: date,
+    box_half_width_m: float = 50,
 ):
     """Return the sub-paths from location A to location B in the date-range given."""
     try:
