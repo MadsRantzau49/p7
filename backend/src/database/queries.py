@@ -545,9 +545,11 @@ def get_candidate_segments(
             WITH hits AS (
                 SELECT trajectory_id, segment_index,
                        (min_longitude <= %(a_max_longitude)s AND max_longitude >= %(a_min_longitude)s
-                        AND min_latitude <= %(a_max_latitude)s AND max_latitude >= %(a_min_latitude)s) AS in_a,
+                        AND min_latitude <= %(a_max_latitude)s AND max_latitude >= %(a_min_latitude)s)
+                        AS in_a,
                        (min_longitude <= %(b_max_longitude)s AND max_longitude >= %(b_min_longitude)s
-                        AND min_latitude <= %(b_max_latitude)s AND max_latitude >= %(b_min_latitude)s) AS in_b
+                        AND min_latitude <= %(b_max_latitude)s AND max_latitude >= %(b_min_latitude)s)
+                        AS in_b
                 FROM trajectory_segments FORCE INDEX (idx_segment_time_bounds)
                 WHERE start_time >= %(start_date)s
                   AND start_time < %(day_after_end)s
