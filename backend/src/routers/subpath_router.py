@@ -9,7 +9,6 @@ router = APIRouter(prefix="/api/subpaths")
 
 @router.get("/get", response_model=list[Subpath])
 def get_subpaths(
-    city: str,
     a_longitude: float,
     a_latitude: float,
     b_longitude: float,
@@ -21,7 +20,6 @@ def get_subpaths(
     """Return the sub-paths from location A to location B in the date-range given."""
     try:
         return find_subpaths(
-            city,
             a_longitude,
             a_latitude,
             b_longitude,

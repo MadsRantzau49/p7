@@ -12,7 +12,6 @@ from models.subpath import Subpath
 
 
 def find_subpaths(
-    city: str,
     a_longitude: float,
     a_latitude: float,
     b_longitude: float,
