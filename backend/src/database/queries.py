@@ -1,10 +1,11 @@
 import json
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta
 
 from models.beijing_trajectory import BeijingTrajectory
 from models.dataset import DataSet
 from models.porto_trajectory import PortoTrajectory
-from models.uniformed_trajectories import UniformedTrajectories
+from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint
+from models.upload_row import VehicleType
 
 
 def get_dataset_id(context, dataset_name: str) -> int:
@@ -233,18 +234,12 @@ async def get_trajectories_from_db(
 
     Missing dates or times mean no limit on that side.
     """
-
     cursor = context.cursor(dictionary=True)
 
     try:
-        # Get the last time stamp of a trajectory
         trajectory_end = "CAST(JSON_UNQUOTE(JSON_EXTRACT(points, '$[last].point_timestamp')) AS DATETIME)"
-
-        conditions = [
-            "city = %s",
-        ]
-
-        values: list = [city]
+        conditions = ["city = %s"]
+        values: list[str | date | time | int] = [city]
 
         if start_date is not None:
             conditions.append("trajectory_date >= %s")
@@ -296,12 +291,25 @@ async def get_trajectories_from_db(
 
         cursor.execute(sql, values)
 
-        trajectories = cursor.fetchall()
-
-        for trajectory in trajectories:
-            trajectory["points"] = json.loads(trajectory["points"])
-
-        return trajectories
+        return [
+            UniformedTrajectories(
+                trajectory_id=trajectory["trajectory_id"],
+                vehicle_id=trajectory["vehicle_id"],
+                vehicle_type=VehicleType(trajectory["vehicle_type"]),
+                trajectory_date=trajectory["trajectory_date"],
+                city=trajectory["city"],
+                points=[
+                    UniformedTrajectoryPoint(
+                        longitude=point["longitude"],
+                        latitude=point["latitude"],
+                        point_timestamp=datetime.fromisoformat(point["point_timestamp"]),
+                    )
+                    for point in json.loads(trajectory["points"])
+                ],
+                source_id=trajectory["source_id"],
+            )
+            for trajectory in cursor.fetchall()
+        ]
 
     except Exception as error:
         print(f"Failed to get trajectories from database: {error}")

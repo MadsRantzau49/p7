@@ -30,10 +30,7 @@ jobs:
         run: python -m compileall -q backend/src backend/tests
 
       - name: Type check
-        run: |
-          if ! pyright backend/src backend/tests; then
-            echo "::warning::Pyright found type errors"
-          fi
+        run: pyright backend/src backend/tests
 
       - name: Check unused code
         run: |
@@ -42,9 +39,12 @@ jobs:
           fi
 
       - name: Test with coverage
+        env:
+          DATABASE_HOST: ${{ secrets.DATABASE_HOST }}
+          DATABASE_PORT: ${{ secrets.DATABASE_PORT }}
+          DATABASE_NAME: ${{ secrets.DATABASE_NAME }}
+          DATABASE_USER: ${{ secrets.DATABASE_USER }}
+          DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
         run: |
           pytest --cov=backend/src --cov-report=term-missing
-
-          if ! coverage report --fail-under=80; then
-            echo "::warning::Test coverage is below 80%"
-          fi
+          coverage report --fail-under=100

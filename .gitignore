@@ -78,6 +78,7 @@ ipython_config.py
 .pdm-build/
 __pypackages__/
 
+.envrc
 .env
 .env.local
 .env.*.local

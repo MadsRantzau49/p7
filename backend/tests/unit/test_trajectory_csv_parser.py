@@ -1,8 +1,13 @@
 import io
-from datetime import datetime
+import json
+from datetime import datetime, timedelta
 
 import pytest
 from helpers.trajectory_csv_parser import InvalidTrajectoryCsvError, parse_trajectory_csv
+from helpers.trajectory_helpers import (
+    convert_beijing_trajectory,
+    convert_porto_trajectory,
+)
 from helpers.upload_parser import EXPECTED_HEADER
 from models.upload_row import VehicleType
 
@@ -50,3 +55,134 @@ def test_invalid_csv_raises_with_line_errors():
 
     assert raised.value.errors[0].line == 2
     assert "needs at least 2" in raised.value.errors[0].message
+
+
+def test_header_without_data_rows_raises_error():
+    """Check CSV with only a header is rejected."""
+    csv_data = io.StringIO(
+        f"{HEADER}\n",
+        newline="",
+    )
+
+    with pytest.raises(InvalidTrajectoryCsvError) as raised:
+        parse_trajectory_csv(csv_data)
+
+    assert raised.value.errors[0].line == 1
+    assert raised.value.errors[0].message == "the file has a header but no data rows"
+
+
+def test_convert_porto_trajectory():
+    """Convert Porto data into the uniform trajectory model."""
+    timestamp = 1700000000
+
+    porto_trajectory = {
+        "taxi_id": 42,
+        "timestamp": timestamp,
+        "source_id": "source-1",
+        "polyline": [
+            [-8.61, 41.15],
+            [-8.62, 41.16],
+        ],
+    }
+
+    result = convert_porto_trajectory(porto_trajectory)
+
+    assert result.vehicle_id == 42
+    assert result.vehicle_type is VehicleType.TAXI
+    assert result.city == "Porto"
+    assert result.source_id == "source-1"
+    assert result.trajectory_date == datetime.fromtimestamp(timestamp)
+
+    assert len(result.points) == 2
+
+    assert result.points[0].longitude == -8.61
+    assert result.points[0].latitude == 41.15
+    assert result.points[0].point_timestamp == datetime.fromtimestamp(timestamp)
+
+    assert result.points[1].longitude == -8.62
+    assert result.points[1].latitude == 41.16
+    assert result.points[1].point_timestamp == (datetime.fromtimestamp(timestamp) + timedelta(seconds=15))
+
+
+def test_convert_porto_trajectory_with_json_polyline():
+    """Convert Porto polyline when stored as JSON text."""
+    timestamp = 1700000000
+
+    porto_trajectory = {
+        "taxi_id": 42,
+        "timestamp": timestamp,
+        "source_id": "source-1",
+        "polyline": json.dumps(
+            [
+                [-8.61, 41.15],
+                [-8.62, 41.16],
+            ]
+        ),
+    }
+
+    result = convert_porto_trajectory(porto_trajectory)
+
+    assert len(result.points) == 2
+    assert result.points[0].longitude == -8.61
+    assert result.points[1].longitude == -8.62
+
+
+def test_convert_beijing_trajectory():
+    """Convert Beijing data into the uniform trajectory model."""
+    beijing_trajectory = {
+        "taxi_id": "15",
+        "source_id": "source-2",
+        "points": [
+            {
+                "date_time": "2024-01-31 10:00:00",
+                "longitude": "116.30",
+                "latitude": "39.90",
+            },
+            {
+                "date_time": "2024-01-31 10:00:05",
+                "longitude": "116.31",
+                "latitude": "39.91",
+            },
+        ],
+    }
+
+    result = convert_beijing_trajectory(beijing_trajectory)
+
+    assert result.vehicle_id == 15
+    assert result.vehicle_type is VehicleType.TAXI
+    assert result.city == "Beijing"
+    assert result.source_id == "source-2"
+    assert result.trajectory_date == datetime(2024, 1, 31, 10, 0)
+
+    assert len(result.points) == 2
+
+    assert result.points[0].longitude == 116.30
+    assert result.points[0].latitude == 39.90
+    assert result.points[0].point_timestamp == datetime(2024, 1, 31, 10, 0)
+
+    assert result.points[1].longitude == 116.31
+    assert result.points[1].latitude == 39.91
+    assert result.points[1].point_timestamp == datetime(2024, 1, 31, 10, 0, 5)
+
+
+def test_convert_beijing_trajectory_with_json_points():
+    """Convert Beijing points when stored as JSON text."""
+    beijing_trajectory = {
+        "taxi_id": "15",
+        "source_id": "source-2",
+        "points": json.dumps(
+            [
+                {
+                    "date_time": "2024-01-31 10:00:00",
+                    "longitude": "116.30",
+                    "latitude": "39.90",
+                }
+            ]
+        ),
+    }
+
+    result = convert_beijing_trajectory(beijing_trajectory)
+
+    assert len(result.points) == 1
+    assert result.points[0].longitude == 116.30
+    assert result.points[0].latitude == 39.90

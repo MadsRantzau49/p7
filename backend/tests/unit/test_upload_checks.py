@@ -2,7 +2,7 @@ import io
 
 import pytest
 from helpers.upload_checks import sort_and_check_trajectories, speed_kmh
-from helpers.upload_parser import EXPECTED_HEADER, parse_upload
+from helpers.upload_parser import EXPECTED_HEADER, MAX_ERRORS, parse_upload
 
 HEADER = ",".join(EXPECTED_HEADER)
 
@@ -104,3 +104,27 @@ def test_each_trajectory_is_checked_on_its_own():
     )
 
     assert errors == []
+
+
+def test_stops_after_max_errors():
+    """Check validation stops after reaching MAX_ERRORS."""
+    rows = ""
+
+    for i in range(MAX_ERRORS + 1):
+        rows += f"t{i},7,CAR,2024-01-31 14:05:00,12.5,55.7,,,\n"
+
+    trajectories, errors = check(rows)
+
+    assert len(errors) == MAX_ERRORS
+
+
+def test_optional_metadata_may_not_change():
+    """Check optional metadata is consistent within a trajectory."""
+    trajectories, errors = check(
+        "t1,7,CAR,2024-01-31 14:05:00,12.5,55.7,Copenhagen,source-a,42\n"
+        "t1,7,CAR,2024-01-31 14:05:30,12.5,55.7,Aarhus,source-a,42\n"
+    )
+
+    assert len(errors) == 1
+    assert errors[0].line == 3
+    assert "different optional metadata" in errors[0].message
