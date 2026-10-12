@@ -8,8 +8,15 @@ from services import trajectory_import_service as service
 def setup_service(monkeypatch):
     """Replace the importer database connection with a test double."""
     context = MagicMock()
-    monkeypatch.setattr(service, "create_db_connection", lambda: context)
-    monkeypatch.setattr(service.database.queries, "get_dataset_id", lambda context, name: 1)
+
+    def create_db_connection():
+        return context
+
+    def get_dataset_id(context, name):
+        return 1
+
+    monkeypatch.setattr(service, "create_db_connection", create_db_connection)
+    monkeypatch.setattr(service.database.queries, "get_dataset_id", get_dataset_id)
     return context
 
 
@@ -18,7 +25,11 @@ def test_save_porto_trajectories(monkeypatch):
     context = setup_service(monkeypatch)
     trajectories = [SimpleNamespace(source_id=None), SimpleNamespace(source_id=None)]
     monkeypatch.setenv("PORTO_DATASET_PATH", "porto.csv")
-    monkeypatch.setattr(service, "parse_porto_trajectories", lambda path: trajectories)
+
+    def parse_porto_trajectories(path):
+        return trajectories
+
+    monkeypatch.setattr(service, "parse_porto_trajectories", parse_porto_trajectories)
     monkeypatch.setattr(service.database.queries, "create_source_trajectories", MagicMock())
     monkeypatch.setattr(service.database.queries, "insert_porto_trajectories", MagicMock())
 
@@ -46,7 +57,11 @@ def test_save_beijing_trajectories(monkeypatch):
     context = setup_service(monkeypatch)
     trajectories = [SimpleNamespace(source_id=None), SimpleNamespace(source_id=None)]
     monkeypatch.setenv("BEIJING_DATASET_PATH", "beijing")
-    monkeypatch.setattr(service, "parse_beijing_trajectories", lambda path: trajectories)
+
+    def parse_beijing_trajectories(path):
+        return trajectories
+
+    monkeypatch.setattr(service, "parse_beijing_trajectories", parse_beijing_trajectories)
     monkeypatch.setattr(service.database.queries, "create_source_trajectories", MagicMock())
     monkeypatch.setattr(service.database.queries, "insert_beijing_dataset", MagicMock())
 
@@ -80,8 +95,11 @@ def test_create_uniformed_data_structure(monkeypatch):
     monkeypatch.setattr(
         service.database.queries, "retrieve_beijing_data_batch", MagicMock(side_effect=[[beijing], []])
     )
-    monkeypatch.setattr(service, "convert_porto_trajectory", lambda data: data)
-    monkeypatch.setattr(service, "convert_beijing_trajectory", lambda data: data)
+    def convert_trajectory(data):
+        return data
+
+    monkeypatch.setattr(service, "convert_porto_trajectory", convert_trajectory)
+    monkeypatch.setattr(service, "convert_beijing_trajectory", convert_trajectory)
     monkeypatch.setattr(service.database.queries, "insert_data_uniformed_trajectories", MagicMock())
 
     assert service.create_uniformed_data_structure(1) == 2

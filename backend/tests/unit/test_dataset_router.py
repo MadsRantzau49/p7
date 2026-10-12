@@ -10,11 +10,11 @@ client = TestClient(app)
 
 def test_upload_dataset_success(monkeypatch):
     """Check a valid dataset upload returns 201."""
-    monkeypatch.setattr(
-        dataset_router,
-        "upload_dataset",
-        lambda name, lines: 42,
-    )
+
+    def upload_dataset(name, lines):
+        return 42
+
+    monkeypatch.setattr(dataset_router, "upload_dataset", upload_dataset)
 
     response = client.post(
         "/api/datasets/upload",
@@ -33,15 +33,11 @@ def test_upload_dataset_name_is_stripped(monkeypatch):
     """Check whitespace is removed from the dataset name."""
     received = {}
 
-    def fake_upload(name, lines):
+    def upload_dataset(name, lines):
         received["name"] = name
         return 42
 
-    monkeypatch.setattr(
-        dataset_router,
-        "upload_dataset",
-        fake_upload,
-    )
+    monkeypatch.setattr(dataset_router, "upload_dataset", upload_dataset)
 
     response = client.post(
         "/api/datasets/upload",
@@ -56,11 +52,7 @@ def test_upload_dataset_name_is_stripped(monkeypatch):
 
 def test_upload_dataset_too_large(monkeypatch):
     """Check files larger than the limit return 413."""
-    monkeypatch.setattr(
-        dataset_router,
-        "MAX_UPLOAD_BYTES",
-        1,
-    )
+    monkeypatch.setattr(dataset_router, "MAX_UPLOAD_BYTES", 1)
 
     response = client.post(
         "/api/datasets/upload",
@@ -75,7 +67,7 @@ def test_upload_dataset_too_large(monkeypatch):
 def test_upload_dataset_invalid_csv(monkeypatch):
     """Check invalid CSV data returns 422."""
 
-    def fake_upload(name, lines):
+    def upload_invalid_dataset(name, lines):
         raise InvalidTrajectoryCsvError(
             [
                 UploadError(
@@ -85,11 +77,7 @@ def test_upload_dataset_invalid_csv(monkeypatch):
             ]
         )
 
-    monkeypatch.setattr(
-        dataset_router,
-        "upload_dataset",
-        fake_upload,
-    )
+    monkeypatch.setattr(dataset_router, "upload_dataset", upload_invalid_dataset)
 
     response = client.post(
         "/api/datasets/upload",
@@ -109,14 +97,10 @@ def test_upload_dataset_invalid_csv(monkeypatch):
 def test_upload_dataset_name_taken(monkeypatch):
     """Check duplicate dataset names return 409."""
 
-    def fake_upload(name, lines):
+    def upload_dataset_with_taken_name(name, lines):
         raise DatasetNameTakenError()
 
-    monkeypatch.setattr(
-        dataset_router,
-        "upload_dataset",
-        fake_upload,
-    )
+    monkeypatch.setattr(dataset_router, "upload_dataset", upload_dataset_with_taken_name)
 
     response = client.post(
         "/api/datasets/upload",
@@ -131,7 +115,7 @@ def test_upload_dataset_name_taken(monkeypatch):
 def test_upload_dataset_invalid_encoding(monkeypatch):
     """Check invalid UTF-8 input returns 422."""
 
-    def fake_upload(name, lines):
+    def upload_dataset_with_invalid_encoding(name, lines):
         raise UnicodeDecodeError(
             "utf-8",
             b"\xff",
@@ -140,11 +124,7 @@ def test_upload_dataset_invalid_encoding(monkeypatch):
             "invalid start byte",
         )
 
-    monkeypatch.setattr(
-        dataset_router,
-        "upload_dataset",
-        fake_upload,
-    )
+    monkeypatch.setattr(dataset_router, "upload_dataset", upload_dataset_with_invalid_encoding)
 
     response = client.post(
         "/api/datasets/upload",

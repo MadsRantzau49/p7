@@ -13,6 +13,50 @@ from models.upload_row import VehicleType
 from database import queries
 
 
+def _call_get_dataset_id(context):
+    return queries.get_dataset_id(context, "x")
+
+
+def _call_create_source_trajectories(context):
+    return queries.create_source_trajectories(context, 1, ["x"])
+
+
+def _call_insert_porto_trajectories(context):
+    return queries.insert_porto_trajectories(context, [])
+
+
+def _call_insert_beijing_dataset(context):
+    return queries.insert_beijing_dataset(context, [])
+
+
+def _call_retrieve_porto_dataset_batch(context):
+    return queries.retrieve_porto_dataset_batch(context, 1, None)
+
+
+def _call_retrieve_beijing_data_batch(context):
+    return queries.retrieve_beijing_data_batch(context, 1, None)
+
+
+def _call_get_trajectories_from_db(context):
+    return asyncio.run(queries.get_trajectories_from_db(context, "x", None, None, None, None, None))
+
+
+def _call_dataset_name_taken(context):
+    return queries.dataset_name_taken(context, "x")
+
+
+def _call_create_dataset(context):
+    return queries.create_dataset(context, "x")
+
+
+def _call_get_trajectories_cities_from_db(context):
+    return asyncio.run(queries.get_trajectories_cities_from_db(context))
+
+
+def _call_get_vehicle_type_ids(context):
+    return queries.get_vehicle_type_ids(context)
+
+
 def test_queries_against_configured_database():
     """Run every query against the database configured by .env."""
     context = create_db_connection()
@@ -83,33 +127,32 @@ def test_queries_against_configured_database():
         context.close()
 
 
-def test_query_errors_are_raised_and_cursors_closed():
+@pytest.mark.parametrize(
+    "call_query",
+    [
+        _call_get_dataset_id,
+        _call_create_source_trajectories,
+        _call_insert_porto_trajectories,
+        _call_insert_beijing_dataset,
+        _call_retrieve_porto_dataset_batch,
+        _call_retrieve_beijing_data_batch,
+        _call_get_trajectories_from_db,
+        _call_dataset_name_taken,
+        _call_create_dataset,
+        _call_get_trajectories_cities_from_db,
+        _call_get_vehicle_type_ids,
+    ],
+)
+def test_query_errors_are_raised_and_cursors_closed(call_query):
     """Ensure query errors propagate after closing their cursors."""
-    calls = [
-        lambda context: queries.get_dataset_id(context, "x"),
-        lambda context: queries.create_source_trajectories(context, 1, ["x"]),
-        lambda context: queries.insert_porto_trajectories(context, []),
-        lambda context: queries.insert_beijing_dataset(context, []),
-        lambda context: queries.retrieve_porto_dataset_batch(context, 1, None),
-        lambda context: queries.retrieve_beijing_data_batch(context, 1, None),
-        lambda context: asyncio.run(
-            queries.get_trajectories_from_db(context, "x", None, None, None, None, None)
-        ),
-        lambda context: queries.dataset_name_taken(context, "x"),
-        lambda context: queries.create_dataset(context, "x"),
-        lambda context: asyncio.run(queries.get_trajectories_cities_from_db(context)),
-        queries.get_vehicle_type_ids,
-    ]
+    context = MagicMock()
+    cursor = context.cursor.return_value
+    cursor.execute.side_effect = cursor.executemany.side_effect = RuntimeError("database error")
 
-    for call in calls:
-        context = MagicMock()
-        cursor = context.cursor.return_value
-        cursor.execute.side_effect = cursor.executemany.side_effect = RuntimeError("database error")
+    with pytest.raises(RuntimeError):
+        call_query(context)
 
-        with pytest.raises(RuntimeError):
-            call(context)
-
-        cursor.close.assert_called_once()
+    cursor.close.assert_called_once()
 
 
 def test_uniformed_insert_error_is_raised_and_cursor_closed():

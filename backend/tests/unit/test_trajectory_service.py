@@ -6,52 +6,75 @@ import pytest
 from services import trajectory_service as service
 
 
-@pytest.mark.parametrize(
-    ("function_name", "query_name", "arguments", "result"),
-    [
-        (
-            "get_trajectories",
-            "get_trajectories_from_db",
-            ("Porto", None, None, None, None, 1),
-            [{"id": 1}],
-        ),
-        ("get_trajectories_cities", "get_trajectories_cities_from_db", (), [{"name": "Porto"}]),
-    ],
-)
-def test_trajectory_service(monkeypatch, function_name, query_name, arguments, result):
-    """Return query results and always close the database connection."""
+def setup_database_connection(monkeypatch):
+    """Use and return a test database connection."""
     context = MagicMock()
-    monkeypatch.setattr(service, "create_db_connection", lambda: context)
-    monkeypatch.setattr(service, query_name, AsyncMock(return_value=result))
 
-    assert asyncio.run(getattr(service, function_name)(*arguments)) == result
+    def create_db_connection():
+        return context
+
+    monkeypatch.setattr(service, "create_db_connection", create_db_connection)
+    return context
+
+
+def test_get_trajectories_returns_query_result(monkeypatch):
+    """Return trajectories from the database query."""
+    context = setup_database_connection(monkeypatch)
+    result = [{"id": 1}]
+    monkeypatch.setattr(service, "get_trajectories_from_db", AsyncMock(return_value=result))
+
+    actual = asyncio.run(service.get_trajectories("Porto", None, None, None, None, 1))
+
+    assert actual == result
     context.close.assert_called_once()
 
 
-@pytest.mark.parametrize(
-    ("function_name", "query_name", "arguments"),
-    [
-        ("get_trajectories", "get_trajectories_from_db", ("Porto", None, None, None, None, 1)),
-        ("get_trajectories_cities", "get_trajectories_cities_from_db", ()),
-    ],
-)
-def test_trajectory_service_error(monkeypatch, function_name, query_name, arguments):
-    """Propagate query errors and always close the database connection."""
-    context = MagicMock()
-    monkeypatch.setattr(service, "create_db_connection", lambda: context)
-    monkeypatch.setattr(service, query_name, AsyncMock(side_effect=RuntimeError("failed")))
+def test_get_trajectories_cities_returns_query_result(monkeypatch):
+    """Return cities from the database query."""
+    context = setup_database_connection(monkeypatch)
+    result = [{"name": "Porto"}]
+    monkeypatch.setattr(service, "get_trajectories_cities_from_db", AsyncMock(return_value=result))
+
+    actual = asyncio.run(service.get_trajectories_cities())
+
+    assert actual == result
+    context.close.assert_called_once()
+
+
+def test_get_trajectories_closes_connection_after_query_error(monkeypatch):
+    """Close the database connection when the trajectory query fails."""
+    context = setup_database_connection(monkeypatch)
+    monkeypatch.setattr(
+        service,
+        "get_trajectories_from_db",
+        AsyncMock(side_effect=RuntimeError("failed")),
+    )
 
     with pytest.raises(RuntimeError):
-        asyncio.run(getattr(service, function_name)(*arguments))
+        asyncio.run(service.get_trajectories("Porto", None, None, None, None, 1))
+
+    context.close.assert_called_once()
+
+
+def test_get_trajectories_cities_closes_connection_after_query_error(monkeypatch):
+    """Close the database connection when the city query fails."""
+    context = setup_database_connection(monkeypatch)
+    monkeypatch.setattr(
+        service,
+        "get_trajectories_cities_from_db",
+        AsyncMock(side_effect=RuntimeError("failed")),
+    )
+
+    with pytest.raises(RuntimeError):
+        asyncio.run(service.get_trajectories_cities())
 
     context.close.assert_called_once()
 
 
 def test_trajectory_service_ignores_full_day_time_range(monkeypatch):
     """Treat the complete day as no time filter."""
-    context = MagicMock()
+    context = setup_database_connection(monkeypatch)
     query = AsyncMock(return_value=[])
-    monkeypatch.setattr(service, "create_db_connection", lambda: context)
     monkeypatch.setattr(service, "get_trajectories_from_db", query)
 
     asyncio.run(service.get_trajectories("Porto", None, None, time.min, time(23, 59), 1))

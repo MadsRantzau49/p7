@@ -31,7 +31,11 @@ def test_parse_beijing_trajectories(tmp_path):
 def test_parse_beijing_rejects_missing_taxi_id(tmp_path, monkeypatch):
     """Reject a completed Beijing trajectory without a taxi ID."""
     (tmp_path / "taxi.txt").write_text("1,2024-01-01 00:00:00,1,2\n")
-    monkeypatch.setattr(parsers, "int", lambda value: None, raising=False)
+
+    def parse_missing_taxi_id(value):
+        return None
+
+    monkeypatch.setattr(parsers, "int", parse_missing_taxi_id, raising=False)
 
     with pytest.raises(ValueError, match="Taxi ID is missing"):
         parsers.parse_beijing_trajectories(str(tmp_path))
