@@ -95,6 +95,7 @@ def test_create_uniformed_data_structure(monkeypatch):
     monkeypatch.setattr(
         service.database.queries, "retrieve_beijing_data_batch", MagicMock(side_effect=[[beijing], []])
     )
+
     def convert_trajectory(data):
         return data
 
