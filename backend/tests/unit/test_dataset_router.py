@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import routers.dataset_router as dataset_router
 from fastapi.testclient import TestClient
 from helpers.trajectory_csv_parser import InvalidTrajectoryCsvError
@@ -14,7 +16,11 @@ def test_upload_dataset_success(monkeypatch):
     def upload_dataset(name, lines):
         return 42
 
-    monkeypatch.setattr(dataset_router, "upload_dataset", upload_dataset)
+    monkeypatch.setitem(
+        app.dependency_overrides,
+        dataset_router.get_dataset_upload_service,
+        lambda: SimpleNamespace(upload_dataset=upload_dataset),
+    )
 
     response = client.post(
         "/api/datasets/upload",
@@ -37,7 +43,11 @@ def test_upload_dataset_name_is_stripped(monkeypatch):
         received["name"] = name
         return 42
 
-    monkeypatch.setattr(dataset_router, "upload_dataset", upload_dataset)
+    monkeypatch.setitem(
+        app.dependency_overrides,
+        dataset_router.get_dataset_upload_service,
+        lambda: SimpleNamespace(upload_dataset=upload_dataset),
+    )
 
     response = client.post(
         "/api/datasets/upload",
@@ -77,7 +87,11 @@ def test_upload_dataset_invalid_csv(monkeypatch):
             ]
         )
 
-    monkeypatch.setattr(dataset_router, "upload_dataset", upload_invalid_dataset)
+    monkeypatch.setitem(
+        app.dependency_overrides,
+        dataset_router.get_dataset_upload_service,
+        lambda: SimpleNamespace(upload_dataset=upload_invalid_dataset),
+    )
 
     response = client.post(
         "/api/datasets/upload",
@@ -100,7 +114,11 @@ def test_upload_dataset_name_taken(monkeypatch):
     def upload_dataset_with_taken_name(name, lines):
         raise DatasetNameTakenError()
 
-    monkeypatch.setattr(dataset_router, "upload_dataset", upload_dataset_with_taken_name)
+    monkeypatch.setitem(
+        app.dependency_overrides,
+        dataset_router.get_dataset_upload_service,
+        lambda: SimpleNamespace(upload_dataset=upload_dataset_with_taken_name),
+    )
 
     response = client.post(
         "/api/datasets/upload",
@@ -124,7 +142,11 @@ def test_upload_dataset_invalid_encoding(monkeypatch):
             "invalid start byte",
         )
 
-    monkeypatch.setattr(dataset_router, "upload_dataset", upload_dataset_with_invalid_encoding)
+    monkeypatch.setitem(
+        app.dependency_overrides,
+        dataset_router.get_dataset_upload_service,
+        lambda: SimpleNamespace(upload_dataset=upload_dataset_with_invalid_encoding),
+    )
 
     response = client.post(
         "/api/datasets/upload",

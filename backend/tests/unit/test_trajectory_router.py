@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import routers.trajectory_router as trajectory_router
 from fastapi.testclient import TestClient
 from main import app
@@ -11,10 +13,10 @@ def test_get_trajectories(monkeypatch):
     async def fake_get_trajectories(city, start_date, end_date, start_time, end_time, limit):
         return [{"trajectory_id": 1, "city": city}]
 
-    monkeypatch.setattr(
-        trajectory_router,
-        "get_trajectories",
-        fake_get_trajectories,
+    monkeypatch.setitem(
+        app.dependency_overrides,
+        trajectory_router.get_trajectory_service,
+        lambda: SimpleNamespace(get_trajectories=fake_get_trajectories),
     )
 
     response = client.get(
@@ -44,7 +46,11 @@ def test_get_trajectories_rejects_invalid_range(monkeypatch):
     async def fake_get_trajectories(*args):
         raise ValueError("invalid range")
 
-    monkeypatch.setattr(trajectory_router, "get_trajectories", fake_get_trajectories)
+    monkeypatch.setitem(
+        app.dependency_overrides,
+        trajectory_router.get_trajectory_service,
+        lambda: SimpleNamespace(get_trajectories=fake_get_trajectories),
+    )
 
     response = client.get("/api/trajectories/get", params={"city": "Porto"})
 
@@ -61,10 +67,12 @@ def test_get_trajectory_cities(monkeypatch):
             {"dataset_id": 2, "name": "Beijing"},
         ]
 
-    monkeypatch.setattr(
-        trajectory_router,
-        "get_trajectories_cities",
-        fake_get_trajectories_cities,
+    monkeypatch.setitem(
+        app.dependency_overrides,
+        trajectory_router.get_trajectory_service,
+        lambda: SimpleNamespace(
+            get_trajectories_cities=fake_get_trajectories_cities,
+        ),
     )
 
     response = client.get("/api/trajectories/get/cities")
