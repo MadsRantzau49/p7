@@ -1,40 +1,41 @@
 flowchart TB
-    accTitle: Planned trajectory preparation and exploration flow
-    accDescr: Uploaded GPS data is preserved, normalised, checked, simplified, and stored. User filters then drive subtrajectory extraction and route grouping, and the results are displayed on a map for further inspection.
+    accTitle: Trajectory processing pipeline
+    accDescr: Source GPS data is parsed and preserved as original trajectories, normalised into uniformed trajectories, then cleaned with rule-based filters and gap splitting to produce cleaned trajectories. A per-query stage extracts subtrajectories between two regions, clusters similar paths, and returns representative routes with traversal counts.
 
-    subgraph preparation[Dataset preparation]
+    subgraph ingest[1 . Ingestion]
         direction LR
-        upload[Uploaded GPS dataset]
-        preserve[Preserve original<br/>observations]
-        normalise[Normalise journey IDs,<br/>coordinates and timestamps]
-        validate[Detect invalid positions,<br/>times and movement]
-        simplify[Compress Data while preserving<br/>route shape and timing]
+        og[Source GPS dataset<br/>Porto / Beijing / upload]
+        parse[Parse and preserve<br/>raw observations]
         storeOriginal[(Original<br/>trajectories)]
-        storePrepared[(Prepared<br/>trajectories)]
-
-        upload --> preserve --> storeOriginal
-        upload --> normalise --> validate --> simplify --> storePrepared
+        og --> parse --> storeOriginal
     end
 
-    subgraph exploration[Interactive route exploration]
+    subgraph transform[2 . Normalise and clean]
         direction LR
-        filters[Select dataset area, timestamp and route similarity filter]
-        query[Query candidate<br/>prepared trajectories]
-        extract[Find subtrajectories]
-        cluster[Group substantially<br/>similar paths]
-        result[Representative routes,<br/>counts, IDs and timestamps]
-
-        filters --> query --> extract --> cluster --> result
+        normalise[Normalise to<br/>common schema]
+        storeUniformed[(Uniformed<br/>trajectories)]
+        clean[Rule-based cleaning<br/>+ gap splitting]
+        storeCleaned[(Cleaned<br/>trajectories)]
+        normalise --> storeUniformed --> clean --> storeCleaned
     end
 
-    preparation -->|Prepared trajectories| exploration
+    subgraph querypipe[3 . Per-query route pipeline]
+        direction LR
+        params[Query input:<br/>entry, exit, time, similarity]
+        extract[Extract<br/>subtrajectories]
+        cluster[Cluster into<br/>route groups]
+        output[Representative routes:<br/>counts, IDs, timestamps]
+        params --> extract --> cluster --> output
+    end
+
+    ingest --> transform --> querypipe
 
     classDef input fill:#fff4cc,stroke:#76520e,color:#2c2109,stroke-width:1.5px;
     classDef process fill:#e9f8ef,stroke:#237a46,color:#123d26,stroke-width:1.5px;
     classDef store fill:#f4eafe,stroke:#7446a6,color:#35204d,stroke-width:1.5px;
-    classDef interaction fill:#e8f1ff,stroke:#245ea8,color:#102a43,stroke-width:1.5px;
+    classDef output fill:#e8f1ff,stroke:#245ea8,color:#102a43,stroke-width:1.5px;
 
-    class upload input;
-    class preserve,normalise,validate,simplify,query,extract,cluster process;
-    class storeOriginal,storePrepared store;
-    class filters,result, interaction;
+    class og,params input;
+    class parse,normalise,clean,extract,cluster process;
+    class storeOriginal,storeUniformed,storeCleaned store;
+    class output output;

@@ -10,15 +10,15 @@ Choose medium size
 To run CI
 
 ```bash
-act
+act --secret-file .env
 ```
 
 To run specific job
 
 ```bash
-act -j <name>
+act -j <name> --secret-file .env
 ```
 
 ```bash
-act -j backend
+act -j backend --secret-file .env
 ```
