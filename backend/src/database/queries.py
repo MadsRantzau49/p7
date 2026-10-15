@@ -2,6 +2,7 @@ import json
 from datetime import date, datetime, time, timedelta
 
 from models.beijing_trajectory import BeijingTrajectory
+from models.bounding_box import BoundingBox
 from models.dataset import DataSet
 from models.porto_trajectory import PortoTrajectory
 from models.trajectory_segments import TrajectorySegments
@@ -536,14 +537,12 @@ async def retrieve_cleaned_uniformed_batch(
 
 def get_candidate_segments(
     context,
-    box_a_bounds: tuple[float, float, float, float],
-    box_b_bounds: tuple[float, float, float, float],
+    box_a: BoundingBox,
+    box_b: BoundingBox,
     start_date: date,
     end_date: date,
 ) -> list[dict]:
-    """Fetch the segments near box A or box B, for trips that come near both, in the date range.
-
-    Bounds are (min_longitude, min_latitude, max_longitude, max_latitude)."""
+    """Fetch the segments near box A or box B, for trips that come near both, in the date range."""
     cursor = context.cursor(dictionary=True)
 
     try:
@@ -588,14 +587,14 @@ def get_candidate_segments(
         values = {
             "start_date": start_date,
             "day_after_end": day_after_end,
-            "a_min_longitude": box_a_bounds[0],
-            "a_min_latitude": box_a_bounds[1],
-            "a_max_longitude": box_a_bounds[2],
-            "a_max_latitude": box_a_bounds[3],
-            "b_min_longitude": box_b_bounds[0],
-            "b_min_latitude": box_b_bounds[1],
-            "b_max_longitude": box_b_bounds[2],
-            "b_max_latitude": box_b_bounds[3],
+            "a_min_longitude": box_a.min_longitude,
+            "a_min_latitude": box_a.min_latitude,
+            "a_max_longitude": box_a.max_longitude,
+            "a_max_latitude": box_a.max_latitude,
+            "b_min_longitude": box_b.min_longitude,
+            "b_min_latitude": box_b.min_latitude,
+            "b_max_longitude": box_b.max_longitude,
+            "b_max_latitude": box_b.max_latitude,
         }
 
         cursor.execute(sql, values)

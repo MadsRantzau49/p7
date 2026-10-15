@@ -8,6 +8,7 @@ from helpers.subpath_cutting import (
     make_box,
     trajectory_subpaths,
 )
+from models.bounding_box import BoundingBox
 from models.subpath import Subpath
 
 
@@ -35,7 +36,9 @@ def find_subpaths(
     context = create_db_connection()
 
     try:
-        rows = get_candidate_segments(context, box_a.bounds, box_b.bounds, start_date, end_date)
+        rows = get_candidate_segments(
+            context, BoundingBox(*box_a.bounds), BoundingBox(*box_b.bounds), start_date, end_date
+        )
         segments_by_trajectory = group_by_trajectory(rows)
 
         pairs_by_trajectory = {}
