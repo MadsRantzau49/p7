@@ -6,12 +6,16 @@ import type { uniformedTrajectoryResponse } from "../models/uniformedTrajectoryR
 export async function clusterTrajectories(
   trajectories: uniformedTrajectoryResponse[],
   epsilonM: number,
+  useSpatialIndex = true,
+  useBoundingBoxFilter = true,
   signal?: AbortSignal,
 ): Promise<PathletClusteringResult> {
   const response = await apiclient.post<PathletClusteringResult>(
     "trajectories/pathlets",
     {
       epsilon_m: epsilonM,
+      use_spatial_index: useSpatialIndex,
+      use_bounding_box_filter: useBoundingBoxFilter,
       trajectories: trajectories.map(({ trajectory_id, points, source_rows }) => ({
         trajectory_id,
         points,

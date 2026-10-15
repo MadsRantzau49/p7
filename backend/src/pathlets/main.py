@@ -2,6 +2,7 @@
 
 import argparse
 import logging
+from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
 from time import perf_counter
@@ -13,7 +14,13 @@ from .loading import load_trajectories
 from .models import ClusteringConfig, ClusteringResult, GPSTrajectory, PipelineMetrics
 from .output import write_json
 from .selection import convert_to_gps, select_final_pathlets, validate_coverage
-from .spatial import build_spatial_index, compare_sspd, construct_candidate_clusters, find_nearby_pairs
+from .spatial import (
+    build_spatial_index,
+    compare_sspd,
+    construct_candidate_clusters,
+    find_nearby_pairs,
+    find_nearby_pairs_brute_force,
+)
 
 LOGGER = logging.getLogger(__name__)
 T = TypeVar("T")
@@ -61,8 +68,13 @@ def run_pipeline(
         "01_projection", lambda: convert_to_meters(gps, config.max_projection_radius_m)
     )
     segments = timed("02_segments", lambda: generate_segments(metric))
-    spatial_index = timed("03_spatial_index", lambda: build_spatial_index(segments))
-    pairs = timed("04_nearby_pairs", lambda: find_nearby_pairs(segments, spatial_index, config))
+    if config.use_spatial_index:
+        spatial_index = timed("03_spatial_index", lambda: build_spatial_index(segments))
+        pairs = timed("04_nearby_pairs", lambda: find_nearby_pairs(segments, spatial_index, config))
+    else:
+        runtimes["03_spatial_index"] = 0.0
+        LOGGER.info("03_spatial_index: skipped (brute-force candidate search)")
+        pairs = timed("04_nearby_pairs", lambda: find_nearby_pairs_brute_force(segments, config))
     matches = timed("05_sspd", lambda: compare_sspd(pairs, segments, config.epsilon_m))
     clusters = timed("06_clusters", lambda: construct_candidate_clusters(segments, matches))
     extended = timed("07_extension", lambda: extend_clusters(clusters, metric, segments, pairs, config))
@@ -70,11 +82,21 @@ def run_pipeline(
     validate_coverage(selected, metric)
     pathlets = timed("09_inverse_projection", lambda: convert_to_gps(selected, metric, projection))
 
+    source_segment_counts = Counter(segment.trajectory_id for segment in segments)
     metrics: PipelineMetrics = {
         "trajectory_count": len(gps),
         "segment_count": len(segments),
         "zero_length_segment_count": sum(segment.start == segment.end for segment in segments),
         "spatial_candidate_pair_count": len(pairs),
+        "possible_cross_trajectory_pair_count": (
+            len(segments) ** 2 - sum(count**2 for count in source_segment_counts.values())
+        )
+        // 2,
+        "use_spatial_index": config.use_spatial_index,
+        "use_bounding_box_filter": config.use_bounding_box_filter,
+        "sspd_comparison_count": len(pairs),
+        "candidate_search_method": "strtree" if config.use_spatial_index else "brute_force",
+        "candidate_discovery_runtime_ms": runtimes["03_spatial_index"] + runtimes["04_nearby_pairs"],
         "sspd_match_count": len(matches),
         "candidate_cluster_count": len(clusters),
         "extended_pathlet_count": len(extended),
@@ -152,7 +174,19 @@ def main() -> None:
     parser.add_argument("--epsilon", type=float, default=100.0, help="SSPD threshold in projected meters")
     parser.add_argument("--search-radius", type=float)
     parser.add_argument("--approximate-search", action="store_true")
+    parser.add_argument(
+        "--spatial-index",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="use STRtree candidate search; --no-spatial-index scans all cross-source pairs",
+    )
     parser.add_argument("--max-extension-steps", type=int, default=100)
+    parser.add_argument(
+        "--bounding-box-filter",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="filter candidate distances; --no-bounding-box-filter sends every cross-source pair to SSPD",
+    )
     parser.add_argument("--extension-gap", type=float, help="maximum seed gap in meters; default 2 * epsilon")
     parser.add_argument("--min-pathlet-length", type=float, default=0.0)
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/pathlets"))
@@ -167,6 +201,8 @@ def main() -> None:
             epsilon_m=args.epsilon,
             search_radius_m=args.search_radius,
             approximate_search=args.approximate_search,
+            use_spatial_index=args.spatial_index,
+            use_bounding_box_filter=args.bounding_box_filter,
             max_extension_steps=args.max_extension_steps,
             extension_gap_m=args.extension_gap,
             min_pathlet_length_m=args.min_pathlet_length,

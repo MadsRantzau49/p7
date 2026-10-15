@@ -24,6 +24,8 @@ class PathletTrajectoryRequest(BaseModel):
 class PathletClusteringRequest(BaseModel):
     trajectories: list[PathletTrajectoryRequest] = Field(min_length=1)
     epsilon_m: float = Field(default=100.0, ge=0, allow_inf_nan=False)
+    use_spatial_index: bool = True
+    use_bounding_box_filter: bool = True
 
 
 class PathletClusteringResponse(BaseModel):

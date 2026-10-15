@@ -32,5 +32,9 @@ export const result: PathletClusteringResult = {
     }),
   ],
   metrics: { trajectory_count: 2, segment_count: 4, final_pathlet_count: 3, shared_pathlet_count: 1,
-    coverage_complete: true, epsilon_m: 2000, total_runtime_ms: 15, step_runtime_ms: {} },
+    coverage_complete: true, epsilon_m: 2000, total_runtime_ms: 15,
+    use_spatial_index: true, use_bounding_box_filter: true, sspd_comparison_count: 3,
+    candidate_search_method: "strtree", candidate_discovery_runtime_ms: 5,
+    spatial_candidate_pair_count: 3, possible_cross_trajectory_pair_count: 4,
+    step_runtime_ms: { "03_spatial_index": 2, "04_nearby_pairs": 3, "05_sspd": 2 } },
 };

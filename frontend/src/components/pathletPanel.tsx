@@ -3,6 +3,13 @@ import type { SubmitEvent } from "react";
 import { clusterTrajectories, getPathletError, previewTrajectoryCsv } from "../api/pathletAPI";
 import type { PathletClusteringResult } from "../models/pathlet";
 import type { uniformedTrajectoryResponse } from "../models/uniformedTrajectoryResponse";
+import PathletTimings from "./pathletTimings";
+
+interface ComparedRuns {
+  trajectories: uniformedTrajectoryResponse[];
+  epsilonM: number;
+  runs: PathletClusteringResult[];
+}
 
 interface PathletPanelProps {
   trajectories: uniformedTrajectoryResponse[];
@@ -22,8 +29,11 @@ export default function PathletPanel({
   onPreviewLoaded, onResultChange, onBusyChange, onShowPathletsChange, onShowOriginalsChange,
 }: PathletPanelProps) {
   const [epsilon, setEpsilon] = useState("100");
+  const [useSpatialIndex, setUseSpatialIndex] = useState(true);
+  const [useBoundingBoxFilter, setUseBoundingBoxFilter] = useState(true);
+  const [comparedRuns, setComparedRuns] = useState<ComparedRuns | null>(null);
   const [file, setFile] = useState<File | null>(null);
-  const [operation, setOperation] = useState<"preview" | "cluster" | null>(null);
+  const [operation, setOperation] = useState<"preview" | "cluster" | "compare" | null>(null);
   const [error, setError] = useState("");
   const request = useRef<AbortController | null>(null);
 
@@ -52,6 +62,10 @@ export default function PathletPanel({
 
   async function handleCluster(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
+    await runClustering(false);
+  }
+
+  async function runClustering(compare: boolean) {
     if (disabled || operation || trajectories.length === 0) return;
     const epsilonM = Number(epsilon);
     if (!epsilon.trim() || !Number.isFinite(epsilonM) || epsilonM < 0) {
@@ -61,12 +75,24 @@ export default function PathletPanel({
     const controller = new AbortController();
     request.current = controller;
     setError("");
-    setOperation("cluster");
+    setOperation(compare ? "compare" : "cluster");
     onBusyChange(true);
     onResultChange(null);
     try {
-      const data = await clusterTrajectories(trajectories, epsilonM, controller.signal);
-      if (!controller.signal.aborted) onResultChange(data);
+      const modes = compare ? [useSpatialIndex, !useSpatialIndex] : [useSpatialIndex];
+      for (const mode of modes) {
+        const data = await clusterTrajectories(trajectories, epsilonM, mode, useBoundingBoxFilter, controller.signal);
+        if (controller.signal.aborted) return;
+        setComparedRuns((previous) => {
+          const history = previous?.trajectories === trajectories && previous.epsilonM === epsilonM
+            ? previous.runs : [];
+          return { trajectories, epsilonM, runs: [
+            ...history.filter((run) => run.metrics.use_spatial_index !== mode
+              || run.metrics.use_bounding_box_filter !== useBoundingBoxFilter), data,
+          ] };
+        });
+        if (mode === useSpatialIndex) onResultChange(data);
+      }
     } catch (failure) {
       if (!controller.signal.aborted) setError(getPathletError(failure));
     } finally {
@@ -78,6 +104,8 @@ export default function PathletPanel({
   }
 
   const busy = disabled || operation !== null;
+  const currentRuns = comparedRuns?.trajectories === trajectories && comparedRuns.epsilonM === Number(epsilon)
+    ? comparedRuns : null;
 
   return (
     <section className="pathlet-panel" aria-labelledby="pathlet-heading" aria-busy={operation !== null}>
@@ -107,13 +135,42 @@ export default function PathletPanel({
             <input id="pathlet-epsilon" type="number" min="0" step="any" required value={epsilon}
               onChange={(event) => {
                 setEpsilon(event.target.value);
+                setComparedRuns(null);
                 setError("");
                 onResultChange(null);
               }} />
             <small>Lower values require closer routes. This is a distance, not a similarity percentage.</small>
           </div>
+          <label className="pathlet-checkbox">
+            <input type="checkbox" checked={useSpatialIndex}
+              onChange={(event) => {
+                setUseSpatialIndex(event.target.checked);
+                setError("");
+                onResultChange(null);
+              }} />
+            Use spatial index (STRtree)
+          </label>
+          <p className="pathlet-help">Uncheck to scan pairs without building an index.</p>
+          <label className="pathlet-checkbox">
+            <input type="checkbox" checked={useBoundingBoxFilter}
+              onChange={(event) => {
+                setUseBoundingBoxFilter(event.target.checked);
+                setError("");
+                onResultChange(null);
+              }} />
+            Use bounding-box distance filter
+          </label>
+          <p className="pathlet-help">
+            {useBoundingBoxFilter ? "Filter out distant segment pairs before SSPD."
+              : "Every cross-trajectory segment pair reaches SSPD. Indexed queries cover the full dataset."}
+            {" "}Compare both modes uses this filter setting; previous settings stay in the timing table.
+          </p>
           <button type="submit" className="trajectory-submit" disabled={busy || trajectories.length === 0}>
             {operation === "cluster" ? "Clustering…" : "Cluster loaded trajectories"}
+          </button>
+          <button type="button" className="trajectory-list-toggle pathlet-compare-button"
+            disabled={busy || trajectories.length === 0} onClick={() => void runClustering(true)}>
+            {operation === "compare" ? "Comparing…" : "Compare both modes"}
           </button>
         </fieldset>
       </form>
@@ -121,7 +178,8 @@ export default function PathletPanel({
       {trajectories.length === 0 && <p className="pathlet-help">Load trajectories or open a CSV to begin.</p>}
       {error && <p className="trajectory-error" role="alert">{error}</p>}
       {operation && <p className="pathlet-help" role="status">
-        {operation === "cluster" ? "Finding shared paths…" : "Reading trajectory CSV…"}
+        {operation === "preview" ? "Reading trajectory CSV…" : operation === "compare"
+          ? "Running both modes sequentially…" : "Finding shared paths…"}
       </p>}
 
       {result && <div className="pathlet-results">
@@ -134,6 +192,9 @@ export default function PathletPanel({
           {" · "}{Math.round(result.metrics.total_runtime_ms)} ms
           {result.metrics.coverage_complete && " · Full coverage"}
         </p>
+        <p className="pathlet-help">{result.metrics.use_spatial_index ? "With spatial index" : "Without spatial index"}</p>
+        <p className="pathlet-help">Bounding-box filter {result.metrics.use_bounding_box_filter ? "on" : "off"}
+          {" · "}{result.metrics.sspd_comparison_count.toLocaleString()} SSPD comparisons</p>
         <label className="pathlet-checkbox">
           <input type="checkbox" checked={showPathlets} disabled={busy}
             onChange={(event) => onShowPathletsChange(event.target.checked)} />
@@ -146,6 +207,8 @@ export default function PathletPanel({
         </label>
         <p className="pathlet-help">Click a pathlet for contributor IDs and original point intervals.</p>
       </div>}
+      {currentRuns && <PathletTimings runs={currentRuns.runs} useSpatialIndex={useSpatialIndex}
+        useBoundingBoxFilter={useBoundingBoxFilter} />}
     </section>
   );
 }

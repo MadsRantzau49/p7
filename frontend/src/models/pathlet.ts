@@ -29,5 +29,12 @@ export interface PathletClusteringResult {
     epsilon_m: number;
     total_runtime_ms: number;
     step_runtime_ms: Record<string, number>;
+    use_spatial_index: boolean;
+    use_bounding_box_filter: boolean;
+    sspd_comparison_count: number;
+    candidate_search_method: "strtree" | "brute_force";
+    candidate_discovery_runtime_ms: number;
+    spatial_candidate_pair_count: number;
+    possible_cross_trajectory_pair_count: number;
   };
 }

@@ -28,6 +28,38 @@ test("CSV to shared pathlets on the real Leaflet map", async ({ page }, testInfo
   await expect(page.getByLabel("Pathlet contributor counts")).toBeVisible();
   await expect(page.locator(".leaflet-shared-pathlets-pane canvas")).toBeVisible();
   await expect(page.getByLabel("Show shared paths")).toBeChecked();
+  await page.getByLabel("Use spatial index (STRtree)").uncheck();
+  const baselineResponse = page.waitForResponse((value) => value.url().endsWith("/trajectories/pathlets")
+    && value.request().method() === "POST" && value.request().postDataJSON().use_spatial_index === false);
+  const indexedResponse = page.waitForResponse((value) => value.url().endsWith("/trajectories/pathlets")
+    && value.request().method() === "POST" && value.request().postDataJSON().use_spatial_index === true);
+  await page.getByRole("button", { name: "Compare both modes" }).click();
+  const baseline: PathletClusteringResult = await (await baselineResponse).json();
+  const indexed: PathletClusteringResult = await (await indexedResponse).json();
+  expect(baseline.metrics.use_spatial_index).toBe(false);
+  expect(baseline.metrics.step_runtime_ms["03_spatial_index"]).toBe(0);
+  expect(baseline.pathlets).toEqual(indexed.pathlets);
+  expect(baseline.pathlets).toEqual(data.pathlets);
+  await expect(page.getByRole("table", { name: "Spatial index timing comparison" })).toBeVisible();
+  await expect(page.getByText("Same pathlets and assignments in both modes.")).toBeVisible();
+  await expect(page.getByText("Without spatial index", { exact: true })).toBeVisible();
+  await page.getByLabel("Use bounding-box distance filter").uncheck();
+  const unfilteredResponse = (indexed: boolean) => page.waitForResponse((value) =>
+    value.url().endsWith("/trajectories/pathlets") && value.request().method() === "POST"
+    && value.request().postDataJSON().use_spatial_index === indexed
+    && value.request().postDataJSON().use_bounding_box_filter === false);
+  const unfilteredBaseline = unfilteredResponse(false);
+  const unfilteredIndex = unfilteredResponse(true);
+  await page.getByRole("button", { name: "Compare both modes" }).click();
+  const exhaustive: PathletClusteringResult = await (await unfilteredBaseline).json();
+  const exhaustiveIndex: PathletClusteringResult = await (await unfilteredIndex).json();
+  expect(exhaustive.metrics.use_bounding_box_filter).toBe(false);
+  expect(exhaustive.metrics.sspd_comparison_count).toBe(exhaustive.metrics.possible_cross_trajectory_pair_count);
+  expect(exhaustive.metrics.sspd_comparison_count).toBeGreaterThan(data.metrics.sspd_comparison_count);
+  expect(exhaustive.pathlets).toEqual(data.pathlets);
+  expect(exhaustiveIndex.pathlets).toEqual(exhaustive.pathlets);
+  await expect(page.getByText("Same pathlets and assignments in all completed runs.")).toBeVisible();
+  await expect(page.getByRole("table", { name: "Spatial index timing comparison" }).getByText("Not run")).toHaveCount(0);
   await page.getByLabel("Overlay original trajectories").check();
   await expect(page.getByLabel("Overlay original trajectories")).toBeChecked();
   await page.screenshot({ path: testInfo.outputPath("shared-pathlets.png") });

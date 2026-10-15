@@ -27,6 +27,7 @@ from pathlets.models import (
     GPSTrajectory,
     MetricPathlet,
     MetricTrajectory,
+    Segment,
 )
 from pathlets.selection import convert_to_gps, select_final_pathlets, uncovered_intervals, validate_coverage
 from pathlets.spatial import (
@@ -34,6 +35,7 @@ from pathlets.spatial import (
     compare_sspd,
     construct_candidate_clusters,
     find_nearby_pairs,
+    find_nearby_pairs_brute_force,
 )
 
 EPOCH = datetime(2024, 1, 1)
@@ -135,6 +137,69 @@ def test_rtree_matches_bruteforce_oracle_across_internal_groups():
     assert pairs == sorted(oracle)
     assert len(pairs) == len(set(pairs))
     assert all(a < b for a, b in pairs)
+    assert find_nearby_pairs_brute_force(segments, config) == pairs
+
+
+@pytest.mark.parametrize("epsilon", [0.0, 0.5, 100.0])
+def test_no_index_discovery_matches_tree_with_degenerate_and_touching_boxes(epsilon):
+    """A full scan and the R-tree return identical sorted pairs, including exact box boundaries."""
+    trajectories = [
+        metric("a", [(0, 0), (0, 0), (5, 0), (5, 5)]),
+        metric("b", [(2, 0), (2, 2), (7, 2)]),
+        metric("c", [(7, 0), (12, 0)]),
+        metric("far", [(10_000, 10_000), (10_001, 10_001)]),
+    ]
+    segments = list(reversed(generate_segments(trajectories)))
+    config = ClusteringConfig(epsilon_m=epsilon)
+    baseline = find_nearby_pairs_brute_force(segments, config)
+    assert baseline == find_nearby_pairs(segments, build_spatial_index(segments), config)
+    assert baseline == sorted(set(baseline))
+    by_id = {segment.segment_id: segment for segment in segments}
+    assert all(by_id[a].trajectory_id != by_id[b].trajectory_id for a, b in baseline)
+    assert all(by_id[a].trajectory_id != "far" and by_id[b].trajectory_id != "far" for a, b in baseline)
+    assert find_nearby_pairs_brute_force([], config) == []
+    assert find_nearby_pairs_brute_force(segments[:1], config) == []
+
+
+def test_unfiltered_discovery_includes_far_pairs_and_never_reads_scan_bounds(monkeypatch):
+    """Turning filtering off must remove all geometric rejection, not just the tree."""
+    segments = list(
+        reversed(
+            generate_segments(
+                [
+                    metric("a", [(0, 0), (1, 0), (1, 0)]),
+                    metric("b", [(10_000, 20_000), (10_001, 20_001)]),
+                    metric("c", [(0, 0), (0, 0)]),
+                ]
+            )
+        )
+    )
+    config = ClusteringConfig(epsilon_m=100, search_radius_m=0, use_bounding_box_filter=False)
+    expected = [(0, 2), (0, 3), (1, 2), (1, 3), (2, 3)]
+    assert find_nearby_pairs(segments, build_spatial_index(segments), config) == expected
+
+    def forbidden(_segment):
+        raise AssertionError("the unfiltered scan must not calculate bounding boxes")
+
+    monkeypatch.setattr(Segment, "bounds", property(forbidden))
+    assert find_nearby_pairs_brute_force(segments, config) == expected
+    assert find_nearby_pairs_brute_force([], config) == []
+
+
+@pytest.mark.parametrize(
+    "coordinates",
+    [
+        [(0, 0), (0, 0)],
+        [(0, 0), (1, 0)],
+        [(0, 0), (0, 1)],
+    ],
+)
+def test_unfiltered_index_enumerates_complete_degenerate_extents(coordinates):
+    """Full-extent queries must preserve coincident points and zero-width or height extents."""
+    segments = generate_segments([metric("a", coordinates), metric("b", coordinates)])
+    config = ClusteringConfig(epsilon_m=0, use_bounding_box_filter=False)
+    assert find_nearby_pairs(segments, build_spatial_index(segments), config) == [(0, 1)]
+    assert find_nearby_pairs([], build_spatial_index([]), config) == []
 
 
 @pytest.mark.parametrize(

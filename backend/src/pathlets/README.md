@@ -98,8 +98,8 @@ in `main.py`, retaining its input/output contracts:
 | Load | `loading.load_trajectories` | Validated CSV; `from_uniformed(id, model)` adapts existing backend data. |
 | 1 | `geometry.convert_to_meters` | Ellipsoidal local azimuthal equidistant projection; inverse WKT retained. |
 | 2 | `geometry.generate_segments` | All consecutive original edges, including zero-length edges. |
-| 3 | `spatial.build_spatial_index` | Shapely 2 `STRtree`; tree positions mapped explicitly to segment IDs. |
-| 4 | `spatial.find_nearby_pairs` | Expanded bounding-box queries; cross-source, unique unordered pairs. |
+| 3 | `spatial.build_spatial_index` | Optional Shapely 2 `STRtree`; tree positions mapped explicitly to segment IDs. |
+| 4 | `spatial.find_nearby_pairs` / `find_nearby_pairs_brute_force` | Optional expanded-box filtering, or every cross-source pair; unique unordered pairs. |
 | 5 | `spatial.compare_sspd` | Reusable `geometry.sspd`, inclusive `distance <= epsilon`. |
 | 6 | `spatial.construct_candidate_clusters` | Representative stars, never transitive connected components. |
 | 7 | `extension.extend_clusters` | Directed clipped-overlap atoms, bounded prefix extension and full SSPD rechecks. |
@@ -135,10 +135,58 @@ conservative. Smaller radii require `approximate_search=True` /
 `--approximate-search`, which can miss valid matches. Spatial proximity alone
 never proves a match.
 
+### Optional spatial index and timing comparisons
+
+`ClusteringConfig(use_spatial_index=True, use_bounding_box_filter=True)` is the
+default. The flags are independent:
+
+| Index | Bounding-box filter | Candidate discovery |
+| --- | --- | --- |
+| On | On | STRtree queries within expanded segment boxes. |
+| Off | On | Scan cross-source pairs using cached bounds and the same inclusive expanded-box predicate. |
+| On | Off | Build STRtree, query the complete dataset extent once, then enumerate all cross-source pairs from the returned entries. |
+| Off | Off | Enumerate all cross-source pairs without reading segment bounds or the search radius. |
+
+Disabling the index skips stage 3 entirely. Disabling the filter sends every
+cross-source pair to `compare_sspd` and the overlap-seeding stage; no distance
+rejection occurs during discovery. Index-on/filter-off retains tree construction
+and its full-extent query for overhead comparison but cannot accelerate pruning.
+All emitted pairs remain unique and sorted identically. The conservative default
+radius preserves SSPD matches and final assignments across these settings in
+the tested cases. Explicit approximate filtered searches can miss matches;
+disabling the filter also disables that radius restriction.
+
+Unfiltered discovery stores O(n²) candidate references and performs O(n²) SSPD
+comparisons; unlike the filtered scan, it must retain the complete pair list.
+The similarity threshold and all later geometric checks remain active.
+
+CLI example:
+
+```bash
+PYTHONPATH=backend/src venv/bin/python -m pathlets.main \
+  --input backend/tests/data/trajectories/aalborg_germany.csv \
+  --epsilon 2000 --no-spatial-index --output-dir outputs/pathlets/no-index
+```
+
+Use `--spatial-index` (or omit either flag) for indexed discovery. The frontend
+API accepts both flags. To disable every broad-phase filter, add
+`--no-spatial-index --no-bounding-box-filter`; `--bounding-box-filter` restores
+the default distance filter. Its search radius is unused when filtering is off.
+The frontend's **Compare both modes** uses the current filter setting; toggle
+the filter and compare again to populate all four timing rows. Metrics record
+both flags, `sspd_comparison_count`, the selected search method,
+`possible_cross_trajectory_pair_count`, and `candidate_discovery_runtime_ms`.
+The latter sums `03_spatial_index` and `04_nearby_pairs`; the skipped stage is
+exactly zero in the baseline. `spatial_candidate_pair_count` retains its original
+field name but counts emitted candidates in every setting (all possible pairs
+when filtering is off). Each row also shows stage `05_sspd` runtime. Total runtime
+includes tree construction. Small inputs can be faster without indexing because
+of index overhead; single-run timings vary with warm-up and system load.
+
 ### Extension and selection trade-offs
 
 1. Whole-segment match stars supply initial seed pairs. **Supplemental clipped
-   seeds** from the same R-tree candidates handle unequal sampling: whole-edge
+   seeds** from the same nearby candidates handle unequal sampling: whole-edge
    SSPD can fail even for two overlapping pieces of the same straight road.
 2. For each directed pair, project endpoints onto the representative, clip the
    longitudinal overlap, project its endpoints back onto the other edge, and

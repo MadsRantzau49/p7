@@ -427,6 +427,58 @@ body {
   margin: 10px 0 0;
 }
 
+.pathlet-compare-button {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.pathlet-timings {
+  margin-top: 20px;
+  padding-top: 12px;
+  border-top: 1px solid #e1e7ef;
+}
+
+.pathlet-timings h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.pathlet-timing-scroll {
+  overflow-x: auto;
+}
+
+.pathlet-timings table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pathlet-timings caption {
+  margin-bottom: 8px;
+  text-align: left;
+  color: #64748b;
+}
+
+.pathlet-timings td,
+.pathlet-timings th {
+  padding: 8px 4px;
+  border-bottom: 1px solid #e1e7ef;
+  text-align: right;
+}
+
+.pathlet-timings th:first-child {
+  text-align: left;
+}
+
+.pathlet-timings th small {
+  display: block;
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 400;
+}
+
 @media (min-width: 701px) {
   .trajectory-sidebar {
     max-height: 100vh;

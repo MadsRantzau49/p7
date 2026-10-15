@@ -79,6 +79,80 @@ def test_aalborg_pipeline_coverage_geometry_and_determinism(tmp_path, epsilon):
     assert not config.debug
 
 
+@pytest.mark.parametrize("epsilon", [0.0, 100.0, 2000.0])
+def test_no_index_pipeline_preserves_outputs_and_never_builds_a_tree(monkeypatch, epsilon):
+    """Only discovery changes: matches, assignments, geometry, and coverage remain identical."""
+    from pathlets import main as pipeline
+
+    config = ClusteringConfig(FIXTURE, epsilon_m=epsilon, output_dir=None)
+    indexed = run_pipeline(config)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("no-index mode must not build or query an STRtree")
+
+    monkeypatch.setattr(pipeline, "build_spatial_index", forbidden)
+    monkeypatch.setattr(pipeline, "find_nearby_pairs", forbidden)
+    baseline = run_pipeline(replace(config, use_spatial_index=False))
+    assert indexed.pathlets == baseline.pathlets
+    assert indexed.projection == baseline.projection
+    for field in (
+        "spatial_candidate_pair_count",
+        "sspd_match_count",
+        "candidate_cluster_count",
+        "extended_pathlet_count",
+        "final_pathlet_count",
+        "coverage_complete",
+        "possible_cross_trajectory_pair_count",
+    ):
+        assert indexed.metrics[field] == baseline.metrics[field]
+    assert indexed.metrics["use_spatial_index"] is True
+    assert indexed.metrics["candidate_search_method"] == "strtree"
+    assert baseline.metrics["use_spatial_index"] is False
+    assert baseline.metrics["candidate_search_method"] == "brute_force"
+    assert baseline.metrics["step_runtime_ms"]["03_spatial_index"] == 0
+    assert (
+        baseline.metrics["candidate_discovery_runtime_ms"]
+        == baseline.metrics["step_runtime_ms"]["04_nearby_pairs"]
+    )
+    assert indexed.metrics["candidate_discovery_runtime_ms"] == (
+        indexed.metrics["step_runtime_ms"]["03_spatial_index"]
+        + indexed.metrics["step_runtime_ms"]["04_nearby_pairs"]
+    )
+    assert (
+        baseline.metrics["spatial_candidate_pair_count"]
+        < baseline.metrics["possible_cross_trajectory_pair_count"]
+    )
+
+
+@pytest.mark.parametrize("epsilon", [0.0, 100.0, 2000.0])
+@pytest.mark.parametrize("indexed", [False, True])
+def test_unfiltered_pipeline_compares_every_pair_without_changing_results(monkeypatch, epsilon, indexed):
+    """All cross-source pairs actually reach SSPD with filtering disabled in either index mode."""
+    from pathlets import spatial
+
+    config = ClusteringConfig(FIXTURE, epsilon_m=epsilon, use_spatial_index=indexed, output_dir=None)
+    filtered = run_pipeline(config)
+    original_sspd = spatial.sspd
+    calls = 0
+
+    def counted_sspd(first, second):
+        nonlocal calls
+        calls += 1
+        return original_sspd(first, second)
+
+    monkeypatch.setattr(spatial, "sspd", counted_sspd)
+    unfiltered = run_pipeline(replace(config, use_bounding_box_filter=False))
+    assert unfiltered.pathlets == filtered.pathlets
+    assert unfiltered.metrics["coverage_complete"] is True
+    assert unfiltered.metrics["use_spatial_index"] is indexed
+    assert unfiltered.metrics["use_bounding_box_filter"] is False
+    assert calls == unfiltered.metrics["sspd_comparison_count"]
+    assert calls == unfiltered.metrics["possible_cross_trajectory_pair_count"]
+    assert calls == unfiltered.metrics["spatial_candidate_pair_count"]
+    assert calls > filtered.metrics["sspd_comparison_count"]
+    assert unfiltered.metrics["sspd_match_count"] == filtered.metrics["sspd_match_count"]
+
+
 def test_every_debug_stage_and_independent_saved_render(tmp_path):
     """Rendering all nine stages changes no pathlets and retains complete stage data."""
     from pathlets.visualization import render_snapshot
@@ -139,6 +213,25 @@ def test_cli_headless_execution_and_malformed_input(tmp_path):
     assert completed.returncode == 0, completed.stderr
     assert "07_extension:" in completed.stderr
     assert (tmp_path / "out/metrics.json").is_file()
+    baseline = subprocess.run(
+        [*command, "--no-spatial-index"], cwd=ROOT, env=environment, text=True, capture_output=True
+    )
+    assert baseline.returncode == 0, baseline.stderr
+    assert "03_spatial_index: skipped" in baseline.stderr
+    baseline_metrics = json.loads((tmp_path / "out/metrics.json").read_text())
+    assert baseline_metrics["use_spatial_index"] is False
+    assert baseline_metrics["step_runtime_ms"]["03_spatial_index"] == 0
+    unfiltered = subprocess.run(
+        [*command, "--no-bounding-box-filter"], cwd=ROOT, env=environment, text=True, capture_output=True
+    )
+    assert unfiltered.returncode == 0, unfiltered.stderr
+    unfiltered_metrics = json.loads((tmp_path / "out/metrics.json").read_text())
+    assert unfiltered_metrics["use_spatial_index"] is True
+    assert unfiltered_metrics["use_bounding_box_filter"] is False
+    assert (
+        unfiltered_metrics["sspd_comparison_count"]
+        == unfiltered_metrics["possible_cross_trajectory_pair_count"]
+    )
 
     # A separate interpreter proves non-debug execution does not import plotting.
     code = (

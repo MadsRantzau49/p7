@@ -59,6 +59,24 @@ def test_frontend_fixture_preview_to_cluster_workflow(client: TestClient):
             assert start == pytest.approx(cursor)
             cursor = end
         assert cursor == len(trajectory["points"]) - 1
+    unfiltered = client.post(
+        "/api/trajectories/pathlets",
+        json={
+            "trajectories": trajectories,
+            "epsilon_m": 2000,
+            "use_spatial_index": False,
+            "use_bounding_box_filter": False,
+        },
+    )
+    assert unfiltered.status_code == 200, unfiltered.text
+    exhaustive = unfiltered.json()
+    assert exhaustive["pathlets"] == result["pathlets"]
+    assert exhaustive["metrics"]["use_bounding_box_filter"] is False
+    assert (
+        exhaustive["metrics"]["sspd_comparison_count"]
+        == exhaustive["metrics"]["possible_cross_trajectory_pair_count"]
+    )
+    assert exhaustive["metrics"]["sspd_comparison_count"] > result["metrics"]["sspd_comparison_count"]
 
 
 def _numeric_trajectory(trajectory_id: int | str) -> dict[str, object]:
@@ -82,6 +100,20 @@ def test_numeric_database_ids_singletons_and_unrelated_timestamps(client: TestCl
     assert result.status_code == 200
     assert len(result.json()["pathlets"]) == 1
     assert result.json()["pathlets"][0]["trajectory_ids"] == ["42", "99"]
+    assert result.json()["metrics"]["use_spatial_index"] is True
+    baseline = client.post(
+        "/api/trajectories/pathlets",
+        json={
+            "trajectories": [first, second],
+            "epsilon_m": 1,
+            "use_spatial_index": False,
+        },
+    )
+    assert baseline.status_code == 200
+    assert baseline.json()["pathlets"] == result.json()["pathlets"]
+    assert baseline.json()["metrics"]["candidate_search_method"] == "brute_force"
+    assert baseline.json()["metrics"]["step_runtime_ms"]["03_spatial_index"] == 0
+    assert baseline.json()["metrics"]["possible_cross_trajectory_pair_count"] == 1
     singleton = client.post("/api/trajectories/pathlets", json={"trajectories": [first]})
     assert singleton.status_code == 200
     assert singleton.json()["pathlets"][0]["count"] == 1

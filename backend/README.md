@@ -19,12 +19,24 @@ The frontend's **Shared paths** panel runs the same pipeline through these APIs:
 | Endpoint | Input | Output |
 | --- | --- | --- |
 | `POST /api/trajectories/preview` | Multipart `file` containing an ordered trajectory CSV. | Explorer trajectories with original string IDs and CSV source rows. |
-| `POST /api/trajectories/pathlets` | JSON `{ "epsilon_m": 100, "trajectories": [...] }`, using the loaded trajectories' IDs, points, and optional `source_rows`. | Leaflet `[latitude, longitude]` pathlets, contributor assignments/counts, and runtime/coverage metrics. |
+| `POST /api/trajectories/pathlets` | JSON `{ "epsilon_m": 100, "use_spatial_index": true, "use_bounding_box_filter": true, "trajectories": [...] }`, using the loaded trajectories' IDs, points, and optional `source_rows`. | Leaflet `[latitude, longitude]` pathlets, contributor assignments/counts, and runtime/coverage metrics. |
 
 These endpoints run without database access or output files. CPU-bound clustering
 runs in a worker thread. The database pool initializes on first database use,
 allowing the app and CSV preview to start without MySQL. See the
 [frontend guide](../frontend/README.md) for the interactive fixture workflow.
+
+Set `use_spatial_index` to `false` for the all-pairs bounding-box scan. It uses
+the same candidate-distance predicate while filtering is enabled. Independently,
+set `use_bounding_box_filter` to `false` to send every cross-source pair to SSPD.
+With indexing enabled, the query then covers the full dataset rather than a
+nearby window. With both options disabled, no bounds are calculated by discovery.
+Both options default to `true`. Metrics include both flags, `sspd_comparison_count`,
+`candidate_search_method`, `possible_cross_trajectory_pair_count`, and
+`candidate_discovery_runtime_ms` (index construction plus search). The skipped
+`03_spatial_index` stage is exactly `0` ms in no-index mode. Total algorithm time
+includes index construction when enabled. The frontend retains separate timing
+rows for all four settings, including SSPD runtime and comparison counts.
 
 
 

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from math import isfinite
 from pathlib import Path
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 from models.uniformed_trajectories import UniformedTrajectoryPoint
 
@@ -18,6 +18,8 @@ class ClusteringConfig:
     epsilon_m: float = 100.0
     search_radius_m: float | None = None
     approximate_search: bool = False
+    use_spatial_index: bool = True
+    use_bounding_box_filter: bool = True
     min_pathlet_length_m: float = 0.0
     max_extension_steps: int = 100
     extension_gap_m: float | None = None
@@ -44,7 +46,11 @@ class ClusteringConfig:
         if self.search_radius_m is not None:
             if not isfinite(self.search_radius_m) or self.search_radius_m < 0:
                 raise ValueError("search_radius_m must be finite and nonnegative")
-            if self.search_radius_m < 4 * self.epsilon_m and not self.approximate_search:
+            if (
+                self.use_bounding_box_filter
+                and self.search_radius_m < 4 * self.epsilon_m
+                and not self.approximate_search
+            ):
                 raise ValueError("search radius below 4 * epsilon requires approximate_search=True")
         if self.extension_gap_m is not None:
             if not isfinite(self.extension_gap_m) or self.extension_gap_m < 0:
@@ -180,6 +186,12 @@ class _RequiredMetrics(TypedDict):
     segment_count: int
     zero_length_segment_count: int
     spatial_candidate_pair_count: int
+    possible_cross_trajectory_pair_count: int
+    use_spatial_index: bool
+    use_bounding_box_filter: bool
+    sspd_comparison_count: int
+    candidate_search_method: Literal["strtree", "brute_force"]
+    candidate_discovery_runtime_ms: float
     sspd_match_count: int
     candidate_cluster_count: int
     extended_pathlet_count: int

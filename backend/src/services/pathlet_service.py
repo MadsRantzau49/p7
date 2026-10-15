@@ -43,7 +43,15 @@ def cluster_loaded_trajectories(request: PathletClusteringRequest) -> PathletClu
                 tuple(source.source_rows),
             )
         )
-    result = run_pipeline(ClusteringConfig(epsilon_m=request.epsilon_m, output_dir=None), trajectories)
+    result = run_pipeline(
+        ClusteringConfig(
+            epsilon_m=request.epsilon_m,
+            use_spatial_index=request.use_spatial_index,
+            use_bounding_box_filter=request.use_bounding_box_filter,
+            output_dir=None,
+        ),
+        trajectories,
+    )
     return PathletClusteringResponse(pathlets=result.pathlets, metrics=dict(result.metrics))
 
 
