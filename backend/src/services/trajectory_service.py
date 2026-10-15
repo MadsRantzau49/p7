@@ -2,11 +2,9 @@ from datetime import date, time
 
 from database.connection import create_db_connection
 from database.queries import (
-    get_last_segmented_trajectory_id,
     get_trajectories_cities_from_db,
     get_trajectories_from_db,
     insert_segments_into_db,
-    retrieve_cleaned_uniformed_batch,
 )
 from models.dataset import DataSet
 from models.trajectory_segments import TrajectorySegments
@@ -122,41 +120,6 @@ async def insert_trajectory_segments(trajectories: list[dict]):
         return len(segments)
     except Exception as error:
         print(f"Failed to insert trajectories segments: {error}")
-        raise
-    finally:
-        context.close()
-
-
-async def test_insert_trajectory_segments():
-    """This function retrieves cleaned trajectories and inserts into segments"""
-    batch_size = 500
-    context = create_db_connection()
-
-    try:
-        last_id = get_last_segmented_trajectory_id(context)
-        print(f"last_id: {last_id}")
-
-        while True:
-            current_batch = await retrieve_cleaned_uniformed_batch(context, batch_size, last_id)
-
-            if not current_batch:
-                break
-
-            print(
-                f"Retrieved {len(current_batch)} trajectories "
-                f"from {current_batch[0]['trajectory_id']} "
-                f"to {current_batch[-1]['trajectory_id']}"
-            )
-
-            inserted = await insert_trajectory_segments(current_batch)
-
-            last_id = current_batch[-1]["trajectory_id"]
-
-            print(f"Inserted {inserted} segments up to trajectory_id {last_id}")
-
-    except Exception as error:
-        print(f"Failed to insert trajectory segments: {error}")
-        context.rollback()
         raise
     finally:
         context.close()

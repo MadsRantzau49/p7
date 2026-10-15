@@ -647,20 +647,3 @@ def get_trajectory_points(context, trajectory_ids: list[int]) -> dict[int, list[
         raise
     finally:
         cursor.close()
-
-
-def get_last_segmented_trajectory_id(context) -> int | None:
-    """Function retrieves the lastest trajectory id from segment table"""
-    cursor = context.cursor(dictionary=True)
-    try:
-        cursor.execute("""
-            SELECT trajectory_id
-            FROM trajectory_segments
-            ORDER BY trajectory_id DESC
-            LIMIT 1
-        """)
-        row = cursor.fetchone()
-
-        return row["trajectory_id"] if row else None
-    finally:
-        cursor.close()
