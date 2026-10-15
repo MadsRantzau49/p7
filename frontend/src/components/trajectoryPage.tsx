@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { SubmitEvent } from "react";
 import { getTrajectories, getTrajectoryCities } from "../api/trajectoryAPI";
 import type { uniformedTrajectoryResponse } from "../models/uniformedTrajectoryResponse";
@@ -7,6 +7,8 @@ import TimeRangeSlider from "./timeRangeSlider.tsx";
 import DatasetUpload from "./datasetUpload";
 import "../css/TrajectoryPage.css";
 import type { trajectoryCitites } from "../models/trajectoryCities";
+import type { PathletClusteringResult } from "../models/pathlet";
+import PathletPanel from "./pathletPanel";
 
 
 export default function TrajectoryPage() {
@@ -21,6 +23,11 @@ export default function TrajectoryPage() {
   const [limit, setLimit] = useState("100");
 
   const [trajectories, setTrajectories] = useState<uniformedTrajectoryResponse[]>([]);
+  const [loadedSource, setLoadedSource] = useState("");
+  const [pathletResult, setPathletResult] = useState<PathletClusteringResult | null>(null);
+  const [pathletBusy, setPathletBusy] = useState(false);
+  const [showPathlets, setShowPathlets] = useState(false);
+  const [showOriginals, setShowOriginals] = useState(false);
 
   const [loadingCities, setLoadingCities] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -32,7 +39,7 @@ export default function TrajectoryPage() {
   const [showTrajectoryDataPoints, setShowTrajectoryDataPoints] = useState(false);
 
   const [selectedTrajectoryId, setSelectedTrajectoryId] =
-    useState<number | null>(null);
+    useState<number | string | null>(null);
 
   useEffect(() => {
     let isActive = true;
@@ -68,10 +75,28 @@ export default function TrajectoryPage() {
   function handleCityChange(value: string) {
     setCity(value);
     setTrajectories([]);
+    setLoadedSource("");
+    handlePathletResult(null);
     setSelectedTrajectoryId(null);
     setHasSearched(false);
     setShowTrajectoryDataPoints(false);
     setError("");
+  }
+
+  function handlePathletResult(result: PathletClusteringResult | null) {
+    setPathletResult(result);
+    setShowPathlets(result !== null);
+    setShowOriginals(false);
+    setShowTrajectoryDataPoints(false);
+  }
+
+  function handleLoadedTrajectories(data: uniformedTrajectoryResponse[], source: string) {
+    setTrajectories(data);
+    setLoadedSource(source);
+    setSelectedTrajectoryId(null);
+    setHasSearched(true);
+    setError("");
+    handlePathletResult(null);
   }
 
   async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
@@ -107,10 +132,7 @@ export default function TrajectoryPage() {
         requestedLimit
       );
 
-      setTrajectories(data);
-      setSelectedTrajectoryId(null);
-      setHasSearched(true);
-      setShowTrajectoryDataPoints(false);
+      handleLoadedTrajectories(data, city);
     } catch {
       setError("Could not load trajectories.");
     } finally {
@@ -118,7 +140,13 @@ export default function TrajectoryPage() {
     }
   }
 
-  const visibleTrajectories = selectedTrajectoryId === null ? trajectories : trajectories.filter( (trajectory) => trajectory.trajectory_id === selectedTrajectoryId);
+  const visibleTrajectories = useMemo(() => selectedTrajectoryId === null
+    ? trajectories : trajectories.filter((trajectory) => trajectory.trajectory_id === selectedTrajectoryId),
+    [trajectories, selectedTrajectoryId]);
+  const visiblePathlets = useMemo(() => (pathletResult?.pathlets ?? []).filter((pathlet) =>
+    selectedTrajectoryId === null || pathlet.trajectory_ids.includes(String(selectedTrajectoryId))),
+    [pathletResult, selectedTrajectoryId]);
+  const busy = loading || pathletBusy;
 
   const isSameDay = Boolean(startDate && endDate && startDate === endDate);
 
@@ -129,7 +157,7 @@ export default function TrajectoryPage() {
   } else if (hasSearched && trajectories.length === 0) {
     statusMessage = "No trajectories found for these filters.";
   } else if (hasSearched) {
-    statusMessage = `${trajectories.length} trajectories loaded.`;
+    statusMessage = `${trajectories.length} trajectories loaded from ${loadedSource}.`;
   }
 
   return (
@@ -144,7 +172,7 @@ export default function TrajectoryPage() {
         </header>
 
         <form onSubmit={handleSubmit}>
-          <fieldset disabled={loading}>
+          <fieldset disabled={busy}>
             <div className="trajectory-field">
               <label htmlFor="city">City</label>
 
@@ -206,7 +234,7 @@ export default function TrajectoryPage() {
               <input id="limit" type="number" min="0" step="1" value={limit} onChange={(event) => setLimit(event.target.value)}/>
             </div>
 
-            <button className="trajectory-submit" type="submit" disabled={loading || loadingCities || !city}> {loading ? "Loading..." : "Load trajectories"}</button>
+            <button className="trajectory-submit" type="submit" disabled={busy || loadingCities || !city}> {loading ? "Loading..." : "Load trajectories"}</button>
           </fieldset>
 
           {error && (<p className="trajectory-error" role="alert">{error}</p>)}
@@ -214,12 +242,19 @@ export default function TrajectoryPage() {
 
         <p className="trajectory-description" role="status">{statusMessage}</p>
 
+        <PathletPanel trajectories={trajectories} result={pathletResult} disabled={busy}
+          showPathlets={showPathlets} showOriginals={showOriginals}
+          onPreviewLoaded={handleLoadedTrajectories} onResultChange={handlePathletResult}
+          onBusyChange={setPathletBusy} onShowPathletsChange={setShowPathlets}
+          onShowOriginalsChange={setShowOriginals} />
+
         <DatasetUpload />
       </aside>
 
       <main className="trajectory-workspace">
-        <div className="trajectory-map-panel" aria-busy={loading}>
-          <TrajectoryMap trajectories={visibleTrajectories} showTrajectoryDataPoints={showTrajectoryDataPoints}/>
+        <div className="trajectory-map-panel" aria-busy={busy}>
+          <TrajectoryMap trajectories={visibleTrajectories} showTrajectoryDataPoints={showTrajectoryDataPoints}
+            pathlets={visiblePathlets} showPathlets={showPathlets} showOriginals={showOriginals} />
         </div>
 
         <section className="trajectory-bottom-bar">
@@ -244,6 +279,12 @@ export default function TrajectoryPage() {
               </button>
             )}
           </div>
+
+          {showPathlets && <p className="pathlet-filter-note">
+            Showing {visiblePathlets.length} pathlets{selectedTrajectoryId !== null
+              ? ` involving trajectory ${selectedTrajectoryId}` : " across all loaded trajectories"}.
+            {" "}Counts include all contributors from the clustering run.
+          </p>}
 
           <div
             id="loaded-trajectories"
@@ -308,6 +349,7 @@ export default function TrajectoryPage() {
 
                               setSelectedTrajectoryId(trajectory.trajectory_id);
                               setShowTrajectoryDataPoints(!(isSelected && showTrajectoryDataPoints));
+                              setShowPathlets(false);
                             }}
                           ></button>
                           {isSelected && showTrajectoryDataPoints ? "Hide data points" : "Show data points"}

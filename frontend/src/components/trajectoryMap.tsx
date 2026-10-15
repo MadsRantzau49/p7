@@ -4,6 +4,8 @@ import { divIcon, latLngBounds } from "leaflet";
 import type { LatLngTuple } from "leaflet";
 import type { Props } from "../models/map/Props"
 import type { MapViewProps } from "../models/map/MapViewProps";
+import { trajectoryHue } from "../models/map/pathletStyle";
+import PathletLayer from "./pathletLayer";
 import "leaflet/dist/leaflet.css";
 import "../css/trajectoryMap.css"
 
@@ -29,10 +31,12 @@ function MapView({ positions }: MapViewProps) {
   
 }
 
-export default function TrajectoryMap({ trajectories, showTrajectoryDataPoints }: Props) {
+export default function TrajectoryMap({
+  trajectories, showTrajectoryDataPoints, pathlets = [], showPathlets = false, showOriginals = false,
+}: Props) {
   const routes = useMemo(() =>
       trajectories.map((trajectory) => {
-        const hue = (trajectory.trajectory_id * 137.508) % 360;
+        const hue = trajectoryHue(trajectory.trajectory_id);
         const color = `hsl(${hue}, 75%, 40%)`;
 
         const positions: LatLngTuple[] = trajectory.points.map(
@@ -52,7 +56,10 @@ export default function TrajectoryMap({ trajectories, showTrajectoryDataPoints }
     [trajectories]
   );
 
-  const allPositions = useMemo(() => routes.flatMap((route) => route.positions), [routes]);
+  const allPositions = useMemo(() => [
+    ...routes.flatMap((route) => route.positions),
+    ...(showPathlets ? pathlets.flatMap((pathlet) => pathlet.coordinates) : []),
+  ], [routes, pathlets, showPathlets]);
 
   return (
     <div className="trajectory-map-wrapper">
@@ -71,12 +78,12 @@ export default function TrajectoryMap({ trajectories, showTrajectoryDataPoints }
 
         <MapView positions={allPositions} />
 
-        {routes.map(({ trajectory, positions, color }) =>
+        {(!showPathlets || showOriginals) && routes.map(({ trajectory, positions, color }) =>
           positions.length > 1 ? (
             <Polyline
               key={`path-${trajectory.trajectory_id}`}
               positions={positions}
-              pathOptions={{ color, weight: 3, opacity: 0.85 }}
+              pathOptions={{ color, weight: showPathlets ? 1 : 3, opacity: showPathlets ? 0.25 : 0.85 }}
             >
               <Popup>
                 <strong>Trajectory {trajectory.trajectory_id}</strong>
@@ -117,7 +124,7 @@ export default function TrajectoryMap({ trajectories, showTrajectoryDataPoints }
           )}
 
         {/* This creates the map circle to indicate the start of a trajectory */}
-        {routes.map(({ trajectory, positions, color }) => {
+        {!showPathlets && routes.map(({ trajectory, positions, color }) => {
           const start = positions[0];
           if (!start) return null;
 
@@ -145,7 +152,7 @@ export default function TrajectoryMap({ trajectories, showTrajectoryDataPoints }
         })}
 
         {/* This creates the map square to indicate the end of a trajectory */}
-        {routes.map(({ trajectory, positions, endIcon }) => {
+        {!showPathlets && routes.map(({ trajectory, positions, endIcon }) => {
           const end = positions[positions.length - 1];
           if (!end) return null;
 
@@ -165,17 +172,25 @@ export default function TrajectoryMap({ trajectories, showTrajectoryDataPoints }
             </Marker>
           );
         })}
+        {showPathlets && <PathletLayer pathlets={pathlets} />}
       </MapContainer>
 
       <div className="trajectory-map-legend">
-        <span>
+        {showPathlets ? <div className="pathlet-legend" aria-label="Pathlet contributor counts">
+          <strong>Distinct trajectories</strong>
+          <span><i className="legend-pathlet legend-pathlet-one" />1 · unique portion</span>
+          <span><i className="legend-pathlet legend-pathlet-two" />2 trajectories</span>
+          <span><i className="legend-pathlet legend-pathlet-four" />3–4 trajectories</span>
+          <span><i className="legend-pathlet legend-pathlet-many" />5+ trajectories</span>
+          <small>Width increases with contributor count</small>
+        </div> : <><span>
           <i className="legend-start" aria-hidden="true" />
           Start
         </span>
         <span>
           <i className="legend-end" aria-hidden="true" />
           End
-        </span>
+        </span></>}
       </div>
     </div>
   );

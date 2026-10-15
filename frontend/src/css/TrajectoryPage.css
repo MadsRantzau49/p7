@@ -379,3 +379,57 @@ body {
   outline: 3px solid #93c5fd;
   outline-offset: 2px;
 }
+
+.pathlet-panel {
+  margin: 24px 0 32px;
+  padding-top: 24px;
+  border-top: 1px solid #e1e7ef;
+}
+
+.pathlet-panel h2 {
+  margin: 0 0 10px;
+  font-size: 20px;
+}
+
+.pathlet-help,
+.pathlet-filter-note {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.pathlet-cluster-form {
+  margin-top: 24px;
+}
+
+.pathlet-results {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  font-size: 13px;
+}
+
+.pathlet-results p {
+  margin: 0 0 10px;
+}
+
+.pathlet-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+  font-size: 13px;
+}
+
+.pathlet-filter-note {
+  margin: 10px 0 0;
+}
+
+@media (min-width: 701px) {
+  .trajectory-sidebar {
+    max-height: 100vh;
+    overflow-y: auto;
+  }
+}

@@ -8,6 +8,24 @@
 - `src/database/`: MySQL connection and queries.
 - `tests/`: api, unit and integration tests.
 
+## Standalone pathlet clustering
+
+`src/pathlets/` implements the modular SSPD trajectory pipeline, independently
+of the API and database. See [its README](src/pathlets/README.md) for the CLI,
+typed stage contracts, per-stage debug plots, output schema, and trade-offs.
+
+The frontend's **Shared paths** panel runs the same pipeline through these APIs:
+
+| Endpoint | Input | Output |
+| --- | --- | --- |
+| `POST /api/trajectories/preview` | Multipart `file` containing an ordered trajectory CSV. | Explorer trajectories with original string IDs and CSV source rows. |
+| `POST /api/trajectories/pathlets` | JSON `{ "epsilon_m": 100, "trajectories": [...] }`, using the loaded trajectories' IDs, points, and optional `source_rows`. | Leaflet `[latitude, longitude]` pathlets, contributor assignments/counts, and runtime/coverage metrics. |
+
+These endpoints run without database access or output files. CPU-bound clustering
+runs in a worker thread. The database pool initializes on first database use,
+allowing the app and CSV preview to start without MySQL. See the
+[frontend guide](../frontend/README.md) for the interactive fixture workflow.
+
 
 
 ## Uploading a dataset

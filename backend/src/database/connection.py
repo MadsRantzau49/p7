@@ -1,4 +1,5 @@
 import os
+from threading import Lock
 
 from dotenv import load_dotenv
 from mysql.connector import pooling
@@ -9,17 +10,27 @@ load_dotenv()
 # IMPORTANT
 # When a function is done using the connection its important that we close the current connection,
 # so it can return to the pool.
-database_pool_cfg = pooling.MySQLConnectionPool(
-    pool_name="connection_pool",
-    pool_size=5,  # Amount of active db connections, which is allowed at once
-    host=os.getenv("DATABASE_HOST"),
-    port=os.getenv("DATABASE_PORT"),
-    database=os.getenv("DATABASE_NAME"),
-    user=os.getenv("DATABASE_USER"),
-    password=os.getenv("DATABASE_PASSWORD"),
-)
+_database_pool: pooling.MySQLConnectionPool | None = None
+_pool_lock = Lock()
 
 
 def create_db_connection() -> pooling.PooledMySQLConnection:
-    """Create and return a database connection."""
-    return database_pool_cfg.get_connection()
+    """Initialize the shared pool on first database use, then return a connection.
+
+    The CSV preview and in-memory pathlet API can start without a database.
+    Serialize initialization because synchronous endpoints use worker threads.
+    """
+    global _database_pool
+    with _pool_lock:
+        if _database_pool is None:
+            _database_pool = pooling.MySQLConnectionPool(
+                pool_name="connection_pool",
+                pool_size=5,
+                host=os.getenv("DATABASE_HOST"),
+                port=os.getenv("DATABASE_PORT"),
+                database=os.getenv("DATABASE_NAME"),
+                user=os.getenv("DATABASE_USER"),
+                password=os.getenv("DATABASE_PASSWORD"),
+            )
+        pool = _database_pool
+    return pool.get_connection()
