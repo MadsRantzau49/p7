@@ -2,6 +2,8 @@ import json
 from datetime import date, datetime, time, timedelta
 
 from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint
+from models.trajectory_segments import TrajectorySegments
+from models.bounding_box import BoundingBox
 from models.upload_row import VehicleType
 from mysql.connector.pooling import PooledMySQLConnection
 
@@ -265,3 +267,194 @@ class TrajectoryRepository:
             raise
         finally:
             cursor.close()
+
+    def insert_segments_into_db(self, segments: list[TrajectorySegments]) -> None:
+        """Inserts segments into tabel in database"""
+        cursor = self.connection.cursor()
+
+        try:
+            rows = []
+
+            for t_segment in segments:
+                rows.append(
+                    (
+                        t_segment.trajectory_id,
+                        t_segment.segment_index,
+                        t_segment.path,
+                        t_segment.start_time,
+                        t_segment.end_time,
+                    )
+                )
+
+            cursor.executemany(
+                """
+            INSERT IGNORE INTO trajectory_segments (
+                trajectory_id,
+                segment_index,
+                path,
+                start_time,
+                end_time)
+                VALUES (%s, %s, ST_GeomFromText(%s, 4326, 'axis-order=long-lat'), %s, %s)
+                """,
+                rows,
+            )
+        except Exception as error:
+            print(f"Failed to insert segments into database: {error}")
+            raise
+        finally:
+            cursor.close()
+
+
+    async def retrieve_cleaned_uniformed_batch(
+        self, batch_size: int, last_trajectory_id: int | None
+    ) -> list[dict]:
+        """Fetch a batch of cleaned uniformed trajectories ordered by trajectory_id."""
+        cursor = self.connection.cursor(dictionary=True)
+        try:
+            base = """
+                SELECT u.trajectory_id, u.points
+                FROM cleaned_uniformed_trajectories u
+            """
+
+            if last_trajectory_id is None:
+                query = base + " ORDER BY u.trajectory_id LIMIT %s"
+                params = (batch_size,)
+            else:
+                query = (
+                    base
+                    + """
+                    WHERE u.trajectory_id > %s
+                    ORDER BY u.trajectory_id
+                    LIMIT %s
+                """
+                )
+                params = (last_trajectory_id, batch_size)
+
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+
+            for row in rows:
+                row["points"] = json.loads(row["points"])
+
+            return rows
+
+        except Exception as error:
+            print(f"Failed to retrieve cleaned uniformed batch: {error}")
+            raise
+        finally:
+            cursor.close()
+
+
+    def get_candidate_segments(
+        self,
+        box_a: BoundingBox,
+        box_b: BoundingBox,
+        start_date: date,
+        end_date: date,
+    ) -> list[dict]:
+        """Fetch the segments near box A or box B, for trips that come near both, in the date range."""
+        cursor = self.connection.cursor(dictionary=True)
+
+        try:
+            day_after_end = end_date + timedelta(days=1)
+
+            sql = """
+                WITH hits AS (
+                    SELECT trajectory_id, segment_index,
+                        (min_longitude <= %(a_max_longitude)s AND max_longitude >= %(a_min_longitude)s
+                            AND min_latitude <= %(a_max_latitude)s AND max_latitude >= %(a_min_latitude)s)
+                            AS in_a,
+                        (min_longitude <= %(b_max_longitude)s AND max_longitude >= %(b_min_longitude)s
+                            AND min_latitude <= %(b_max_latitude)s AND max_latitude >= %(b_min_latitude)s)
+                            AS in_b
+                    FROM trajectory_segments FORCE INDEX (idx_segment_time_bounds)
+                    WHERE start_time >= %(start_date)s
+                    AND start_time < %(day_after_end)s
+                    AND ((min_longitude <= %(a_max_longitude)s AND max_longitude >= %(a_min_longitude)s
+                            AND min_latitude <= %(a_max_latitude)s AND max_latitude >= %(a_min_latitude)s)
+                        OR (min_longitude <= %(b_max_longitude)s AND max_longitude >= %(b_min_longitude)s
+                            AND min_latitude <= %(b_max_latitude)s AND max_latitude >= %(b_min_latitude)s))
+                ),
+                both_boxes AS (
+                    SELECT trajectory_id
+                    FROM hits
+                    GROUP BY trajectory_id
+                    HAVING MAX(in_a) = 1 AND MAX(in_b) = 1
+                )
+                SELECT s.trajectory_id, s.segment_index, s.start_time, s.end_time,
+                    ST_Longitude(ST_StartPoint(s.path)) AS start_longitude,
+                    ST_Latitude(ST_StartPoint(s.path))  AS start_latitude,
+                    ST_Longitude(ST_EndPoint(s.path))   AS end_longitude,
+                    ST_Latitude(ST_EndPoint(s.path))    AS end_latitude
+                FROM hits h
+                JOIN both_boxes b ON b.trajectory_id = h.trajectory_id
+                JOIN trajectory_segments s
+                ON s.trajectory_id = h.trajectory_id
+                AND s.segment_index = h.segment_index
+                ORDER BY s.trajectory_id, s.segment_index
+            """
+
+            values = {
+                "start_date": start_date,
+                "day_after_end": day_after_end,
+                "a_min_longitude": box_a.min_longitude,
+                "a_min_latitude": box_a.min_latitude,
+                "a_max_longitude": box_a.max_longitude,
+                "a_max_latitude": box_a.max_latitude,
+                "b_min_longitude": box_b.min_longitude,
+                "b_min_latitude": box_b.min_latitude,
+                "b_max_longitude": box_b.max_longitude,
+                "b_max_latitude": box_b.max_latitude,
+            }
+
+            cursor.execute(sql, values)
+
+            return cursor.fetchall()
+        except Exception as error:
+            print(f"Failed to get candidate segments: {error}")
+            raise
+        finally:
+            cursor.close()
+
+
+    def get_trajectory_points(self, trajectory_ids: list[int]) -> dict[int, list[UniformedTrajectoryPoint]]:
+        """Fetch all points of the given trips, as one list per trip"""
+        if len(trajectory_ids) == 0:
+            return {}
+
+        cursor = self.connection.cursor(dictionary=True)
+
+        try:
+            placeholders = ", ".join(["%s"] * len(trajectory_ids))
+
+            sql = f"""
+                SELECT trajectory_id, points
+                FROM cleaned_uniformed_trajectories
+                WHERE trajectory_id IN ({placeholders})
+            """
+
+            cursor.execute(sql, trajectory_ids)
+
+            points_by_trip: dict[int, list[UniformedTrajectoryPoint]] = {}
+
+            for row in cursor.fetchall():
+                points = []
+
+                for point in json.loads(row["points"]):
+                    points.append(
+                        UniformedTrajectoryPoint(
+                            longitude=point["longitude"],
+                            latitude=point["latitude"],
+                            point_timestamp=datetime.fromisoformat(point["point_timestamp"]),
+                        )
+                    )
+
+                points_by_trip[row["trajectory_id"]] = points
+
+            return points_by_trip
+        except Exception as error:
+            print(f"Failed to get trip points: {error}")
+            raise
+        finally:
+            cursor.close()
+
