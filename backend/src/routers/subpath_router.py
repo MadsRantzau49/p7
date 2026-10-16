@@ -1,14 +1,17 @@
 from datetime import date
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException
+from dependencies import get_subpath_service
+from fastapi import APIRouter, Depends, HTTPException
 from models.subpath import Subpath
-from services.subpath_service import find_subpaths
+from services.subpath_service import SubPathService
 
 router = APIRouter(prefix="/api/subpaths")
 
 
 @router.get("/get", response_model=list[Subpath])
 def get_subpaths(
+    serivce: Annotated[SubPathService, Depends(get_subpath_service)],
     a_longitude: float,
     a_latitude: float,
     b_longitude: float,
@@ -19,7 +22,7 @@ def get_subpaths(
 ):
     """Return the sub-paths from location A to location B in the date-range given."""
     try:
-        return find_subpaths(
+        return serivce.find_subpaths(
             a_longitude,
             a_latitude,
             b_longitude,
