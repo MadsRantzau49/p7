@@ -98,6 +98,46 @@ body {
   line-height: 1.5;
 }
 
+.trajectory-field .trajectory-box-size-slider {
+  padding: 0;
+  border: 0;
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+
+.trajectory-slider-limits {
+  display: flex;
+  justify-content: space-between;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.trajectory-area-selection p {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.trajectory-area-card {
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid #e1e7ef;
+  border-left-width: 4px;
+  border-radius: 8px;
+}
+
+.trajectory-area-a {
+  border-left-color: #16a34a;
+}
+
+.trajectory-area-b {
+  border-left-color: #dc2626;
+}
+
+.trajectory-area-card .trajectory-list-toggle[aria-pressed="true"] {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
 .trajectory-submit {
   width: 100%;
   min-height: 44px;
@@ -277,6 +317,11 @@ body {
 
 .trajectory-list-toggle:hover {
   background: #e2e8f0;
+}
+
+.trajectory-sidebar-clear {
+  width: 100%;
+  margin-bottom: 24px;
 }
 
 .trajectory-list-toggle:focus-visible {

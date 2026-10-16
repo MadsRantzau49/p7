@@ -1,8 +1,13 @@
 from datetime import date, time
 
 from database.connection import create_db_connection
-from database.queries import get_trajectories_cities_from_db, get_trajectories_from_db
+from database.queries import (
+    get_trajectories_cities_from_db,
+    get_trajectories_from_db,
+    insert_segments_into_db,
+)
 from models.dataset import DataSet
+from models.trajectory_segments import TrajectorySegments
 from models.uniformed_trajectories import UniformedTrajectories
 
 
@@ -67,6 +72,54 @@ async def get_trajectories_cities() -> list[DataSet]:
 
     except Exception as error:
         print(f"Failed to retrieve cities from database: {error}")
+        raise
+    finally:
+        context.close()
+
+
+async def insert_trajectory_segments(trajectories: list[dict]):
+    """Creates segments from cleaned trajectory data"""
+
+    segments = []
+
+    context = create_db_connection()
+
+    for trajectory in trajectories:
+        points = trajectory["points"]
+
+        for segment_index in range(len(points) - 1):
+            start = points[segment_index]
+            end = points[segment_index + 1]
+
+            start_lon = start["longitude"]
+            start_lat = start["latitude"]
+            end_lon = end["longitude"]
+            end_lat = end["latitude"]
+
+            path = f"LINESTRING({start_lon} {start_lat}, {end_lon} {end_lat})"
+
+            if trajectory["trajectory_id"] is None:
+                raise ValueError("Trajectory_id is none!")
+
+            segments.append(
+                TrajectorySegments(
+                    trajectory_id=trajectory["trajectory_id"],
+                    segment_index=segment_index,
+                    path=path,
+                    start_time=start["point_timestamp"],
+                    end_time=end["point_timestamp"],
+                )
+            )
+
+    if not segments:
+        return 0
+
+    try:
+        insert_segments_into_db(context, segments)
+        context.commit()
+        return len(segments)
+    except Exception as error:
+        print(f"Failed to insert trajectories segments: {error}")
         raise
     finally:
         context.close()

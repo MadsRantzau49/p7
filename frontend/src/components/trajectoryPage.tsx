@@ -1,15 +1,83 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { SubmitEvent } from "react";
+import type { LatLngTuple } from "leaflet";
+import { isAxiosError } from "axios";
+import { getSubpaths } from "../api/subpathAPI";
+import type { Subpath } from "../models/subpath";
 import { getTrajectories, getTrajectoryCities } from "../api/trajectoryAPI";
 import type { uniformedTrajectoryResponse } from "../models/uniformedTrajectoryResponse";
 import TrajectoryMap from "./trajectoryMap";
+import SubpathResults from "./subpathResults";
 import TimeRangeSlider from "./timeRangeSlider.tsx";
 import DatasetUpload from "./datasetUpload";
 import "../css/TrajectoryPage.css";
 import type { trajectoryCitites } from "../models/trajectoryCities";
+import type { AreaName, SelectedArea } from "../models/map/SelectedArea";
 
+const PORTO_CENTER: LatLngTuple = [41.1579, -8.6291];
+const EMPTY_TRAJECTORIES: uniformedTrajectoryResponse[] = [];
 
 export default function TrajectoryPage() {
+  const [sidebarCleared, setSidebarCleared] = useState(false);
+  const [explorerCity, setExplorerCity] = useState("");
+  const [explorerStartDate, setExplorerStartDate] = useState("");
+  const [explorerEndDate, setExplorerEndDate] = useState("");
+  const [boxSize, setBoxSize] = useState(2);
+  const [activeArea, setActiveArea] = useState<AreaName | null>("A");
+  const [areas, setAreas] = useState<Partial<Record<AreaName, SelectedArea>>>({});
+  const [subpaths, setSubpaths] = useState<Subpath[]>([]);
+  const [selectedSubpathId, setSelectedSubpathId] = useState<number | null>(null);
+  const [showSubpathPoints, setShowSubpathPoints] = useState(false);
+  const visibleSubpaths = useMemo(() => selectedSubpathId === null
+    ? subpaths : subpaths.filter((subpath) => subpath.subpath_id === selectedSubpathId),
+  [subpaths, selectedSubpathId]);
+
+  function selectSubpath(id: number | null) {
+    setSelectedSubpathId(id);
+    setShowSubpathPoints(false);
+  }
+  const [loadingSubpaths, setLoadingSubpaths] = useState(false);
+  const [subpathError, setSubpathError] = useState("");
+  const [hasRetrievedSubpaths, setHasRetrievedSubpaths] = useState(false);
+
+  function clearSubpathResults() {
+    selectSubpath(null);
+    setSubpaths([]);
+    setHasRetrievedSubpaths(false);
+    setSubpathError("");
+  }
+
+  async function handleRetrieveSubpaths(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubpathError("");
+    if (!explorerCity || !areas.A || !areas.B || !explorerStartDate || !explorerEndDate) {
+      setSubpathError("Choose a city, both dates, and areas A and B.");
+      return;
+    }
+    if (explorerStartDate > explorerEndDate) {
+      setSubpathError("End date must be on or after start date.");
+      return;
+    }
+    setLoadingSubpaths(true);
+    clearSubpathResults();
+    try {
+      const data = await getSubpaths(areas.A, areas.B, explorerStartDate, explorerEndDate, boxSize);
+      setSubpaths(data);
+      setHasRetrievedSubpaths(true);
+    } catch (error) {
+      const detail = isAxiosError(error) ? error.response?.data?.detail : undefined;
+      setSubpathError(typeof detail === "string" ? detail : "Could not retrieve subpaths. Please try again.");
+    } finally {
+      setLoadingSubpaths(false);
+    }
+  }
+
+  function handleAreaSelect(area: SelectedArea) {
+    if (activeArea === null) return;
+    clearSubpathResults();
+    setAreas((previous) => ({ ...previous, [activeArea]: area }));
+    setActiveArea(!areas[activeArea] && activeArea === "A" && !areas.B ? "B" : null);
+  }
   const [cities, setCities] = useState<trajectoryCitites[]>([]);
   const [city, setCity] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -135,94 +203,238 @@ export default function TrajectoryPage() {
   return (
     <div className="trajectory-page">
       <aside className="trajectory-sidebar">
-        <header>
-          <p className="trajectory-eyebrow">TRAJECTORY EXPLORER</p>
-          <h1>Find trajectories</h1>
-          <p className="trajectory-description">
-            Choose a city and refine your search.
-          </p>
-        </header>
+        <button
+          type="button"
+          className="trajectory-list-toggle trajectory-sidebar-clear"
+          onClick={() => setSidebarCleared((cleared) => !cleared)}
+        >
+          {sidebarCleared ? "Restore sidebar" : "Clear sidebar"}
+        </button>
 
-        <form onSubmit={handleSubmit}>
-          <fieldset disabled={loading}>
-            <div className="trajectory-field">
-              <label htmlFor="city">City</label>
+        {sidebarCleared ? (
+          <form onSubmit={handleRetrieveSubpaths}>
+            <fieldset disabled={loadingSubpaths}>
+              <div className="trajectory-field">
+                <label htmlFor="explorer-city">City</label>
+                <select
+                  id="explorer-city"
+                  value={explorerCity}
+                  onChange={(event) => setExplorerCity(event.target.value)}
+                >
+                  <option value="" disabled>Choose a city</option>
+                  <option value="Porto">Porto</option>
+                </select>
+              </div>
+              {explorerCity && (
+                <>
+                  <div className="trajectory-field">
+                    <label htmlFor="explorer-start-date">Start date</label>
+                    <input
+                      id="explorer-start-date"
+                      type="date"
+                      required
+                      value={explorerStartDate}
+                      max={explorerEndDate || undefined}
+                      onChange={(event) => {
+                        setExplorerStartDate(event.target.value);
+                        clearSubpathResults();
+                      }}
+                    />
+                  </div>
+                  <div className="trajectory-field">
+                    <label htmlFor="explorer-end-date">End date</label>
+                    <input
+                      id="explorer-end-date"
+                      type="date"
+                      required
+                      value={explorerEndDate}
+                      min={explorerStartDate || undefined}
+                      onChange={(event) => {
+                        setExplorerEndDate(event.target.value);
+                        clearSubpathResults();
+                      }}
+                    />
+                  </div>
+                  <div className="trajectory-field">
+                    <label htmlFor="explorer-box-size">
+                      Box size: <output htmlFor="explorer-box-size">{boxSize} m</output>
+                    </label>
+                    <input
+                      id="explorer-box-size"
+                      className="trajectory-box-size-slider"
+                      type="range"
+                      min={2}
+                      max={80}
+                      step={1}
+                      value={boxSize}
+                      aria-valuetext={`${boxSize} meters`}
+                      onChange={(event) => {
+                        setBoxSize(Number(event.target.value));
+                        clearSubpathResults();
+                      }}
+                    />
+                    <div className="trajectory-slider-limits" aria-hidden="true">
+                      <span>2 m</span>
+                      <span>80 m</span>
+                    </div>
+                  </div>
+                  <section className="trajectory-area-selection" aria-label="Map areas">
+                    <p role="status">
+                      {activeArea === null
+                        ? "Select an area below before clicking the map to move it."
+                        : `Click the map to ${areas[activeArea] ? "move" : "place"} Area ${activeArea}.`}
+                    </p>
+                    {(["A", "B"] as const).map((name) => {
+                      const area = areas[name];
+                      return (
+                        <div key={name} className={`trajectory-area-card trajectory-area-${name.toLowerCase()}`}>
+                          <button
+                            type="button"
+                            className="trajectory-list-toggle"
+                            aria-pressed={activeArea === name}
+                            onClick={() => setActiveArea(name)}
+                          >
+                            {area ? "Move" : "Select"} Area {name}
+                          </button>
+                          {area ? (
+                            <p>
+                              Latitude: {area.latitude.toFixed(6)}<br />
+                              Longitude: {area.longitude.toFixed(6)}<br />
+                              Size: {boxSize} × {boxSize} m
+                            </p>
+                          ) : <p>No location selected.</p>}
+                        </div>
+                      );
+                    })}
+                  </section>
+                  <button
+                    className="trajectory-submit"
+                    type="submit"
+                    disabled={loadingSubpaths || !areas.A || !areas.B || !explorerStartDate || !explorerEndDate || explorerStartDate > explorerEndDate}
+                  >
+                    {loadingSubpaths ? "Retrieving..." : "Retrieve subpaths"}
+                  </button>
+                </>
+              )}
+            </fieldset>
+            {subpathError && <p className="trajectory-error" role="alert">{subpathError}</p>}
+            <p className="trajectory-description" role="status">
+              {loadingSubpaths ? "Retrieving subpaths..." : hasRetrievedSubpaths
+                ? subpaths.length === 0 ? "No subpaths found for these areas and dates." : `${subpaths.length} subpaths loaded.`
+                : "Choose dates and mark both areas to retrieve subpaths from A to B."}
+            </p>
+          </form>
+        ) : (
+          <>
+            <header>
+              <p className="trajectory-eyebrow">TRAJECTORY EXPLORER</p>
+              <h1>Find trajectories</h1>
+              <p className="trajectory-description">
+                Choose a city and refine your search.
+              </p>
+            </header>
 
-              <select
-                id="city"
-                value={city}
-                onChange={(event) =>
-                  handleCityChange(event.target.value)
-                }
-                disabled={loadingCities || cities.length === 0}
-                required
-              >
-                {cities.length === 0 && (<option value=""> {loadingCities ? "Loading cities..." : "No cities available"} </option>)}
+            <form onSubmit={handleSubmit}>
+              <fieldset disabled={loading}>
+                <div className="trajectory-field">
+                  <label htmlFor="city">City</label>
 
-                {cities.map((item) => ( <option key={item.dataset_id} value={item.name}> {item.name} </option>))}
-              </select>
-            </div>
+                  <select
+                    id="city"
+                    value={city}
+                    onChange={(event) =>
+                      handleCityChange(event.target.value)
+                    }
+                    disabled={loadingCities || cities.length === 0}
+                    required
+                  >
+                    {cities.length === 0 && (<option value=""> {loadingCities ? "Loading cities..." : "No cities available"} </option>)}
 
-            {cityError && ( <p className="trajectory-error" role="alert"> {cityError} </p>)}
+                    {cities.map((item) => ( <option key={item.dataset_id} value={item.name}> {item.name} </option>))}
+                  </select>
+                </div>
 
-            <div className="trajectory-field">
-              <label htmlFor="start-date">Start date</label>
-              <input id="start-date" type="date" value={startDate} max={endDate || undefined} onChange={(event) => setStartDate(event.target.value)} />
-            </div>
+                {cityError && ( <p className="trajectory-error" role="alert"> {cityError} </p>)}
 
-            <div className="trajectory-field">
-              <label htmlFor="end-date">End date</label>
-              <input id="end-date" type="date" value={endDate} min={startDate || undefined} onChange={(event) => setEndDate(event.target.value)}/>
-              <small>Leave dates empty to search all dates.</small>
-            </div>
+                <div className="trajectory-field">
+                  <label htmlFor="start-date">Start date</label>
+                  <input id="start-date" type="date" value={startDate} max={endDate || undefined} onChange={(event) => setStartDate(event.target.value)} />
+                </div>
 
-            <div className="trajectory-field">
-              <label>Time range</label>
+                <div className="trajectory-field">
+                  <label htmlFor="end-date">End date</label>
+                  <input id="end-date" type="date" value={endDate} min={startDate || undefined} onChange={(event) => setEndDate(event.target.value)}/>
+                  <small>Leave dates empty to search all dates.</small>
+                </div>
 
-              <TimeRangeSlider
-                startTime={startTime}
-                endTime={endTime}
-                onChange={(
-                  newStartTime,
-                  newEndTime
-                ) => {
-                  setStartTime(
-                    newStartTime
-                  );
+                <div className="trajectory-field">
+                  <label>Time range</label>
 
-                  setEndTime(
-                    newEndTime
-                  );
+                  <TimeRangeSlider
+                    startTime={startTime}
+                    endTime={endTime}
+                    onChange={(
+                      newStartTime,
+                      newEndTime
+                    ) => {
+                      setStartTime(
+                        newStartTime
+                      );
 
-                }}
-                allowOvernight={!isSameDay}
-              />
-            </div>
+                      setEndTime(
+                        newEndTime
+                      );
+
+                    }}
+                    allowOvernight={!isSameDay}
+                  />
+                </div>
 
 
-            <div className="trajectory-field">
-              <label htmlFor="limit">Maximum trajectories</label>
+                <div className="trajectory-field">
+                  <label htmlFor="limit">Maximum trajectories</label>
 
-              <input id="limit" type="number" min="0" step="1" value={limit} onChange={(event) => setLimit(event.target.value)}/>
-            </div>
+                  <input id="limit" type="number" min="0" step="1" value={limit} onChange={(event) => setLimit(event.target.value)}/>
+                </div>
 
-            <button className="trajectory-submit" type="submit" disabled={loading || loadingCities || !city}> {loading ? "Loading..." : "Load trajectories"}</button>
-          </fieldset>
+                <button className="trajectory-submit" type="submit" disabled={loading || loadingCities || !city}> {loading ? "Loading..." : "Load trajectories"}</button>
+              </fieldset>
 
-          {error && (<p className="trajectory-error" role="alert">{error}</p>)}
-        </form>
+              {error && (<p className="trajectory-error" role="alert">{error}</p>)}
+            </form>
 
-        <p className="trajectory-description" role="status">{statusMessage}</p>
+            <p className="trajectory-description" role="status">{statusMessage}</p>
 
-        <DatasetUpload />
+            <DatasetUpload />
+          </>
+        )}
       </aside>
 
       <main className="trajectory-workspace">
-        <div className="trajectory-map-panel" aria-busy={loading}>
-          <TrajectoryMap trajectories={visibleTrajectories} showTrajectoryDataPoints={showTrajectoryDataPoints}/>
+        <div className="trajectory-map-panel" aria-busy={sidebarCleared ? loadingSubpaths : loading}>
+          <TrajectoryMap
+            trajectories={sidebarCleared ? EMPTY_TRAJECTORIES : visibleTrajectories}
+            subpaths={sidebarCleared ? visibleSubpaths : undefined}
+            onSubpathSelect={sidebarCleared ? selectSubpath : undefined}
+            showTrajectoryDataPoints={sidebarCleared ? showSubpathPoints : showTrajectoryDataPoints}
+            cityCenter={sidebarCleared && explorerCity === "Porto" ? PORTO_CENTER : undefined}
+            areas={sidebarCleared ? areas : undefined}
+            boxSize={boxSize}
+            onAreaSelect={sidebarCleared && explorerCity && !loadingSubpaths && activeArea !== null ? handleAreaSelect : undefined}
+          />
         </div>
 
-        <section className="trajectory-bottom-bar">
+        {sidebarCleared && (
+          <SubpathResults
+            subpaths={subpaths}
+            selectedId={selectedSubpathId}
+            showPoints={showSubpathPoints}
+            onSelect={selectSubpath}
+            onTogglePoints={() => setShowSubpathPoints((previous) => !previous)}
+          />
+        )}
+
+        <section className="trajectory-bottom-bar" hidden={sidebarCleared}>
           <div className="trajectory-toolbar">
             <button type="button" className="trajectory-list-toggle" onClick={() => setShowTrajectories(!showTrajectories)} aria-expanded={showTrajectories} aria-controls="loaded-trajectories">
               {showTrajectories
