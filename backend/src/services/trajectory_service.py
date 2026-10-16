@@ -1,16 +1,20 @@
 from datetime import date, time
 
+from database.database_actions import DatabaseActions
 from database.repositories.dataset_repository import DatasetRepository
 from database.repositories.trajectory_repository import TrajectoryRepository
-from database.database_actions import DatabaseActions
-
 from models.dataset import DataSet
 from models.trajectory_segments import TrajectorySegments
 from models.uniformed_trajectories import UniformedTrajectories
 
 
 class TrajectoryService:
-    def __init__(self, trajectory_repository: TrajectoryRepository, dataset_repository: DatasetRepository, db_actions: DatabaseActions) -> None:
+    def __init__(
+        self,
+        trajectory_repository: TrajectoryRepository,
+        dataset_repository: DatasetRepository,
+        db_actions: DatabaseActions,
+    ) -> None:
         self.trajectory_repository = trajectory_repository
         self.dataset_repository = dataset_repository
         self.db_actions = db_actions
@@ -72,7 +76,6 @@ class TrajectoryService:
         except Exception as error:
             print(f"Failed to retrieve cities from database: {error}")
             raise
-
 
     async def insert_trajectory_segments(self, trajectories: list[dict]):
         """Creates segments from cleaned trajectory data"""

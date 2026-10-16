@@ -17,16 +17,31 @@ def setup_service(monkeypatch):
     trajectory_repository.get_trajectories_from_db = AsyncMock()
     dataset_repository.get_trajectories_cities_from_db = AsyncMock()
 
-    monkeypatch.setattr(dependencies, "create_db_connection", lambda: context)
+    def fake_create_db_connection():
+        return context
+
+    def fake_get_trajectory_repository(connection):
+        return trajectory_repository
+
+    def fake_get_dataset_repository(connection):
+        return dataset_repository
+
+    monkeypatch.setattr(
+        dependencies,
+        "create_db_connection",
+        fake_create_db_connection,
+    )
+
     monkeypatch.setattr(
         dependencies,
         "get_trajectory_repository",
-        lambda connection: trajectory_repository,
+        fake_get_trajectory_repository,
     )
+
     monkeypatch.setattr(
         dependencies,
         "get_dataset_repository",
-        lambda connection: dataset_repository,
+        fake_get_dataset_repository,
     )
 
     return context, trajectory_repository, dataset_repository
@@ -112,6 +127,7 @@ def test_trajectory_service_rejects_invalid_ranges(
     instance = service.TrajectoryService(
         trajectory_repository=MagicMock(),
         dataset_repository=MagicMock(),
+        db_actions=MagicMock(),
     )
 
     with pytest.raises(ValueError):

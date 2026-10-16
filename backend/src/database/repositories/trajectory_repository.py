@@ -1,9 +1,9 @@
 import json
 from datetime import date, datetime, time, timedelta
 
-from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint
-from models.trajectory_segments import TrajectorySegments
 from models.bounding_box import BoundingBox
+from models.trajectory_segments import TrajectorySegments
+from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint
 from models.upload_row import VehicleType
 from mysql.connector.pooling import PooledMySQLConnection
 
@@ -304,7 +304,6 @@ class TrajectoryRepository:
         finally:
             cursor.close()
 
-
     async def retrieve_cleaned_uniformed_batch(
         self, batch_size: int, last_trajectory_id: int | None
     ) -> list[dict]:
@@ -343,7 +342,6 @@ class TrajectoryRepository:
             raise
         finally:
             cursor.close()
-
 
     def get_candidate_segments(
         self,
@@ -416,7 +414,6 @@ class TrajectoryRepository:
         finally:
             cursor.close()
 
-
     def get_trajectory_points(self, trajectory_ids: list[int]) -> dict[int, list[UniformedTrajectoryPoint]]:
         """Fetch all points of the given trips, as one list per trip"""
         if len(trajectory_ids) == 0:
@@ -457,4 +454,3 @@ class TrajectoryRepository:
             raise
         finally:
             cursor.close()
-

@@ -11,9 +11,10 @@ from helpers.subpath_cutting import (
 from models.bounding_box import BoundingBox
 from models.subpath import Subpath
 
+
 class SubPathService:
     def __init__(self, trajectory_repository: TrajectoryRepository) -> None:
-        self. trajectory_repository = trajectory_repository
+        self.trajectory_repository = trajectory_repository
 
     def find_subpaths(
         self,

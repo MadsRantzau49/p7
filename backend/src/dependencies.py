@@ -6,8 +6,8 @@ from database.repositories.trajectory_repository import TrajectoryRepository
 from mysql.connector.pooling import PooledMySQLConnection
 from services.cleaning_service import CleanService
 from services.dataset_upload_service import UploadDataset
-from services.trajectory_service import TrajectoryService
 from services.subpath_service import SubPathService
+from services.trajectory_service import TrajectoryService
 
 
 def get_db_connection():
@@ -48,7 +48,7 @@ def get_trajectory_service():
         yield TrajectoryService(
             trajectory_repository=get_trajectory_repository(connection),
             dataset_repository=get_dataset_repository(connection),
-            db_actions=get_database_actions(connection)
+            db_actions=get_database_actions(connection),
         )
     finally:
         connection.close()
@@ -78,12 +78,11 @@ def get_cleaning_service():
     finally:
         connection.close()
 
+
 def get_subpath_service():
     """Provides a subpath service and close loses the connection after use"""
     connection = create_db_connection()
     try:
-        yield SubPathService(
-            trajectory_repository=get_trajectory_repository(connection)
-        )
+        yield SubPathService(trajectory_repository=get_trajectory_repository(connection))
     finally:
         connection.close()

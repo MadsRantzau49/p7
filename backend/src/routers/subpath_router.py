@@ -1,10 +1,10 @@
 from datetime import date
+from typing import Annotated
 
+from dependencies import get_subpath_service
 from fastapi import APIRouter, Depends, HTTPException
 from models.subpath import Subpath
-from dependencies import get_subpath_service
 from services.subpath_service import SubPathService
-from typing import Annotated
 
 router = APIRouter(prefix="/api/subpaths")
 
