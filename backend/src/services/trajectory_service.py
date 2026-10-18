@@ -67,11 +67,11 @@ class TrajectoryService:
             )
             raise
 
-    async def get_trajectories_cities(self) -> list[DataSet]:
+    def get_trajectories_cities(self) -> list[DataSet]:
         """Fetch the available trajectory cities from the database."""
 
         try:
-            return await self.dataset_repository.get_trajectories_cities_from_db()
+            return self.dataset_repository.get_trajectories_cities_from_db()
 
         except Exception as error:
             print(f"Failed to retrieve cities from database: {error}")

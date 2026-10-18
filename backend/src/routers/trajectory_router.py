@@ -31,8 +31,8 @@ async def get_trajectories_endpoint(
 
 
 @router.get("/get/cities")
-async def get_trajectories_cities_endpoint(
+def get_trajectories_cities_endpoint(
     service: Annotated[TrajectoryService, Depends(get_trajectory_service)],
 ):
     """Return the available trajectory cities."""
-    return await service.get_trajectories_cities()
+    return service.get_trajectories_cities()

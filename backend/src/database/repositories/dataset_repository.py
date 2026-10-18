@@ -53,7 +53,7 @@ class DatasetRepository:
         finally:
             cursor.close()
 
-    async def get_trajectories_cities_from_db(self) -> list[DataSet]:
+    def get_trajectories_cities_from_db(self) -> list[DataSet]:
         """Fetch available trajectory cities from the database."""
         cursor = self.connection.cursor(dictionary=True)
 
