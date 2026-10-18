@@ -67,7 +67,7 @@ def test_get_trajectories_rejects_invalid_range(monkeypatch):
 def test_get_trajectory_cities(monkeypatch):
     """Check cities endpoint returns service result."""
 
-    async def fake_get_trajectories_cities():
+    def fake_get_trajectories_cities():
         return [
             {"dataset_id": 1, "name": "Porto"},
             {"dataset_id": 2, "name": "Beijing"},

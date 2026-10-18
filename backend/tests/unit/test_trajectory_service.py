@@ -15,7 +15,7 @@ def setup_service(monkeypatch):
     dataset_repository = MagicMock()
 
     trajectory_repository.get_trajectories_from_db = AsyncMock()
-    dataset_repository.get_trajectories_cities_from_db = AsyncMock()
+    dataset_repository.get_trajectories_cities_from_db = MagicMock()
 
     def fake_create_db_connection():
         return context
@@ -47,13 +47,24 @@ def setup_service(monkeypatch):
     return context, trajectory_repository, dataset_repository
 
 
+@contextmanager
+def trajectory_service_context():
+    """Build the service with explicit dependencies and manage its connection."""
+    with contextmanager(dependencies.get_db_connection)() as connection:
+        yield dependencies.get_trajectory_service(
+            dependencies.get_trajectory_repository(connection),
+            dependencies.get_dataset_repository(connection),
+            dependencies.get_database_actions(connection),
+        )
+
+
 def test_get_trajectories_returns_query_result(monkeypatch):
     """Return trajectories and release the connection afterward."""
     context, trajectory_repository, _ = setup_service(monkeypatch)
     result = [{"id": 1}]
     trajectory_repository.get_trajectories_from_db.return_value = result
 
-    with contextmanager(dependencies.get_trajectory_service)() as instance:
+    with trajectory_service_context() as instance:
         actual = asyncio.run(instance.get_trajectories("Porto", None, None, None, None, 1))
 
     assert actual == result
@@ -66,8 +77,8 @@ def test_get_trajectories_cities_returns_query_result(monkeypatch):
     result = [{"name": "Porto"}]
     dataset_repository.get_trajectories_cities_from_db.return_value = result
 
-    with contextmanager(dependencies.get_trajectory_service)() as instance:
-        actual = asyncio.run(instance.get_trajectories_cities())
+    with trajectory_service_context() as instance:
+        actual = instance.get_trajectories_cities()
 
     assert actual == result
     context.close.assert_called_once()
@@ -79,7 +90,7 @@ def test_get_trajectories_closes_connection_after_query_error(monkeypatch):
     trajectory_repository.get_trajectories_from_db.side_effect = RuntimeError("failed")
 
     with pytest.raises(RuntimeError):
-        with contextmanager(dependencies.get_trajectory_service)() as instance:
+        with trajectory_service_context() as instance:
             asyncio.run(instance.get_trajectories("Porto", None, None, None, None, 1))
 
     context.close.assert_called_once()
@@ -91,8 +102,8 @@ def test_get_trajectories_cities_closes_connection_after_query_error(monkeypatch
     dataset_repository.get_trajectories_cities_from_db.side_effect = RuntimeError("failed")
 
     with pytest.raises(RuntimeError):
-        with contextmanager(dependencies.get_trajectory_service)() as instance:
-            asyncio.run(instance.get_trajectories_cities())
+        with trajectory_service_context() as instance:
+            instance.get_trajectories_cities()
 
     context.close.assert_called_once()
 
@@ -103,7 +114,7 @@ def test_trajectory_service_ignores_full_day_time_range(monkeypatch):
     query = trajectory_repository.get_trajectories_from_db
     query.return_value = []
 
-    with contextmanager(dependencies.get_trajectory_service)() as instance:
+    with trajectory_service_context() as instance:
         asyncio.run(instance.get_trajectories("Porto", None, None, time.min, time(23, 59), 1))
 
     query.assert_awaited_once_with("Porto", None, None, None, None, 1)

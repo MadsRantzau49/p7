@@ -53,7 +53,7 @@ def _call_create_dataset(context):
 
 
 def _call_get_trajectories_cities_from_db(context):
-    return asyncio.run(DatasetRepository(context).get_trajectories_cities_from_db())
+    return DatasetRepository(context).get_trajectories_cities_from_db()
 
 
 def _call_get_vehicle_type_ids(context):
@@ -73,7 +73,7 @@ def test_queries_against_configured_database():
 
     try:
         assert {"CAR", "TAXI", "UNKNOWN"} <= trajectory_repository.get_vehicle_type_ids().keys()
-        assert isinstance(asyncio.run(dataset_repository.get_trajectories_cities_from_db()), list)
+        assert isinstance(dataset_repository.get_trajectories_cities_from_db(), list)
         assert not dataset_repository.dataset_name_taken(name)
 
         dataset_id = dataset_repository.create_dataset(name)
