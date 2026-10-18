@@ -5,8 +5,10 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent.parent))
 
-import database.queries
-from database.connection import create_db_connection
+from database.database_actions import DatabaseActions
+from database.repositories.dataset_repository import DatasetRepository
+from database.repositories.import_repository import ImportRepository
+from database.repositories.trajectory_repository import TrajectoryRepository
 from dotenv import load_dotenv
 from helpers.parsers import parse_beijing_trajectories, parse_porto_trajectories
 from helpers.trajectory_helpers import (
@@ -17,161 +19,160 @@ from helpers.trajectory_helpers import (
 load_dotenv()
 
 
-def save_porto_trajectories(dataset_name: str, batch_size: int) -> None:
-    """Save Porto trajectories to the database in batches."""
-    context = create_db_connection()
+class TrajectoryImportService:
+    def __init__(
+        self,
+        trajectory_repository: TrajectoryRepository,
+        dataset_repository: DatasetRepository,
+        import_repository: ImportRepository,
+        db_actions: DatabaseActions,
+    ) -> None:
+        self.trajectory_repository = trajectory_repository
+        self.dataset_repository = dataset_repository
+        self.import_repository = import_repository
+        self.db_actions = db_actions
 
-    try:
-        dataset_id = database.queries.get_dataset_id(context, dataset_name)
+    def save_porto_trajectories(self, dataset_name: str, batch_size: int) -> None:
+        """Save Porto trajectories to the database in batches."""
 
-        porto_path = os.getenv("PORTO_DATASET_PATH")
+        try:
+            dataset_id = self.dataset_repository.get_dataset_id(dataset_name)
 
-        if porto_path is None:
-            raise ValueError("Path for Porto dataset is None!")
+            porto_path = os.getenv("PORTO_DATASET_PATH")
 
-        trajectories = parse_porto_trajectories(porto_path)
+            if porto_path is None:
+                raise ValueError("Path for Porto dataset is None!")
 
-        total = len(trajectories)
+            trajectories = parse_porto_trajectories(porto_path)
 
-        for start in range(0, total, batch_size):
-            print("Batch started")
-            batch = trajectories[start : start + batch_size]
+            total = len(trajectories)
 
-            # Generate source IDs ourselves
-            for trajectory in batch:
-                trajectory.source_id = str(uuid.uuid4())
+            for start in range(0, total, batch_size):
+                print("Batch started")
+                batch = trajectories[start : start + batch_size]
 
-            source_ids = []
+                # Generate source IDs ourselves
+                for trajectory in batch:
+                    trajectory.source_id = str(uuid.uuid4())
 
-            for trajectory in batch:
-                source_ids.append(trajectory.source_id)
+                source_ids = []
 
-            # Creates bridge entry
-            database.queries.create_source_trajectories(context, dataset_id, source_ids)
+                for trajectory in batch:
+                    source_ids.append(trajectory.source_id)
 
-            # Inserts trajectory data, with source_id from source_trajectories table as PR and FK
-            database.queries.insert_porto_trajectories(context, batch)
+                # Creates bridge entry
+                self.trajectory_repository.create_source_trajectories(dataset_id, source_ids)
 
-            context.commit()
-            print("Batch ended")
+                # Inserts trajectory data, with source_id from source_trajectories table as PR and FK
+                self.import_repository.insert_porto_trajectories(batch)
 
-    except Exception as error:
-        context.rollback()
-        print(f"Failed to save trajectories: {error}")
-        raise
+                self.db_actions.commit()
+                print("Batch ended")
 
-    finally:
-        context.close()
+        except Exception as error:
+            self.db_actions.rollback()
+            print(f"Failed to save trajectories: {error}")
+            raise
 
+    def save_dataset_trajectories(self, dataset_name: str, batch_size) -> None:
+        """Save trajectory data to the database in batches."""
+        source_ids = []
+        try:
+            dataset_id = self.dataset_repository.get_dataset_id(dataset_name)
 
-def save_dataset_trajectories(dataset_name: str, batch_size) -> None:
-    """Save trajectory data to the database in batches."""
-    context = create_db_connection()
-    source_ids = []
-    try:
-        dataset_id = database.queries.get_dataset_id(context, dataset_name)
+            beijing_path = os.getenv("BEIJING_DATASET_PATH")
 
-        beijing_path = os.getenv("BEIJING_DATASET_PATH")
+            if beijing_path is None:
+                raise ValueError("Path for Beijing dataset is None!")
 
-        if beijing_path is None:
-            raise ValueError("Path for Beijing dataset is None!")
+            trajectories = parse_beijing_trajectories(beijing_path)
 
-        trajectories = parse_beijing_trajectories(beijing_path)
+            total = len(trajectories)
 
-        total = len(trajectories)
+            for start in range(0, total, batch_size):
+                print("batch started")
+                batch = trajectories[start : start + batch_size]
 
-        for start in range(0, total, batch_size):
-            print("batch started")
-            batch = trajectories[start : start + batch_size]
+                for trajectory in batch:
+                    trajectory.source_id = str(uuid.uuid4())
 
-            for trajectory in batch:
-                trajectory.source_id = str(uuid.uuid4())
+                source_ids = []
 
-            source_ids = []
+                for trajectory in batch:
+                    source_ids.append(trajectory.source_id)
 
-            for trajectory in batch:
-                source_ids.append(trajectory.source_id)
+                self.trajectory_repository.create_source_trajectories(dataset_id, source_ids)
 
-            database.queries.create_source_trajectories(context, dataset_id, source_ids)
+                self.import_repository.insert_beijing_dataset(batch)
 
-            database.queries.insert_beijing_dataset(context, batch)
+                self.db_actions.commit()
+                print("Batch ended")
 
-            context.commit()
-            print("Batch ended")
+        except Exception as error:
+            self.db_actions.rollback()
+            print(f"Failed to save beijing trajectories: {error}")
+            raise
 
-    except Exception as error:
-        context.rollback()
-        print(f"Failed to save beijing trajectories: {error}")
-        raise
+    def create_uniformed_data_structure(self, batch_size: int):
+        """Convert Porto and Beijing data into the uniform trajectory format."""
 
-    finally:
-        context.close()
+        porto_total = 0
+        beijing_total = 0
 
+        try:
+            # Porto
+            last_source_id = None
 
-def create_uniformed_data_structure(batch_size: int):
-    """Convert Porto and Beijing data into the uniform trajectory format."""
-    context = create_db_connection()
+            while True:
+                porto_data = self.import_repository.retrieve_porto_dataset_batch(batch_size, last_source_id)
 
-    porto_total = 0
-    beijing_total = 0
+                if not porto_data:
+                    break
 
-    try:
-        # Porto
-        last_source_id = None
+                uniformed_trajectories = []
 
-        while True:
-            porto_data = database.queries.retrieve_porto_dataset_batch(context, batch_size, last_source_id)
+                for data in porto_data:
+                    uniformed_trajectories.append(convert_porto_trajectory(data))
 
-            if not porto_data:
-                break
+                self.trajectory_repository.insert_data_uniformed_trajectories(uniformed_trajectories)
 
-            uniformed_trajectories = []
+                self.db_actions.commit()
 
-            for data in porto_data:
-                uniformed_trajectories.append(convert_porto_trajectory(data))
+                porto_total += len(uniformed_trajectories)
+                last_source_id = porto_data[-1]["source_id"]
 
-            database.queries.insert_data_uniformed_trajectories(context, uniformed_trajectories)
+                print(f"Created {porto_total} trajectories from Porto")
 
-            context.commit()
+            last_source_id = None
 
-            porto_total += len(uniformed_trajectories)
-            last_source_id = porto_data[-1]["source_id"]
+            # Beijing
+            while True:
+                beijing_data = self.import_repository.retrieve_beijing_data_batch(batch_size, last_source_id)
 
-            print(f"Created {porto_total} trajectories from Porto")
+                if not beijing_data:
+                    break
 
-        last_source_id = None
+                uniformed_trajectories = []
 
-        # Beijing
-        while True:
-            beijing_data = database.queries.retrieve_beijing_data_batch(context, batch_size, last_source_id)
+                for data in beijing_data:
+                    uniformed_trajectories.append(convert_beijing_trajectory(data))
 
-            if not beijing_data:
-                break
+                self.trajectory_repository.insert_data_uniformed_trajectories(uniformed_trajectories)
 
-            uniformed_trajectories = []
+                self.db_actions.commit()
 
-            for data in beijing_data:
-                uniformed_trajectories.append(convert_beijing_trajectory(data))
+                beijing_total += len(uniformed_trajectories)
+                last_source_id = beijing_data[-1]["source_id"]
 
-            database.queries.insert_data_uniformed_trajectories(context, uniformed_trajectories)
+                print(f"Created {beijing_total} trajectories from Beijing")
 
-            context.commit()
+            total_created = porto_total + beijing_total
 
-            beijing_total += len(uniformed_trajectories)
-            last_source_id = beijing_data[-1]["source_id"]
+            print(f"Created {total_created} trajectories in total")
 
-            print(f"Created {beijing_total} trajectories from Beijing")
+            return total_created
 
-        total_created = porto_total + beijing_total
-
-        print(f"Created {total_created} trajectories in total")
-
-        return total_created
-
-    except Exception as error:
-        context.rollback()
-        print(f"Failed to create uniformed data structure: {error}")
-        raise
-
-    finally:
-        context.close()
+        except Exception as error:
+            self.db_actions.rollback()
+            print(f"Failed to create uniformed data structure: {error}")
+            raise

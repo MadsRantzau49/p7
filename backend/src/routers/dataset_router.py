@@ -1,11 +1,12 @@
 import io
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from dependencies import get_dataset_upload_service
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from helpers.trajectory_csv_parser import InvalidTrajectoryCsvError
 from services.dataset_upload_service import (
     DatasetNameTakenError,
-    upload_dataset,
+    UploadDataset,
 )
 
 router = APIRouter(prefix="/api/datasets")
@@ -15,7 +16,9 @@ MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 
 @router.post("/upload", status_code=201)
 def upload_dataset_endpoint(
-    name: Annotated[str, Form(min_length=1, max_length=50)], file: Annotated[UploadFile, File()]
+    service: Annotated[UploadDataset, Depends(get_dataset_upload_service)],
+    name: Annotated[str, Form(min_length=1, max_length=50)],
+    file: Annotated[UploadFile, File()],
 ):
     """Upload and save a trajectory dataset."""
     if file.size is not None and file.size > MAX_UPLOAD_BYTES:
@@ -26,7 +29,7 @@ def upload_dataset_endpoint(
     lines = io.TextIOWrapper(file.file, encoding="utf-8-sig", newline="")
 
     try:
-        dataset_id = upload_dataset(name.strip(), lines)
+        dataset_id = service.upload_dataset(name.strip(), lines)
     except InvalidTrajectoryCsvError as error:
         errors = [{"line": item.line, "message": item.message} for item in error.errors]
         raise HTTPException(status_code=422, detail=errors) from error

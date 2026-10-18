@@ -3,9 +3,9 @@ from dataclasses import replace
 from datetime import datetime
 from typing import cast
 
-import database.queries as queries
 from config.cleaning_config import get_config
-from database.connection import create_db_connection
+from database.database_actions import DatabaseActions
+from database.repositories.trajectory_repository import TrajectoryRepository
 from helpers.cleaners import (
     detect_gaps,
     drop_accel_outliers,
@@ -19,7 +19,48 @@ from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajec
 from models.upload_row import VehicleType
 
 
-def clean_trajectory(trajectory: UniformedTrajectories) -> tuple[list[UniformedTrajectories], JourneyReport]:
+class CleanService:
+    def __init__(self, trajectory_repository: TrajectoryRepository, db_actions: DatabaseActions) -> None:
+        self.trajectory_repository = trajectory_repository
+        self.db_actions = db_actions
+
+    def clean_dataset(self, city: str, batch_size: int) -> DatasetReport:
+        """Clean a city's uniformed trajectories in batches and return the aggregated report."""
+        reports: list[JourneyReport] = []
+
+        try:
+            last_id = None
+            while True:
+                batch = self.trajectory_repository.retrieve_uniformed_batch(city, batch_size, last_id)
+                if not batch:
+                    break
+
+                cleaned_batch: list[UniformedTrajectories] = []
+                for row in batch:
+                    cleaned, report = _clean_trajectory(_row_to_trajectory(row))
+                    cleaned_batch.extend(cleaned)
+                    reports.append(report)
+
+                dataset_id = batch[0]["dataset_id"]
+                source_ids = []
+                for run in cleaned_batch:
+                    source_ids.append(cast(str, run.source_id))
+
+                self.trajectory_repository.create_source_trajectories(dataset_id, source_ids)
+                self.trajectory_repository.insert_cleaned_uniformed_trajectories(cleaned_batch)
+
+                self.db_actions.commit()
+                last_id = batch[-1]["trajectory_id"]
+
+        except Exception as error:
+            self.db_actions.rollback()
+            print(f"{error}")
+            raise
+
+        return _aggregate_report(city, reports)
+
+
+def _clean_trajectory(trajectory: UniformedTrajectories) -> tuple[list[UniformedTrajectories], JourneyReport]:
     """Clean one journey, split it on gaps, and return the surviving runs with a report."""
     if trajectory.city is None:
         raise ValueError("Cannot clean a trajectory without a city")
@@ -62,7 +103,7 @@ def clean_trajectory(trajectory: UniformedTrajectories) -> tuple[list[UniformedT
     return cleaned, report
 
 
-def aggregate_report(city: str, reports: list[JourneyReport]) -> DatasetReport:
+def _aggregate_report(city: str, reports: list[JourneyReport]) -> DatasetReport:
     """Run a batch of per-journey reports into a single dataset-level cleaning summary."""
     dataset = DatasetReport(city=city)
     for report in reports:
@@ -95,41 +136,3 @@ def _row_to_trajectory(row: dict) -> UniformedTrajectories:
         city=row["city"],
         source_id=row["source_id"],
     )
-
-
-def clean_dataset(city: str, batch_size: int) -> DatasetReport:
-    """Clean a city's uniformed trajectories in batches and return the aggregated report."""
-    context = create_db_connection()
-    reports: list[JourneyReport] = []
-
-    try:
-        last_id = None
-        while True:
-            batch = queries.retrieve_uniformed_batch(context, city, batch_size, last_id)
-            if not batch:
-                break
-
-            cleaned_batch: list[UniformedTrajectories] = []
-            for row in batch:
-                cleaned, report = clean_trajectory(_row_to_trajectory(row))
-                cleaned_batch.extend(cleaned)
-                reports.append(report)
-
-            dataset_id = batch[0]["dataset_id"]
-            source_ids = []
-            for run in cleaned_batch:
-                source_ids.append(cast(str, run.source_id))
-
-            queries.create_source_trajectories(context, dataset_id, source_ids)
-            queries.insert_cleaned_uniformed_trajectories(context, cleaned_batch)
-            context.commit()
-            last_id = batch[-1]["trajectory_id"]
-
-    except Exception as error:
-        context.rollback()
-        print(f"{error}")
-        raise
-    finally:
-        context.close()
-
-    return aggregate_report(city, reports)
