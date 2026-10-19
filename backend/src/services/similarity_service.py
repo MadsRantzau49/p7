@@ -680,8 +680,10 @@ class SimilarityService:
             logger.info("Generated %d segments", len(segments))
 
             #Step 3: Build R-tree
-            rtree = self.build_rtree(segments, epsilon, max_entries)
-            # Step 3: Build R-tree
+            with log_step("Step 4: Find matching segment pairs"):
+                rtree = self.build_rtree(segments, epsilon, max_entries)
+            logger.info("Built R-tree over %d segments", len(segments))
+            
 
             # Step 4: Find Matching Segment Pairs
             with log_step("Step 4: Find matching segment pairs"):
