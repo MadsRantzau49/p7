@@ -174,7 +174,8 @@ class SimilarityService:
             raise ValueError("max_entries must be at least 2.")
         if not segments:
             return None
- 
+
+        #TODO make this a full for-loop
         entries = [
             RTreeEntry(box=self.bounding_box(segment, epsilon), segment=segment)
             for segment in segments
@@ -231,18 +232,25 @@ class SimilarityService:
  
     @staticmethod
     def _str_groups(items: list, max_entries: int) -> list[list]:
-        """Group items (anything with a .box) into nodes using STR.
- 
-        With P = ceil(n / max_entries) nodes needed, the items are split into
-        S = ceil(sqrt(P)) vertical slices by x, and each slice is sorted by y
-        and cut into groups of max_entries. This gives roughly square nodes.
-        """
+        """Group items (anything with a .box) into nodes using shape-aware STR."""
         node_count = math.ceil(len(items) / max_entries)
-        slice_count = math.ceil(math.sqrt(node_count))
-        slice_size = slice_count * max_entries
- 
+
+        centres = [item.box.center for item in items]
+        width = max(x for x, _ in centres) - min(x for x, _ in centres)
+        height = max(y for _, y in centres) - min(y for _, y in centres)
+
+        if height == 0:
+            slice_count = node_count
+        elif width == 0:
+            slice_count = 1
+        else:
+            slice_count = math.ceil(math.sqrt(node_count * width / height))
+        slice_count = max(1, min(slice_count, node_count))
+
+        slice_size = math.ceil(node_count / slice_count) * max_entries
+
         by_x = sorted(items, key=lambda item: item.box.center[0])
- 
+
         groups = []
         for start in range(0, len(by_x), slice_size):
             vertical_slice = sorted(
@@ -254,6 +262,7 @@ class SimilarityService:
                 for i in range(0, len(vertical_slice), max_entries)
             )
         return groups
+
     def FDS(self, subpaths: list[Subpath], epsilon : float,
                 max_entries : int) -> None:
         """Run FDS with timings for each implemented step and the total runtime."""
