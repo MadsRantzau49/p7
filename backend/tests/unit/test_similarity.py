@@ -218,3 +218,4 @@ def test_no_trajectories_gives_no_segments():
     """An empty input list gives an empty segment list."""
     assert SimilarityService().generate_segments(make_trajectories_in_meters({})) == []
  
+

@@ -105,7 +105,7 @@ class BoundingBox:
 class RTreeEntry:
     """A segment's expanded bounding box, stored in a leaf."""
     box: BoundingBox
-    segment: "TrajectorySegments"
+    segment: TrajectorySegments
 
 @dataclass
 class RTreeNode:
