@@ -150,4 +150,4 @@ runs/
 docs/rendered/*
 **/.DS_Store
 
-backend/tests/data/trajectories/beijing_data.csvbackend/tests/data/trajectories/beijing_data.csv
+backend/tests/data/trajectories/beijing_data.csv
