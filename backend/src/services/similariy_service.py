@@ -27,6 +27,10 @@ class SimilarityService:
         self,
         trajectories: list[TrajectoryInMeters],
     ) -> list[TrajectorySegments]:
+        """Split each trajectory into segments between consecutive points (Step 2).
+        (a, b, c, d) -> (a, b), (b, c), (c, d). Each segment keeps its
+        trajectory ID and 0-based index j (connecting point j to j + 1).
+        """
 
         segments = []
 
