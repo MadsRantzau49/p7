@@ -28,6 +28,12 @@ class TrajectorySegments:
     end: Coordinate
 
 @dataclass
+class MatchingSegmentPair:
+    """Two matching original segments."""
+    segment_a: TrajectorySegments
+    segment_b: TrajectorySegments
+
+@dataclass
 class BoundingBox:
     """Axis-aligned box: [min_x, max_x] x [min_y, max_y], in meters."""
     min_x: float

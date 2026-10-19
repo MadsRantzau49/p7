@@ -4,6 +4,7 @@ from models.subpath import Subpath
 from models.similarity import (
     BoundingBox,
     Coordinate,
+    MatchingSegmentPair,
     Pathlet,
     ProjectedTrajectory,
     RTreeEntry,
@@ -229,6 +230,73 @@ class SimilarityService:
                 stack.extend(node.children)
  
         return results
+
+    def point_to_segment_distance(self, point: Coordinate, segment: TrajectorySegments) -> float:
+        """Return the shortest Euclidean distance to the finite original segment."""
+        dx = segment.end.x - segment.start.x
+        dy = segment.end.y - segment.start.y
+        length_squared = dx * dx + dy * dy
+
+        if length_squared == 0:
+            return math.hypot(point.x - segment.start.x, point.y - segment.start.y)
+
+        # Project onto the line, then clamp to the segment's endpoints.
+        fraction = (
+            (point.x - segment.start.x) * dx + (point.y - segment.start.y) * dy
+        ) / length_squared
+        fraction = max(0.0, min(1.0, fraction))
+        closest_x = segment.start.x + fraction * dx
+        closest_y = segment.start.y + fraction * dy
+        return math.hypot(point.x - closest_x, point.y - closest_y)
+
+    def sspd(self, segment_a: TrajectorySegments, segment_b: TrajectorySegments) -> float:
+        """Average the two directed endpoint-to-segment distances (SSPD)."""
+        spd_a_to_b = (
+            self.point_to_segment_distance(segment_a.start, segment_b)
+            + self.point_to_segment_distance(segment_a.end, segment_b)
+        ) / 2
+        spd_b_to_a = (
+            self.point_to_segment_distance(segment_b.start, segment_a)
+            + self.point_to_segment_distance(segment_b.end, segment_a)
+        ) / 2
+        return (spd_a_to_b + spd_b_to_a) / 2
+
+    def find_matching_segment_pairs(
+        self,
+        segments: list[TrajectorySegments],
+        root: RTreeNode | None,
+        epsilon: float,
+    ) -> list[MatchingSegmentPair]:
+        """Find cross-trajectory pairs passing the R-tree and SSPD tests (Step 4).
+
+        The tree stores epsilon-expanded boxes. Queries use original boxes,
+        and distance calculations use the original segment coordinates.
+        """
+        if epsilon < 0:
+            raise ValueError("epsilon must be non-negative.")
+
+        matches = []
+        candidate_count = 0
+        for segment in segments:
+            query_box = self.bounding_box(segment)
+            candidates = self.query_rtree(root, query_box)
+            for candidate in candidates:
+                # i < k excludes the same trajectory and counts each pair once.
+                if segment.trajectory_id >= candidate.trajectory_id:
+                    continue
+
+                candidate_count += 1
+                distance = self.sspd(segment, candidate)
+                if distance <= epsilon:
+                    matches.append(
+                        MatchingSegmentPair(
+                            segment_a=segment,
+                            segment_b=candidate,
+                        )
+                    )
+
+        logger.debug("Checked %d candidate pairs; found %d matches", candidate_count, len(matches))
+        return matches
  
     @staticmethod
     def _str_groups(items: list, max_entries: int) -> list[list]:
@@ -285,6 +353,9 @@ class SimilarityService:
             # Step 3: Build R-tree
 
             # Step 4: Find Matching Segment Pairs
+            with log_step("Step 4: Find matching segment pairs"):
+                matching_pairs = self.find_matching_segment_pairs(segments, rtree, epsilon)
+            logger.info("Found %d matching segment pairs", len(matching_pairs))
 
             # Step 5: Construct Candidate Clusters
 
