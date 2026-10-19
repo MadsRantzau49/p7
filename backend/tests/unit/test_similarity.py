@@ -1,4 +1,5 @@
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 
@@ -6,6 +7,39 @@ from models.similarity import Coordinate, ProjectedTrajectory
 from models.subpath import Subpath
 from models.uniformed_trajectories import UniformedTrajectoryPoint
 from services.similarity_service import SimilarityService
+from trajectory_builder.importer import load_subpaths
+
+
+def test_similarity_with_builder_fixture():
+    """Run the similarity steps directly on manually drawn routes."""
+    fixture = Path(__file__).parent.parent / "data" / "trajectories" / "aalborg_germany.csv"
+    subpaths = load_subpaths(fixture)
+    service = SimilarityService()
+
+    projected = service.projection(subpaths)
+    segments = service.generate_segments(projected)
+
+    assert len(projected) == 8
+    assert len(segments) == 190
+    assert {segment.trajectory_id for segment in segments} == set(range(1, 9))
+
+
+def test_similarity_with_skagen_to_aalborg_fixture():
+    """Run similarity on the same manually drawn fixture used by debug_fds."""
+    fixture = Path(__file__).parent.parent / "data" / "trajectories" / "skagen_to_aalborg.csv"
+    subpaths = load_subpaths(fixture)
+    service = SimilarityService()
+
+    projected = service.projection(subpaths)
+    segments = service.generate_segments(projected)
+
+    assert len(projected) == 10
+    assert projected[0].trajectory_id == 888
+    assert len(projected[0].projected_points) == 19
+    assert len(segments) == 268
+    assert {segment.trajectory_id for segment in segments} == set(range(888, 898))
+    assert service.FDS(subpaths) is None
+
 
 def make_trajectories_in_meters(trajectories: dict) -> list[ProjectedTrajectory]:
     """Build test input shaped like the output of projection.
