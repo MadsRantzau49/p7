@@ -2,6 +2,7 @@ import type { uniformedTrajectoryResponse } from "../uniformedTrajectoryResponse
 import type { LatLngTuple } from "leaflet";
 import type { AreaName, SelectedArea } from "./SelectedArea";
 import type { Subpath } from "../subpath";
+import type { Pathlet } from "../pathlet";
 
 export interface Props {
   trajectories: uniformedTrajectoryResponse[];
@@ -12,4 +13,6 @@ export interface Props {
   onAreaSelect?: (area: SelectedArea) => void;
   subpaths?: Subpath[];
   onSubpathSelect?: (id: number) => void;
+  pathlets?: Pathlet[];
+  onPathletSelect?: (id: number) => void;
 }

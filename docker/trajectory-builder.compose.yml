@@ -2,12 +2,13 @@ name: trajectory-builder
 
 services:
   trajectory-builder:
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
     build:
       context: ..
       dockerfile: docker/trajectory-builder/Dockerfile
     environment:
       TRAJECTORY_DATA_DIR: /data
     ports:
-      - "5174:80"
+      - "5174:8080"
     volumes:
       - ../backend/tests/data/trajectories:/data

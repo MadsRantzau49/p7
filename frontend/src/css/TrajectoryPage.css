@@ -424,3 +424,28 @@ body {
   outline: 3px solid #93c5fd;
   outline-offset: 2px;
 }
+
+.similarity-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.similarity-cancel {
+  margin-top: 12px;
+}
+
+.similarity-toolbar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.trajectory-table .similarity-trajectory-ids {
+  min-width: 160px;
+  max-width: 360px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

@@ -6,6 +6,7 @@ import type { Props } from "../models/map/Props"
 import type { MapViewProps } from "../models/map/MapViewProps";
 import type { SelectedArea } from "../models/map/SelectedArea";
 import type { Subpath } from "../models/subpath";
+import type { Pathlet } from "../models/pathlet";
 import "leaflet/dist/leaflet.css";
 import "../css/trajectoryMap.css"
 
@@ -38,6 +39,7 @@ function MapView({ positions, cityCenter }: MapViewProps) {
 }
 
 const EMPTY_SUBPATHS: Subpath[] = [];
+const EMPTY_PATHLETS: Pathlet[] = [];
 
 function AreaClickHandler({ onSelect }: { onSelect: (area: SelectedArea) => void }) {
   useMapEvents({
@@ -48,7 +50,7 @@ function AreaClickHandler({ onSelect }: { onSelect: (area: SelectedArea) => void
   return null;
 }
 
-export default function TrajectoryMap({ trajectories, showTrajectoryDataPoints, cityCenter, areas = {}, boxSize = 2, onAreaSelect, subpaths = EMPTY_SUBPATHS, onSubpathSelect }: Props) {
+export default function TrajectoryMap({ trajectories, showTrajectoryDataPoints, cityCenter, areas = {}, boxSize = 2, onAreaSelect, subpaths = EMPTY_SUBPATHS, onSubpathSelect, pathlets = EMPTY_PATHLETS, onPathletSelect }: Props) {
   const routes = useMemo(() =>
       trajectories.map((trajectory) => {
         const hue = (trajectory.trajectory_id * 137.508) % 360;
@@ -77,10 +79,17 @@ export default function TrajectoryMap({ trajectories, showTrajectoryDataPoints, 
     color: `hsl(${(subpath.subpath_id * 137.508) % 360}, 75%, 40%)`,
   })), [subpaths]);
 
+  const pathletRoutes = useMemo(() => pathlets.map((pathlet) => ({
+    pathlet,
+    positions: pathlet.points.map((point): LatLngTuple => [point.latitude, point.longitude]),
+    color: `hsl(${(pathlet.pathlet_id * 137.508) % 360}, 75%, 40%)`,
+  })), [pathlets]);
+
   const allPositions = useMemo(() => [
     ...routes.flatMap((route) => route.positions),
     ...subpathRoutes.flatMap((route) => route.positions),
-  ], [routes, subpathRoutes]);
+    ...pathletRoutes.flatMap((route) => route.positions),
+  ], [routes, subpathRoutes, pathletRoutes]);
 
   return (
     <div className="trajectory-map-wrapper">
@@ -99,6 +108,42 @@ export default function TrajectoryMap({ trajectories, showTrajectoryDataPoints, 
 
         <MapView positions={allPositions} cityCenter={cityCenter} />
         {onAreaSelect && <AreaClickHandler onSelect={onAreaSelect} />}
+
+        {pathletRoutes.map(({ pathlet, positions, color }) => (
+          <Polyline key={`pathlet-${pathlet.pathlet_id}`} positions={positions}
+            pathOptions={{ color, weight: 4, opacity: 0.9 }} bubblingMouseEvents={false}>
+            <Tooltip>Pathlet {pathlet.pathlet_id} · Support {pathlet.count}</Tooltip>
+            <Popup>
+              <strong>Pathlet {pathlet.pathlet_id}</strong><br />
+              Support: {pathlet.count}<br />
+              Trajectory IDs: {pathlet.trajectories_included.join(", ")}<br />
+              Points: {pathlet.points.length}
+              {onPathletSelect && (
+                <>
+                  <br />
+                  <button type="button" className="trajectory-select-button"
+                    onClick={() => onPathletSelect(pathlet.pathlet_id)}>
+                    Show only this pathlet
+                  </button>
+                </>
+              )}
+            </Popup>
+          </Polyline>
+        ))}
+
+        {showTrajectoryDataPoints && pathletRoutes.flatMap(({ pathlet, positions, color }) =>
+          positions.map((position, index) => (
+            <CircleMarker key={`pathlet-${pathlet.pathlet_id}-point-${index}`} center={position} radius={4}
+              pathOptions={{ color, weight: 2, fillColor: "#ffffff", fillOpacity: 1 }}
+              bubblingMouseEvents={false}>
+              <Popup>
+                <strong>Pathlet {pathlet.pathlet_id}, point {index + 1}</strong><br />
+                Latitude: {position[0]}<br />
+                Longitude: {position[1]}
+              </Popup>
+            </CircleMarker>
+          ))
+        )}
 
         {subpathRoutes.map(({ subpath, positions, color }) => (
           <Polyline
@@ -268,14 +313,20 @@ export default function TrajectoryMap({ trajectories, showTrajectoryDataPoints, 
       </MapContainer>
 
       <div className="trajectory-map-legend">
-        <span>
-          <i className="legend-start" aria-hidden="true" />
-          Start
-        </span>
-        <span>
-          <i className="legend-end" aria-hidden="true" />
-          End
-        </span>
+        {pathlets.length > 0 ? (
+          <span>Select a pathlet to inspect support and trajectory IDs</span>
+        ) : (
+          <>
+            <span>
+              <i className="legend-start" aria-hidden="true" />
+              Start
+            </span>
+            <span>
+              <i className="legend-end" aria-hidden="true" />
+              End
+            </span>
+          </>
+        )}
       </div>
     </div>
   );

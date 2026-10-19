@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers.dataset_router import router as dataset_router
+from routers.similarity_router import router as similarity_router
 from routers.subpath_router import router as subpath_router
 from routers.trajectory_router import router as trajectory_router
 
@@ -22,6 +23,7 @@ app.add_middleware(
 app.include_router(trajectory_router)
 app.include_router(dataset_router)
 app.include_router(subpath_router)
+app.include_router(similarity_router)
 
 
 if __name__ == "__main__":  # pragma: no cover

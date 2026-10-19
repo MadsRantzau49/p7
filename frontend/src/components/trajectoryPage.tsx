@@ -10,6 +10,7 @@ import TrajectoryMap from "./trajectoryMap";
 import SubpathResults from "./subpathResults";
 import TimeRangeSlider from "./timeRangeSlider.tsx";
 import DatasetUpload from "./datasetUpload";
+import SimilarityPage from "./similarityPage";
 import "../css/TrajectoryPage.css";
 import type { trajectoryCitites } from "../models/trajectoryCities";
 import type { AreaName, SelectedArea } from "../models/map/SelectedArea";
@@ -18,6 +19,7 @@ const PORTO_CENTER: LatLngTuple = [41.1579, -8.6291];
 const EMPTY_TRAJECTORIES: uniformedTrajectoryResponse[] = [];
 
 export default function TrajectoryPage() {
+  const [showSimilarity, setShowSimilarity] = useState(false);
   const [sidebarCleared, setSidebarCleared] = useState(false);
   const [explorerCity, setExplorerCity] = useState("");
   const [explorerStartDate, setExplorerStartDate] = useState("");
@@ -200,9 +202,17 @@ export default function TrajectoryPage() {
     statusMessage = `${trajectories.length} trajectories loaded.`;
   }
 
+  if (showSimilarity) {
+    return <SimilarityPage onBack={() => setShowSimilarity(false)} />;
+  }
+
   return (
     <div className="trajectory-page">
       <aside className="trajectory-sidebar">
+        <button type="button" className="trajectory-list-toggle trajectory-sidebar-clear"
+          onClick={() => setShowSimilarity(true)}>
+          Similarity (FDS)
+        </button>
         <button
           type="button"
           className="trajectory-list-toggle trajectory-sidebar-clear"

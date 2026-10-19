@@ -8,7 +8,17 @@ docker compose -f docker/app.compose.yml up --build -d
 ## Start trajectory builder
 
 ```bash
-docker compose -f docker/trajectory-builder.compose.yml up --build -d
+LOCAL_UID="$(id -u)" LOCAL_GID="$(id -g)" docker compose -f docker/trajectory-builder.compose.yml up --build -d
+```
+
+The builder runs as your user and saves CSV fixtures with your ownership. This
+allows Snap-packaged Firefox to read them for uploads. The container listens on
+port 8080; the builder is still available at http://localhost:5174.
+
+For older, root-owned exports, run this once from the repository root:
+
+```bash
+sudo chown -R "$(id -u):$(id -g)" backend/tests/data/trajectories
 ```
 
 ## Stop everything
