@@ -300,42 +300,21 @@ class SimilarityService:
 
 
 def debug_fds() -> None:
-    """Temporarily run FDS on real database subpaths using hardcoded areas."""
+    """Run FDS on the manually drawn Skagen-to-Aalborg CSV fixture."""
     configure_logging()
     started = perf_counter()
     logger.info("Writing logs to %s (level: %s)", LOG_FILE, LOG_LEVEL)
 
-    from datetime import date
-
-    with log_step("Database setup"):
-        from database.connection import create_db_connection
-        from database.repositories.trajectory_repository import TrajectoryRepository
-        from services.subpath_service import SubPathService
-
-        connection = create_db_connection()
-
     try:
-        repository = TrajectoryRepository(connection)
-        subpath_service = SubPathService(repository)
+        with log_step("Load CSV subpaths"):
+            from trajectory_builder.importer import load_subpaths
 
-        # Edit these areas and dates to match the data you want to debug.
-        with log_step("Find subpaths"):
-            subpaths = subpath_service.find_subpaths(
-                a_longitude=9.9392,  # centre of the sample's Aalborg-area start points
-                a_latitude=57.0344,
-                b_longitude=9.3775,  # centre of the sample's Flensburg-area end points
-                b_latitude=54.7864,
-                start_date=date(2026, 10, 6),
-                end_date=date(2026, 10, 6),
-                box_half_width_m=5000,
-            )
-        logger.info("Found %d subpaths", len(subpaths))
-        if not subpaths:
-            logger.warning("No subpaths matched. Check the areas, dates, and prepared database data.")
-        result = SimilarityService().FDS(subpaths,epsilon=2000, max_entries=4)
+            fixture = Path(__file__).resolve().parents[2] / "tests/data/trajectories/skagen_to_aalborg.csv"
+            subpaths = load_subpaths(fixture)
+        logger.info("Loaded %d subpaths from %s", len(subpaths), fixture)
+        result = SimilarityService().FDS(subpaths, 2000, 4)
         logger.info("FDS result: %s", result)
     finally:
-        connection.close()
         logger.info("Debug run total elapsed: %.6f s", perf_counter() - started)
 
 
