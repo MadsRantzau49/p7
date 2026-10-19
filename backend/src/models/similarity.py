@@ -8,9 +8,9 @@ class Coordinate:
     y: float
 
 @dataclass
-class TrajectoryInMeters:
+class ProjectedTrajectory:
     trajectory_id: int
-    meter_points: list[Coordinate]
+    projected_points: list[Coordinate]
 
 @dataclass
 class Pathlet:
@@ -25,4 +25,4 @@ class TrajectorySegments:
     trajectory_id: int
     segment_index: int
     start: Coordinate
-    end: Coordinate 
+    end: Coordinate

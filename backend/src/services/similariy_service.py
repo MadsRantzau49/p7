@@ -1,22 +1,22 @@
 from models.subpath import Subpath
-from models.similarity import Coordinate, TrajectoryInMeters, Pathlet, TrajectorySegments
+from models.similarity import Coordinate, ProjectedTrajectory, Pathlet, TrajectorySegments
 
 from pyproj import Transformer
 
 
 class SimilarityService:
 
-    def convert_gps_to_meter_coordinates(
+    def projection(
         self,
         trajectories: list[Subpath],
-    ) -> list[TrajectoryInMeters]:
+    ) -> list[ProjectedTrajectory]:
 
         # Collect all points so one projection can be used for every trajectory.
-        points = [
-            point
-            for trajectory in trajectories
-            for point in trajectory.points
-        ]
+        points = []
+
+        for trajectory in trajectories:
+            for point in trajectory.points:
+                points.append(point)
 
         if not points:
             return []
@@ -35,10 +35,10 @@ class SimilarityService:
             always_xy=True,
         )
 
-        converted_trajectories = []
+        projected_trajectories = []
 
         for trajectory in trajectories:
-            meter_points = []
+            projected_points = []
 
             for point in trajectory.points:
                 # always_xy=True means the inputs must be longitude, then latitude.
@@ -47,20 +47,20 @@ class SimilarityService:
                     point.latitude,
                 )
 
-                meter_points.append(Coordinate(x=x, y=y))
+                projected_points.append(Coordinate(x=x, y=y))
 
-            converted_trajectories.append(
-                TrajectoryInMeters(
+            projected_trajectories.append(
+                ProjectedTrajectory(
                     trajectory_id=trajectory.trajectory_id,
-                    meter_points=meter_points,
+                    projected_points=projected_points,
                 )
             )
 
-        return converted_trajectories
+        return projected_trajectories
 
     def generate_segments(
         self,
-        trajectories: list[TrajectoryInMeters],
+        trajectories: list[ProjectedTrajectory],
     ) -> list[TrajectorySegments]:
         """Split each trajectory into segments between consecutive points (Step 2).
         (a, b, c, d) -> (a, b), (b, c), (c, d). Each segment keeps its
@@ -70,7 +70,7 @@ class SimilarityService:
         segments = []
 
         for trajectory in trajectories:
-            points = trajectory.meter_points
+            points = trajectory.projected_points
             # One segment per pair of consecutive points: (a,b,c,d) -> (a,b),(b,c),(c,d)
             for j in range(len(points) - 1):
                 segments.append(
@@ -88,11 +88,11 @@ class SimilarityService:
             self, 
             subpaths: list[Subpath]
         ) -> list[Pathlet]:
-        # Step 1: Convert GPS to Meters
-        trajectories_in_meters = self.convert_gps_to_meter_coordinates(subpaths)
+        # Step 1: Projection
+        projected_trajectories = self.projection(subpaths)
 
         #Step 2: Generate Segments
-        segments = self.generate_segments(trajectories_in_meters)
+        segments = self.generate_segments(projected_trajectories)
 
         #Step 3: Build R-tree
 
@@ -109,5 +109,5 @@ class SimilarityService:
         #Step 7: Select Final Pathlets
 
 
-        #Step 8: Convert Pathlets Back to GPS
+        #Step 8: Inverse Projection
         
