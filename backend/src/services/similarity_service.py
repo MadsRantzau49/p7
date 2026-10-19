@@ -5,12 +5,14 @@ from models.similarity import (
     BoundingBox,
     CandidateCluster,
     Coordinate,
+    ExtendedPathletCandidate,
     MatchingSegmentPair,
     Pathlet,
     ProjectedTrajectory,
     RTreeEntry,
     RTreeNode,
     TrajectorySegments,
+    TrajectorySection,
 )
 import logging
 from contextlib import contextmanager
@@ -250,17 +252,35 @@ class SimilarityService:
         closest_y = segment.start.y + fraction * dy
         return math.hypot(point.x - closest_x, point.y - closest_y)
 
-    def sspd(self, segment_a: TrajectorySegments, segment_b: TrajectorySegments) -> float:
-        """Average the two directed endpoint-to-segment distances (SSPD)."""
-        spd_a_to_b = (
-            self.point_to_segment_distance(segment_a.start, segment_b)
-            + self.point_to_segment_distance(segment_a.end, segment_b)
-        ) / 2
-        spd_b_to_a = (
-            self.point_to_segment_distance(segment_b.start, segment_a)
-            + self.point_to_segment_distance(segment_b.end, segment_a)
-        ) / 2
+    def _spd(self, points: list[Coordinate], target_segments: list[TrajectorySegments]) -> float:
+        """Average each source point's shortest distance to the target path."""
+        total_distance = 0.0
+        for point in points:
+            total_distance += min(
+                self.point_to_segment_distance(point, segment) for segment in target_segments
+            )
+        return total_distance / len(points)
+
+    def _sspd(
+        self,
+        points_a: list[Coordinate],
+        points_b: list[Coordinate],
+        segments_a: list[TrajectorySegments],
+        segments_b: list[TrajectorySegments],
+    ) -> float:
+        """Calculate SSPD for both two-point segments and longer paths."""
+        spd_a_to_b = self._spd(points_a, segments_b)
+        spd_b_to_a = self._spd(points_b, segments_a)
         return (spd_a_to_b + spd_b_to_a) / 2
+
+    def sspd(self, segment_a: TrajectorySegments, segment_b: TrajectorySegments) -> float:
+        """Compare two segments using the shared SSPD calculation."""
+        return self._sspd(
+            [segment_a.start, segment_a.end],
+            [segment_b.start, segment_b.end],
+            [segment_a],
+            [segment_b],
+        )
 
     def find_matching_segment_pairs(
         self,
@@ -332,6 +352,103 @@ class SimilarityService:
             )
 
         return clusters
+
+    def path_sspd(self, path_a: TrajectorySection, path_b: TrajectorySection) -> float:
+        """Compare full paths using every vertex's distance to the other polyline."""
+        if len(path_a.points) < 2 or len(path_b.points) < 2:
+            raise ValueError("SSPD paths must contain at least two points.")
+
+        segments_a = self.generate_segments([ProjectedTrajectory(path_a.trajectory_id, path_a.points)])
+        segments_b = self.generate_segments([ProjectedTrajectory(path_b.trajectory_id, path_b.points)])
+
+        return self._sspd(path_a.points, path_b.points, segments_a, segments_b)
+
+    def _extend_section(
+        self,
+        section: TrajectorySection,
+        trajectory: ProjectedTrajectory,
+    ) -> TrajectorySection | None:
+        """Append the next original point, keeping the shared endpoint only once."""
+        next_index = section.end_index + 1
+        if next_index >= len(trajectory.projected_points):
+            return None
+
+        return TrajectorySection(
+            trajectory_id=section.trajectory_id,
+            start_index=section.start_index,
+            end_index=next_index,
+            points=section.points + [trajectory.projected_points[next_index]],
+        )
+
+    def extend_candidate_clusters(
+        self,
+        clusters: list[CandidateCluster],
+        trajectories: list[ProjectedTrajectory],
+        epsilon: float,
+    ) -> list[ExtendedPathletCandidate]:
+        """Extend direct matches along consecutive segments (Step 6).
+
+        Keep every valid shorter candidate. Stop extending a group when its
+        representative ends or no other matching section can continue.
+        """
+        if epsilon < 0:
+            raise ValueError("epsilon must be non-negative.")
+
+        trajectories_by_id = {trajectory.trajectory_id: trajectory for trajectory in trajectories}
+        candidates = []
+        for cluster in clusters:
+            segment = cluster.representative
+            representative = TrajectorySection(
+                trajectory_id=segment.trajectory_id,
+                start_index=segment.segment_index,
+                end_index=segment.segment_index + 1,
+                points=[segment.start, segment.end],
+            )
+            matching_sections = []
+            for member in cluster.segments:
+                if member.trajectory_id == representative.trajectory_id:
+                    continue
+                matching_sections.append(
+                    TrajectorySection(
+                        trajectory_id=member.trajectory_id,
+                        start_index=member.segment_index,
+                        end_index=member.segment_index + 1,
+                        points=[member.start, member.end],
+                    )
+                )
+
+            while True:
+                sections = [representative] + matching_sections
+                trajectory_ids = {section.trajectory_id for section in sections}
+                candidates.append(
+                    ExtendedPathletCandidate(
+                        representative=representative,
+                        sections=sections,
+                        trajectories_included=list(trajectory_ids),
+                        trajectory_count=len(trajectory_ids),
+                    )
+                )
+
+                if not matching_sections:
+                    break
+                next_representative = self._extend_section(
+                    representative, trajectories_by_id[representative.trajectory_id]
+                )
+                if next_representative is None:
+                    break
+
+                extended_matches = []
+                for section in matching_sections:
+                    next_section = self._extend_section(section, trajectories_by_id[section.trajectory_id])
+                    if next_section is not None and self.path_sspd(next_representative, next_section) <= epsilon:
+                        extended_matches.append(next_section)
+
+                if not extended_matches:
+                    break
+                representative = next_representative
+                matching_sections = extended_matches
+
+        return candidates
  
     @staticmethod
     def _str_groups(items: list, max_entries: int) -> list[list]:
@@ -398,6 +515,11 @@ class SimilarityService:
             logger.info("Constructed %d candidate clusters", len(candidate_clusters))
 
             # Step 6: Extend Candidate Clusters
+            with log_step("Step 6: Extend candidate clusters"):
+                extended_candidates = self.extend_candidate_clusters(
+                    candidate_clusters, projected_trajectories, epsilon
+                )
+            logger.info("Constructed %d extended pathlet candidates", len(extended_candidates))
 
             # Step 7: Select Final Pathlets
 
@@ -418,7 +540,7 @@ def debug_fds() -> None:
         with log_step("Load CSV subpaths"):
             from trajectory_builder.importer import load_subpaths
 
-            fixture = Path(__file__).resolve().parents[2] / "tests/data/trajectories/skagen_to_aalborg.csv"
+            fixture = Path(__file__).resolve().parents[2] / "tests/data/trajectories/beijing_10.csv"
             subpaths = load_subpaths(fixture)
         logger.info("Loaded %d subpaths from %s", len(subpaths), fixture)
         result = SimilarityService().FDS(subpaths, 2000, 4)

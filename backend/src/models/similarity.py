@@ -42,6 +42,22 @@ class CandidateCluster:
     trajectory_count: int
 
 @dataclass
+class TrajectorySection:
+    """A projected path with inclusive, 0-based point indexes in its original trajectory."""
+    trajectory_id: int
+    start_index: int
+    end_index: int
+    points: list[Coordinate]
+
+@dataclass
+class ExtendedPathletCandidate:
+    """A representative path and the trajectory sections assigned to it."""
+    representative: TrajectorySection
+    sections: list[TrajectorySection]
+    trajectories_included: list[int]
+    trajectory_count: int
+
+@dataclass
 class BoundingBox:
     """Axis-aligned box: [min_x, max_x] x [min_y, max_y], in meters."""
     min_x: float
