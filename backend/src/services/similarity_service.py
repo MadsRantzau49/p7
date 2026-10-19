@@ -1,12 +1,21 @@
+import math
+
+from models.subpath import Subpath
+from models.similarity import (
+    BoundingBox,
+    Coordinate,
+    Pathlet,
+    ProjectedTrajectory,
+    RTreeEntry,
+    RTreeNode,
+    TrajectorySegments,
+)
 import logging
 from contextlib import contextmanager
 from pathlib import Path
 from time import perf_counter
 
 from pyproj import Transformer
-
-from models.similarity import Coordinate, ProjectedTrajectory, TrajectorySegments
-from models.subpath import Subpath
 
 
 # Choose "DEBUG", "INFO", "WARNING", or "ERROR".
@@ -131,21 +140,139 @@ class SimilarityService:
                 )
 
         return segments
-
-    def FDS(self, subpaths: list[Subpath]) -> None:
+    
+    def bounding_box(
+        self,
+        segment: TrajectorySegments,
+        epsilon: float = 0,
+    ) -> BoundingBox:
+        """Box around a segment, grown by epsilon meters on every side.
+ 
+        epsilon=0 gives the original box BB; epsilon>0 gives EBB_epsilon.
+        """
+        return BoundingBox(
+            min_x=min(segment.start.x, segment.end.x) - epsilon,
+            min_y=min(segment.start.y, segment.end.y) - epsilon,
+            max_x=max(segment.start.x, segment.end.x) + epsilon,
+            max_y=max(segment.start.y, segment.end.y) + epsilon,
+        )
+    
+    def build_rtree(
+    self,
+    segments: list[TrajectorySegments],
+    epsilon: float,
+    max_entries: int,
+    ) -> RTreeNode | None:
+        """Build an R-tree over the segments' expanded bounding boxes (Step 3).
+ 
+        Uses Sort-Tile-Recursive (STR) packing: boxes are sorted by x into
+        vertical slices, each slice is sorted by y and packed into nodes of
+        up to max_entries. The same packing is repeated level by level
+        until one root remains. Returns None when there are no segments.
+        """
+        if max_entries < 2:
+            raise ValueError("max_entries must be at least 2.")
+        if not segments:
+            return None
+ 
+        entries = [
+            RTreeEntry(box=self.bounding_box(segment, epsilon), segment=segment)
+            for segment in segments
+        ]
+ 
+        # Leaves: STR-pack the segment boxes.
+        nodes = [
+            RTreeNode(
+                box=BoundingBox.enclosing([entry.box for entry in group]),
+                entries=group,
+            )
+            for group in self._str_groups(entries, max_entries)
+        ]
+ 
+        # Upper levels: STR-pack the node boxes until one root remains.
+        while len(nodes) > 1:
+            nodes = [
+                RTreeNode(
+                    box=BoundingBox.enclosing([child.box for child in group]),
+                    children=group,
+                )
+                for group in self._str_groups(nodes, max_entries)
+            ]
+ 
+        return nodes[0]
+ 
+    def query_rtree(
+        self,
+        root: RTreeNode | None,
+        query_box: BoundingBox,
+    ) -> list[TrajectorySegments]:
+        """Return segments whose stored (expanded) box intersects query_box."""
+        if root is None:
+            return []
+ 
+        results = []
+        stack = [root]
+ 
+        while stack:
+            node = stack.pop()
+            if not node.box.intersects(query_box):
+                continue  # Nothing below this node can match.
+ 
+            if node.is_leaf:
+                results.extend(
+                    entry.segment
+                    for entry in node.entries
+                    if entry.box.intersects(query_box)
+                )
+            else:
+                stack.extend(node.children)
+ 
+        return results
+ 
+    @staticmethod
+    def _str_groups(items: list, max_entries: int) -> list[list]:
+        """Group items (anything with a .box) into nodes using STR.
+ 
+        With P = ceil(n / max_entries) nodes needed, the items are split into
+        S = ceil(sqrt(P)) vertical slices by x, and each slice is sorted by y
+        and cut into groups of max_entries. This gives roughly square nodes.
+        """
+        node_count = math.ceil(len(items) / max_entries)
+        slice_count = math.ceil(math.sqrt(node_count))
+        slice_size = slice_count * max_entries
+ 
+        by_x = sorted(items, key=lambda item: item.box.center[0])
+ 
+        groups = []
+        for start in range(0, len(by_x), slice_size):
+            vertical_slice = sorted(
+                by_x[start:start + slice_size],
+                key=lambda item: item.box.center[1],
+            )
+            groups.extend(
+                vertical_slice[i:i + max_entries]
+                for i in range(0, len(vertical_slice), max_entries)
+            )
+        return groups
+    def FDS(self, subpaths: list[Subpath], epsilon : float,
+                max_entries : int) -> None:
         """Run FDS with timings for each implemented step and the total runtime."""
         configure_logging()
         started = perf_counter()
         logger.info("Running FDS on %d subpaths", len(subpaths))
         try:
             with log_step("Step 1: Projection"):
+                # Step 1: Projection
                 projected_trajectories = self.projection(subpaths)
             logger.debug("Projected %d trajectories", len(projected_trajectories))
 
             with log_step("Step 2: Generate segments"):
+                # Step 2: Genereate Segments
                 segments = self.generate_segments(projected_trajectories)
             logger.info("Generated %d segments", len(segments))
 
+            #Step 3: Build R-tree
+            rtree = self.build_rtree(segments, epsilon, max_entries)
             # Step 3: Build R-tree
 
             # Step 4: Find Matching Segment Pairs
@@ -176,7 +303,7 @@ def debug_fds() -> None:
             fixture = Path(__file__).resolve().parents[2] / "tests/data/trajectories/skagen_to_aalborg.csv"
             subpaths = load_subpaths(fixture)
         logger.info("Loaded %d subpaths from %s", len(subpaths), fixture)
-        result = SimilarityService().FDS(subpaths)
+        result = SimilarityService().FDS(subpaths, 2000, 4)
         logger.info("FDS result: %s", result)
     finally:
         logger.info("Debug run total elapsed: %.6f s", perf_counter() - started)

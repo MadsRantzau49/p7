@@ -38,7 +38,7 @@ def test_similarity_with_skagen_to_aalborg_fixture():
     assert len(projected[0].projected_points) == 19
     assert len(segments) == 268
     assert {segment.trajectory_id for segment in segments} == set(range(888, 898))
-    assert service.FDS(subpaths) is None
+    assert service.FDS(subpaths, 2000, 4) is None
 
 
 def make_trajectories_in_meters(trajectories: dict) -> list[ProjectedTrajectory]:
