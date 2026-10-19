@@ -1,0 +1,10 @@
+trajectory_id,vehicle_id,vehicle_type,timestamp,longitude,latitude,city,source_id,database_trajectory_id
+fucked_aalborg,0,UNKNOWN,2026-10-01 15:15:00,9.889197,57.024056,,,
+fucked_aalborg,0,UNKNOWN,2026-10-01 15:15:15,9.905076,57.032417,,,
+fucked_aalborg,0,UNKNOWN,2026-10-01 15:15:30,9.90602,57.039936,,,
+fucked_aalborg,0,UNKNOWN,2026-10-01 15:15:45,9.893618,57.039983,,,
+fucked_aalborg,0,UNKNOWN,2026-10-01 15:16:00,10.198746,57.030269,,,
+fucked_aalborg,0,UNKNOWN,2026-10-01 15:16:15,9.907436,57.044092,,,
+fucked_aalborg,0,UNKNOWN,2026-10-01 15:16:30,9.931126,57.049694,,,
+fucked_aalborg,0,UNKNOWN,2026-10-01 15:16:45,9.930096,57.05735,,,
+fucked_aalborg,0,UNKNOWN,2026-10-01 15:17:00,9.926662,57.070043,,,
