@@ -11,15 +11,18 @@ class SimilarityService:
         trajectories: list[Subpath],
     ) -> list[ProjectedTrajectory]:
 
+        if not trajectories:
+            raise ValueError("Projection requires at least one trajectory.")
+
         # Collect all points so one projection can be used for every trajectory.
         points = []
 
         for trajectory in trajectories:
+            if not trajectory.points:
+                raise ValueError("Each trajectory must contain at least one point.")
+
             for point in trajectory.points:
                 points.append(point)
-
-        if not points:
-            return []
 
         # Choose a UTM zone based on the centre of the input data.
         # This is suitable when the trajectories cover a local or regional area.

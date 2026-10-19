@@ -89,22 +89,29 @@ def test_projection_uses_shared_zone():
 
 
 def test_projection_empty_input():
-    """Return an empty list when no subpaths are provided."""
+    """Reject an empty list of subpaths."""
     service = SimilarityService()
 
-    result = service.projection([])
-
-    assert result == []
+    with pytest.raises(ValueError, match="Projection requires at least one trajectory"):
+        service.projection([])
 
 
 def test_projection_without_points():
-    """Return an empty list when a subpath has no geographic points."""
+    """Reject a subpath with no geographic points."""
     service = SimilarityService()
     subpath = make_subpath(42, [])
 
-    result = service.projection([subpath])
+    with pytest.raises(ValueError, match="Each trajectory must contain at least one point"):
+        service.projection([subpath])
 
-    assert result == []
+
+def test_projection_with_empty_and_nonempty_trajectories():
+    """Reject an empty trajectory even when another trajectory has points."""
+    service = SimilarityService()
+    subpaths = [make_subpath(1, [(9, 45)]), make_subpath(2, [])]
+
+    with pytest.raises(ValueError, match="Each trajectory must contain at least one point"):
+        service.projection(subpaths)
 
 
 def test_four_points_give_three_segments():
