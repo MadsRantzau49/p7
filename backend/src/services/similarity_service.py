@@ -6,7 +6,9 @@ from models.similarity import (
     CandidateCluster,
     Coordinate,
     ExtendedPathletCandidate,
+    GPSCoordinate,
     MatchingSegmentPair,
+    Pathlet,
     ProjectedPathlet,
     ProjectedTrajectory,
     RTreeEntry,
@@ -20,6 +22,7 @@ from pathlib import Path
 from time import perf_counter
 
 from pyproj import Transformer
+from pyproj.enums import TransformDirection
 
 
 # Choose "DEBUG", "INFO", "WARNING", or "ERROR".
@@ -63,6 +66,9 @@ def log_step(name: str):
 
 class SimilarityService:
 
+    def __init__(self) -> None:
+        self._projection_transformer: Transformer | None = None
+
     def projection(
         self,
         trajectories: list[Subpath],
@@ -95,6 +101,7 @@ class SimilarityService:
             f"EPSG:{epsg_code}",
             always_xy=True,
         )
+        self._projection_transformer = transformer
 
         projected_trajectories = []
 
@@ -118,6 +125,34 @@ class SimilarityService:
             )
 
         return projected_trajectories
+
+    def inverse_projection(self, pathlets: list[ProjectedPathlet]) -> list[Pathlet]:
+        """Convert every representative point back using the most recent Step 1 projection."""
+        if not pathlets:
+            return []
+        if self._projection_transformer is None:
+            raise ValueError("Run projection() before inverse_projection() on the same service.")
+
+        gps_pathlets = []
+        for pathlet in pathlets:
+            gps_points = []
+            for point in pathlet.representative.points:
+                # always_xy=True also means the inverse returns longitude, then latitude.
+                longitude, latitude = self._projection_transformer.transform(
+                    point.x, point.y, direction=TransformDirection.INVERSE
+                )
+                gps_points.append(GPSCoordinate(latitude=latitude, longitude=longitude))
+
+            gps_pathlets.append(
+                Pathlet(
+                    pathlet_id=pathlet.pathlet_id,
+                    count=pathlet.count,
+                    trajectories_included=list(pathlet.trajectories_included),
+                    points=gps_points,
+                )
+            )
+
+        return gps_pathlets
 
     def generate_segments(
         self,
@@ -597,8 +632,8 @@ class SimilarityService:
         return groups
 
     def FDS(self, subpaths: list[Subpath], epsilon : float,
-                max_entries : int) -> None:
-        """Run FDS with timings for each implemented step and the total runtime."""
+                max_entries : int) -> list[Pathlet]:
+        """Run all FDS steps and return GPS pathlets, with per-step and total timings."""
         configure_logging()
         started = perf_counter()
         logger.info("Running FDS on %d subpaths", len(subpaths))
@@ -640,10 +675,13 @@ class SimilarityService:
             logger.info("Selected %d projected pathlets", len(selected_pathlets))
 
             # Step 8: Inverse Projection
+            with log_step("Step 8: Inverse projection"):
+                gps_pathlets = self.inverse_projection(selected_pathlets)
+            logger.info("Converted %d pathlets back to GPS", len(gps_pathlets))
         finally:
             logger.info("FDS total elapsed: %.6f s", perf_counter() - started)
 
-        return None
+        return gps_pathlets
 
 
 def debug_fds() -> None:
@@ -660,7 +698,8 @@ def debug_fds() -> None:
             subpaths = load_subpaths(fixture)
         logger.info("Loaded %d subpaths from %s", len(subpaths), fixture)
         result = SimilarityService().FDS(subpaths, 2000, 4)
-        logger.info("FDS result: %s", result)
+        logger.info("FDS result: %d GPS pathlets", len(result))
+        logger.debug("GPS pathlets: %s", result)
     finally:
         logger.info("Debug run total elapsed: %.6f s", perf_counter() - started)
 

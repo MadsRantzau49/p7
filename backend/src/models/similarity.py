@@ -1,7 +1,5 @@
 from dataclasses import dataclass, field
 
-from models.uniformed_trajectories import UniformedTrajectoryPoint
-
 @dataclass
 class Coordinate:
     x: float
@@ -13,12 +11,18 @@ class ProjectedTrajectory:
     projected_points: list[Coordinate]
 
 @dataclass
+class GPSCoordinate:
+    """A WGS84 geographic coordinate in degrees."""
+    latitude: float
+    longitude: float
+
+@dataclass
 class Pathlet:
+    """A selected pathlet with all GPS points in travel order."""
     pathlet_id: int
     count: int
     trajectories_included: list[int]
-    start_point: UniformedTrajectoryPoint
-    end_point: UniformedTrajectoryPoint
+    points: list[GPSCoordinate]
     
 @dataclass
 class TrajectorySegments:
