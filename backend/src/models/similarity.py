@@ -19,3 +19,10 @@ class Pathlet:
     trajectories_included: list[int]
     start_point: UniformedTrajectoryPoint
     end_point: UniformedTrajectoryPoint
+    
+@dataclass
+class TrajectorySegments:
+    trajectory_id: int
+    segment_index: int
+    start: Coordinate
+    end: Coordinate 
