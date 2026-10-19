@@ -7,7 +7,7 @@ from models.similarity import (
     Coordinate,
     ExtendedPathletCandidate,
     MatchingSegmentPair,
-    Pathlet,
+    ProjectedPathlet,
     ProjectedTrajectory,
     RTreeEntry,
     RTreeNode,
@@ -449,6 +449,119 @@ class SimilarityService:
                 matching_sections = extended_matches
 
         return candidates
+
+    def _sections_from_segment_indices(
+        self,
+        trajectory: ProjectedTrajectory,
+        segment_indices: set[int],
+    ) -> list[TrajectorySection]:
+        """Turn selected segment indexes into separate, contiguous trajectory sections."""
+        sections = []
+        start_index = None
+        # The last point closes a run: it is not itself a segment's start index.
+        for index in range(len(trajectory.projected_points)):
+            if index in segment_indices:
+                if start_index is None:
+                    start_index = index
+            elif start_index is not None:
+                sections.append(
+                    TrajectorySection(
+                        trajectory_id=trajectory.trajectory_id,
+                        start_index=start_index,
+                        end_index=index,
+                        points=trajectory.projected_points[start_index:index + 1],
+                    )
+                )
+                start_index = None
+        return sections
+
+    def select_final_pathlets(
+        self,
+        candidates: list[ExtendedPathletCandidate],
+        trajectories: list[ProjectedTrajectory],
+    ) -> list[ProjectedPathlet]:
+        """Greedily select pathlets by newly covered distance (Step 7).
+
+        Coverage is tracked by original trajectory ID and segment index, so
+        overlapping assignments count once. Uncovered contiguous sections
+        become individual pathlets with support one.
+        """
+        trajectories_by_id = {trajectory.trajectory_id: trajectory for trajectory in trajectories}
+        represented = {trajectory.trajectory_id: set() for trajectory in trajectories}
+        segment_lengths = {}
+        for trajectory in trajectories:
+            lengths = []
+            for start, end in zip(trajectory.projected_points, trajectory.projected_points[1:]):
+                lengths.append(math.hypot(end.x - start.x, end.y - start.y))
+            segment_lengths[trajectory.trajectory_id] = lengths
+
+        remaining = []
+        for candidate in candidates:
+            coverage = {}
+            for section in candidate.sections:
+                coverage.setdefault(section.trajectory_id, set()).update(
+                    range(section.start_index, section.end_index)
+                )
+            remaining.append((candidate, coverage))
+
+        pathlets = []
+        while remaining:
+            best_index = None
+            best_new_coverage = 0.0
+            for index, (_, coverage) in enumerate(remaining):
+                new_coverage = 0.0
+                for trajectory_id, indices in coverage.items():
+                    for segment_index in indices - represented[trajectory_id]:
+                        new_coverage += segment_lengths[trajectory_id][segment_index]
+                if new_coverage > best_new_coverage:
+                    best_index = index
+                    best_new_coverage = new_coverage
+
+            if best_index is None:
+                break
+
+            candidate, coverage = remaining.pop(best_index)
+            new_sections = []
+            contributing_ids = []
+            for trajectory_id, indices in coverage.items():
+                new_indices = indices - represented[trajectory_id]
+                new_length = sum(segment_lengths[trajectory_id][index] for index in new_indices)
+                if new_length > 0:
+                    contributing_ids.append(trajectory_id)
+                    new_sections.extend(
+                        self._sections_from_segment_indices(trajectories_by_id[trajectory_id], new_indices)
+                    )
+                represented[trajectory_id].update(indices)
+
+            pathlets.append(
+                ProjectedPathlet(
+                    pathlet_id=len(pathlets) + 1,
+                    representative=candidate.representative,
+                    sections=new_sections,
+                    trajectories_included=contributing_ids,
+                    count=len(contributing_ids),
+                )
+            )
+            logger.debug(
+                "Selected pathlet %d: %.6f m new coverage from %d trajectories",
+                pathlets[-1].pathlet_id, best_new_coverage, len(contributing_ids),
+            )
+
+        for trajectory in trajectories:
+            all_indices = set(range(len(trajectory.projected_points) - 1))
+            uncovered = all_indices - represented[trajectory.trajectory_id]
+            for section in self._sections_from_segment_indices(trajectory, uncovered):
+                pathlets.append(
+                    ProjectedPathlet(
+                        pathlet_id=len(pathlets) + 1,
+                        representative=section,
+                        sections=[section],
+                        trajectories_included=[trajectory.trajectory_id],
+                        count=1,
+                    )
+                )
+
+        return pathlets
  
     @staticmethod
     def _str_groups(items: list, max_entries: int) -> list[list]:
@@ -522,6 +635,9 @@ class SimilarityService:
             logger.info("Constructed %d extended pathlet candidates", len(extended_candidates))
 
             # Step 7: Select Final Pathlets
+            with log_step("Step 7: Select final pathlets"):
+                selected_pathlets = self.select_final_pathlets(extended_candidates, projected_trajectories)
+            logger.info("Selected %d projected pathlets", len(selected_pathlets))
 
             # Step 8: Inverse Projection
         finally:
@@ -540,7 +656,7 @@ def debug_fds() -> None:
         with log_step("Load CSV subpaths"):
             from trajectory_builder.importer import load_subpaths
 
-            fixture = Path(__file__).resolve().parents[2] / "tests/data/trajectories/beijing_10.csv"
+            fixture = Path(__file__).resolve().parents[2] / "tests/data/trajectories/skagen_to_aalborg.csv"
             subpaths = load_subpaths(fixture)
         logger.info("Loaded %d subpaths from %s", len(subpaths), fixture)
         result = SimilarityService().FDS(subpaths, 2000, 4)

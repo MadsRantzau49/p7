@@ -58,6 +58,15 @@ class ExtendedPathletCandidate:
     trajectory_count: int
 
 @dataclass
+class ProjectedPathlet:
+    """A selected representative and its newly covered sections, in meters."""
+    pathlet_id: int
+    representative: TrajectorySection
+    sections: list[TrajectorySection]
+    trajectories_included: list[int]
+    count: int
+
+@dataclass
 class BoundingBox:
     """Axis-aligned box: [min_x, max_x] x [min_y, max_y], in meters."""
     min_x: float
