@@ -34,6 +34,14 @@ class MatchingSegmentPair:
     segment_b: TrajectorySegments
 
 @dataclass
+class CandidateCluster:
+    """A representative, its direct matches, and contributing trajectory IDs and count."""
+    representative: TrajectorySegments
+    segments: list[TrajectorySegments]
+    trajectories_included: list[int]
+    trajectory_count: int
+
+@dataclass
 class BoundingBox:
     """Axis-aligned box: [min_x, max_x] x [min_y, max_y], in meters."""
     min_x: float

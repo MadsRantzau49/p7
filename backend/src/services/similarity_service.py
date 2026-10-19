@@ -3,6 +3,7 @@ import math
 from models.subpath import Subpath
 from models.similarity import (
     BoundingBox,
+    CandidateCluster,
     Coordinate,
     MatchingSegmentPair,
     Pathlet,
@@ -297,6 +298,40 @@ class SimilarityService:
 
         logger.debug("Checked %d candidate pairs; found %d matches", candidate_count, len(matches))
         return matches
+
+    def construct_candidate_clusters(
+        self,
+        segments: list[TrajectorySegments],
+        matching_pairs: list[MatchingSegmentPair],
+    ) -> list[CandidateCluster]:
+        """Build one cluster around each segment using only direct matches (Step 5)."""
+        members_by_segment = {}
+        for segment in segments:
+            key = (segment.trajectory_id, segment.segment_index)
+            members_by_segment[key] = {key: segment}
+
+        # Add each match in both directions. Segment keys prevent duplicate members.
+        for pair in matching_pairs:
+            key_a = (pair.segment_a.trajectory_id, pair.segment_a.segment_index)
+            key_b = (pair.segment_b.trajectory_id, pair.segment_b.segment_index)
+            members_by_segment[key_a][key_b] = pair.segment_b
+            members_by_segment[key_b][key_a] = pair.segment_a
+
+        clusters = []
+        for representative in segments:
+            key = (representative.trajectory_id, representative.segment_index)
+            members = list(members_by_segment[key].values())
+            trajectory_ids = {member.trajectory_id for member in members}
+            clusters.append(
+                CandidateCluster(
+                    representative=representative,
+                    segments=members,
+                    trajectories_included=list(trajectory_ids),
+                    trajectory_count=len(trajectory_ids),
+                )
+            )
+
+        return clusters
  
     @staticmethod
     def _str_groups(items: list, max_entries: int) -> list[list]:
@@ -358,6 +393,9 @@ class SimilarityService:
             logger.info("Found %d matching segment pairs", len(matching_pairs))
 
             # Step 5: Construct Candidate Clusters
+            with log_step("Step 5: Construct candidate clusters"):
+                candidate_clusters = self.construct_candidate_clusters(segments, matching_pairs)
+            logger.info("Constructed %d candidate clusters", len(candidate_clusters))
 
             # Step 6: Extend Candidate Clusters
 
