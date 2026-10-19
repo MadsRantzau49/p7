@@ -1,5 +1,5 @@
 from models.subpath import Subpath
-from models.similarity import TrajectoryInMeters, Pathlet
+from models.similarity import TrajectoryInMeters, Pathlet, TrajectorySegments
 
 
 class SimilarityService:
@@ -23,6 +23,27 @@ class SimilarityService:
 
         return converted_trajectories
 
+    def generate_segments(
+        self,
+        trajectories: list[TrajectoryInMeters],
+    ) -> list[TrajectorySegments]:
+
+        segments = []
+
+        for trajectory in trajectories:
+            points = trajectory.meter_points
+            # One segment per pair of consecutive points: (a,b,c,d) -> (a,b),(b,c),(c,d)
+            for j in range(len(points) - 1):
+                segments.append(
+                    TrajectorySegments(
+                        trajectory_id=trajectory.trajectory_id,
+                        segment_index=j,
+                        start=points[j],
+                        end=points[j + 1],
+                    )
+                )
+
+        return segments
 
     def FDS(
             self, 
@@ -32,7 +53,7 @@ class SimilarityService:
         trajectories_in_meters = self.convert_gps_to_meter_coordinates(subpaths)
 
         #Step 2: Generate Segments
-
+        segments = self.generate_segments(trajectories_in_meters)
 
         #Step 3: Build R-tree
 
