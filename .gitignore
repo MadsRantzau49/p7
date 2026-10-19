@@ -148,3 +148,4 @@ logs/
 outputs/
 runs/
 docs/rendered/*
+**/.DS_Store

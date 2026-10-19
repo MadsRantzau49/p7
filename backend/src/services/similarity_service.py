@@ -10,8 +10,51 @@ from models.similarity import (
     RTreeNode,
     TrajectorySegments,
 )
+import logging
+from contextlib import contextmanager
+from pathlib import Path
+from time import perf_counter
 
 from pyproj import Transformer
+
+
+# Choose "DEBUG", "INFO", "WARNING", or "ERROR".
+LOG_LEVEL = "INFO"
+LOG_FILE = Path(__file__).resolve().parents[2] / "similarity_service.log"
+
+# Use logger.debug(...), logger.info(...), logger.warning(...), or logger.error(...).
+logger = logging.getLogger("similarity_service")
+
+
+def configure_logging() -> None:
+    """Send service logs to both the console and an appended log file."""
+    logger.setLevel(LOG_LEVEL)
+    logger.propagate = False
+    if logger.handlers:
+        return
+
+    formatter = logging.Formatter("%(asctime)s | %(levelname)-7s | %(message)s")
+    console_handler = logging.StreamHandler()
+    file_handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
+
+    for handler in (console_handler, file_handler):
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+
+
+@contextmanager
+def log_step(name: str):
+    """Log a step's elapsed time, including a traceback if it fails."""
+    configure_logging()
+    started = perf_counter()
+    logger.info("%s started", name)
+    try:
+        yield
+    except Exception:
+        logger.exception("%s failed after %.6f s", name, perf_counter() - started)
+        raise
+    else:
+        logger.info("%s finished in %.6f s", name, perf_counter() - started)
 
 
 class SimilarityService:
@@ -41,6 +84,7 @@ class SimilarityService:
 
         utm_zone = int((centre_longitude + 180) / 6) + 1
         epsg_code = (32600 if centre_latitude >= 0 else 32700) + utm_zone
+        logger.debug("Projecting %d points using UTM zone %d (EPSG:%d)", len(points), utm_zone, epsg_code)
 
         transformer = Transformer.from_crs(
             "EPSG:4326",
@@ -210,34 +254,81 @@ class SimilarityService:
                 for i in range(0, len(vertical_slice), max_entries)
             )
         return groups
+    def FDS(self, subpaths: list[Subpath], epsilon : float,
+                max_entries : int) -> None:
+        """Run FDS with timings for each implemented step and the total runtime."""
+        configure_logging()
+        started = perf_counter()
+        logger.info("Running FDS on %d subpaths", len(subpaths))
+        try:
+            with log_step("Step 1: Projection"):
+                # Step 1: Projection
+                projected_trajectories = self.projection(subpaths)
+            logger.debug("Projected %d trajectories", len(projected_trajectories))
 
-    def FDS(
-            self, 
-            subpaths: list[Subpath],
-            epsilon : float,
-            max_entries : int
-        ) -> list[Pathlet]:
-        # Step 1: Projection
-        projected_trajectories = self.projection(subpaths)
+            with log_step("Step 2: Generate segments"):
+                # Step 2: Genereate Segments
+                segments = self.generate_segments(projected_trajectories)
+            logger.info("Generated %d segments", len(segments))
 
-        #Step 2: Generate Segments
-        segments = self.generate_segments(projected_trajectories)
+            #Step 3: Build R-tree
+            rtree = self.build_rtree(segments, epsilon, max_entries)
+            # Step 3: Build R-tree
 
-        #Step 3: Build R-tree
-        rtree = self.build_rtree(segments, epsilon, max_entries)
+            # Step 4: Find Matching Segment Pairs
 
+            # Step 5: Construct Candidate Clusters
 
-        #Step 4: Find Matching Segment Pairs
+            # Step 6: Extend Candidate Clusters
 
+            # Step 7: Select Final Pathlets
 
-        #Step 5: Construct Candidate Clusters
+            # Step 8: Inverse Projection
+        finally:
+            logger.info("FDS total elapsed: %.6f s", perf_counter() - started)
 
-
-        #Step 6: Extend Candidate Clusters
-
-
-        #Step 7: Select Final Pathlets
+        return None
 
 
-        #Step 8: Inverse Projection
-        
+def debug_fds() -> None:
+    """Temporarily run FDS on real database subpaths using hardcoded areas."""
+    configure_logging()
+    started = perf_counter()
+    logger.info("Writing logs to %s (level: %s)", LOG_FILE, LOG_LEVEL)
+
+    from datetime import date
+
+    with log_step("Database setup"):
+        from database.connection import create_db_connection
+        from database.repositories.trajectory_repository import TrajectoryRepository
+        from services.subpath_service import SubPathService
+
+        connection = create_db_connection()
+
+    try:
+        repository = TrajectoryRepository(connection)
+        subpath_service = SubPathService(repository)
+
+        # Edit these areas and dates to match the data you want to debug.
+        with log_step("Find subpaths"):
+            subpaths = subpath_service.find_subpaths(
+                a_longitude=9.9392,  # centre of the sample's Aalborg-area start points
+                a_latitude=57.0344,
+                b_longitude=9.3775,  # centre of the sample's Flensburg-area end points
+                b_latitude=54.7864,
+                start_date=date(2026, 10, 6),
+                end_date=date(2026, 10, 6),
+                box_half_width_m=5000,
+            )
+        logger.info("Found %d subpaths", len(subpaths))
+        if not subpaths:
+            logger.warning("No subpaths matched. Check the areas, dates, and prepared database data.")
+        result = SimilarityService().FDS(subpaths,epsilon=2000, max_entries=4)
+        logger.info("FDS result: %s", result)
+    finally:
+        connection.close()
+        logger.info("Debug run total elapsed: %.6f s", perf_counter() - started)
+
+
+if __name__ == "__main__":
+    debug_fds()

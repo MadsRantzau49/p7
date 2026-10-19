@@ -5,7 +5,7 @@ import pytest
 from models.similarity import Coordinate, ProjectedTrajectory
 from models.subpath import Subpath
 from models.uniformed_trajectories import UniformedTrajectoryPoint
-from services.similariy_service import SimilarityService
+from services.similarity_service import SimilarityService
 
 def make_trajectories_in_meters(trajectories: dict) -> list[ProjectedTrajectory]:
     """Build test input shaped like the output of projection.
