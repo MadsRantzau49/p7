@@ -180,6 +180,21 @@ class SimilarityService:
 
         return segments
     
+    def center_x(self, item: RTreeEntry | RTreeNode) -> float:
+        """Sort key: the x-coordinate of an item's box center."""
+        return item.box.center[0]
+
+
+    def center_y(self, item: RTreeEntry | RTreeNode) -> float:
+        """Sort key: the y-coordinate of an item's box center."""
+        return item.box.center[1]
+    
+    def _box_around(self, items):
+        boxes = []
+        for item in items:
+            boxes.append(item.box)
+        return BoundingBox.enclosing(boxes)
+    
     def bounding_box(
         self,
         segment: TrajectorySegments,
@@ -214,31 +229,24 @@ class SimilarityService:
         if not segments:
             return None
 
-        #TODO make this a full for-loop
-        entries = [
-            RTreeEntry(box=self.bounding_box(segment, epsilon), segment=segment)
-            for segment in segments
-        ]
- 
-        # Leaves: STR-pack the segment boxes.
-        nodes = [
-            RTreeNode(
-                box=BoundingBox.enclosing([entry.box for entry in group]),
-                entries=group,
-            )
-            for group in self._str_groups(entries, max_entries)
-        ]
- 
-        # Upper levels: STR-pack the node boxes until one root remains.
+        entries = []
+        for segment in segments:
+            box = self.bounding_box(segment, epsilon)
+            entries.append(RTreeEntry(box=box, segment=segment))
+        
+        # Make the leaves.
+        nodes = []
+        for group in self._str_groups(entries, max_entries):
+            leaf = RTreeNode(box=self._box_around(group), entries=group)
+            nodes.append(leaf)
+        
+        # Bottom up from leaves to root.
         while len(nodes) > 1:
-            nodes = [
-                RTreeNode(
-                    box=BoundingBox.enclosing([child.box for child in group]),
-                    children=group,
-                )
-                for group in self._str_groups(nodes, max_entries)
-            ]
- 
+            parents = []
+            for group in self._str_groups(nodes, max_entries):
+                parent = RTreeNode(box=self._box_around(group), children=group)
+                parents.append(parent)
+            nodes = parents
         return nodes[0]
  
     def query_rtree(
@@ -598,37 +606,60 @@ class SimilarityService:
 
         return pathlets
  
-    @staticmethod
-    def _str_groups(items: list, max_entries: int) -> list[list]:
-        """Group items (anything with a .box) into nodes using shape-aware STR."""
+
+    def _str_groups(self, items: list, max_entries: int) -> list[list]:
+        """Group items into nodes.
+        
+        The items are sorted by x and cut into vertical slices. Each slice is
+        sorted by y and cut into groups of max_entries.
+        """
+        # Number of leafs/nodes needed, rounded up.
         node_count = math.ceil(len(items) / max_entries)
 
-        centres = [item.box.center for item in items]
-        width = max(x for x, _ in centres) - min(x for x, _ in centres)
-        height = max(y for _, y in centres) - min(y for _, y in centres)
+        # Width and height of the area covered by the box centres.
+        min_x, min_y = items[0].box.center
+        max_x, max_y = items[0].box.center
+        for item in items:
+            x, y = item.box.center
+            min_x = min(min_x, x)
+            max_x = max(max_x, x)
+            min_y = min(min_y, y)
+            max_y = max(max_y, y)
+        width = max_x - min_x
+        height = max_y - min_y
 
+        # Number of vertical slices.
+        # Wide data gets more slices and tall data fewer, keeping the groups square.
         if height == 0:
+            # All centres on one horizontal line: one group per slice.
             slice_count = node_count
         elif width == 0:
+            # All centres on one vertical line: a single slice.
             slice_count = 1
         else:
             slice_count = math.ceil(math.sqrt(node_count * width / height))
+            
+        
         slice_count = max(1, min(slice_count, node_count))
 
+        # The amount of items per slice
         slice_size = math.ceil(node_count / slice_count) * max_entries
 
-        by_x = sorted(items, key=lambda item: item.box.center[0])
+        # Sort everything left → right by box centre.
+        by_x = sorted(items, key=self.center_x)
 
+        # Cut into slices, sort each by y, cut into groups.
         groups = []
+        
+        # Start at 0 and jump forward by slice_size until the end.
         for start in range(0, len(by_x), slice_size):
-            vertical_slice = sorted(
-                by_x[start:start + slice_size],
-                key=lambda item: item.box.center[1],
-            )
-            groups.extend(
-                vertical_slice[i:i + max_entries]
-                for i in range(0, len(vertical_slice), max_entries)
-            )
+            vertical_slice = by_x[start:start + slice_size]
+            vertical_slice = sorted(vertical_slice, key=self.center_y)
+            # Sort the slice bottom -> top, then cut it into groups of max_entries.
+            for i in range(0, len(vertical_slice), max_entries):
+                group = vertical_slice[i:i + max_entries]
+                groups.append(group)
+
         return groups
 
     def FDS(self, subpaths: list[Subpath], epsilon : float,
