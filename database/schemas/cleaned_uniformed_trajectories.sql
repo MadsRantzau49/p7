@@ -5,7 +5,7 @@ CREATE TABLE cleaned_uniformed_trajectories(
     city VARCHAR(100) NOT NULL,
     vehicle_type_id INT NOT NULL,
     points JSONB NOT NULL,
-    source_id CHAR(36) NOT NULL
+    source_id CHAR(36) NOT NULL,
 
     FOREIGN KEY (vehicle_type_id) REFERENCES vehicle_types(vehicle_type_id),
     FOREIGN KEY (source_id) REFERENCES source_trajectories(source_id)
