@@ -18,6 +18,18 @@ docker compose -f docker/app.compose.yml down
 docker compose -f docker/trajectory-builder.compose.yml down
 ```
 
+## Start the database (when on the server)
+
+```bash
+docker compose -f docker/database.compose.yml up -d
+```
+
+## Stop the database (when on the server)
+
+```bash
+docker compose -f docker/database.compose.yml down
+```
+
 URLs:
 
 - Frontend: http://localhost:5173
