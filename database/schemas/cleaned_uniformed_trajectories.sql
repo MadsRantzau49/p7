@@ -1,13 +1,15 @@
 CREATE TABLE cleaned_uniformed_trajectories(
-    trajectory_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    trajectory_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     vehicle_id INT,
-    trajectory_date DATETIME,
+    trajectory_date TIMESTAMP,
     city VARCHAR(100) NOT NULL,
     vehicle_type_id INT NOT NULL,
-    points JSON NOT NULL,
-    source_id CHAR(36) NOT NULL,
+    points JSONB NOT NULL,
+    source_id CHAR(36) NOT NULL
+
     FOREIGN KEY (vehicle_type_id) REFERENCES vehicle_types(vehicle_type_id),
-    FOREIGN KEY (source_id) REFERENCES source_trajectories(source_id),
-    INDEX idx_city_date (city, trajectory_date),
-    INDEX idx_trajectory_date (trajectory_date)
+    FOREIGN KEY (source_id) REFERENCES source_trajectories(source_id)
 );
+
+CREATE INDEX idx_cleaned_city_date ON cleaned_uniformed_trajectories (city, trajectory_date);
+CREATE INDEX idx_cleaned_date ON cleaned_uniformed_trajectories (trajectory_date);

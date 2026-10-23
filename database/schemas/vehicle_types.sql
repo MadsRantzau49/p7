@@ -1,5 +1,5 @@
 CREATE TABLE vehicle_types (
-    vehicle_type_id INT AUTO_INCREMENT PRIMARY KEY,
+    vehicle_type_id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     name VARCHAR(32) NOT NULL UNIQUE
 );
 
