@@ -1,4 +1,5 @@
 export interface trajectoryCitites{
-    dataset_id: number;
+    city_id: number;
     name: string;
+    time_zone: string;
 }

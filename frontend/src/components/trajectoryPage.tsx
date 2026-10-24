@@ -350,7 +350,7 @@ export default function TrajectoryPage() {
                   >
                     {cities.length === 0 && (<option value=""> {loadingCities ? "Loading cities..." : "No cities available"} </option>)}
 
-                    {cities.map((item) => ( <option key={item.dataset_id} value={item.name}> {item.name} </option>))}
+                    {cities.map((item) => ( <option key={item.city_id} value={item.name}> {item.name} </option>))}
                   </select>
                 </div>
 
