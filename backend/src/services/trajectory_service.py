@@ -3,7 +3,7 @@ from datetime import date, time
 from database.database_actions import DatabaseActions
 from database.repositories.dataset_repository import DatasetRepository
 from database.repositories.trajectory_repository import TrajectoryRepository
-from models.dataset import DataSet
+from models.city import City
 from models.trajectory_segments import TrajectorySegments
 from models.uniformed_trajectories import UniformedTrajectories
 
@@ -67,7 +67,7 @@ class TrajectoryService:
             )
             raise
 
-    def get_trajectories_cities(self) -> list[DataSet]:
+    def get_trajectories_cities(self) -> list[City]:
         """Fetch the available trajectory cities from the database."""
 
         try:

@@ -7,6 +7,7 @@ CREATE TABLE uniformed_trajectories(
     points JSONB NOT NULL,
     source_id CHAR(36) NOT NULL,
 
+    FOREIGN KEY (city) REFERENCES cities (name),
     FOREIGN KEY (vehicle_type_id) REFERENCES vehicle_types(vehicle_type_id),
     FOREIGN KEY (source_id) REFERENCES source_trajectories(source_id)
 );

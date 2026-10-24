@@ -83,7 +83,7 @@ class TrajectoryRepository:
 
             query = sql.SQL("""
                             WITH z AS (SELECT time_zone
-                                       FROM datasets
+                                       FROM cities
                                        WHERE name = %(city)s)
                             SELECT t.trajectory_id,
                                    t.vehicle_id,
