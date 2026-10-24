@@ -1,6 +1,7 @@
 fastapi
 uvicorn
-mysql-connector-python
+psycopg[binary]
+psycopg_pool
 python-dotenv
 pytest
 ruff

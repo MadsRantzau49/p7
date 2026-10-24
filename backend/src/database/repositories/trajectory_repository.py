@@ -5,11 +5,11 @@ from models.bounding_box import BoundingBox
 from models.trajectory_segments import TrajectorySegments
 from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint
 from models.upload_row import VehicleType
-from mysql.connector.pooling import PooledMySQLConnection
+from psycopg import Connection
 
 
 class TrajectoryRepository:
-    def __init__(self, connection: PooledMySQLConnection):
+    def __init__(self, connection: Connection):
         self.connection = connection
 
     async def get_trajectories_from_db(

@@ -5,3 +5,4 @@ from dataclasses import dataclass
 class DataSet:
     dataset_id: int
     name: str
+    time_zone: str

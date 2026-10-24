@@ -1,6 +1,5 @@
 from datetime import date
 
-from database.connection import create_db_connection
 from database.repositories.trajectory_repository import TrajectoryRepository
 from helpers.subpath_cutting import (
     build_subpath_points,
@@ -38,25 +37,20 @@ class SubPathService:
         if box_a.intersects(box_b):
             raise ValueError("box A and box B must not overlap")
 
-        context = create_db_connection()
+        rows = self.trajectory_repository.get_candidate_segments(
+            BoundingBox(*box_a.bounds), BoundingBox(*box_b.bounds), start_date, end_date
+        )
+        segments_by_trajectory = group_by_trajectory(rows)
 
-        try:
-            rows = self.trajectory_repository.get_candidate_segments(
-                BoundingBox(*box_a.bounds), BoundingBox(*box_b.bounds), start_date, end_date
-            )
-            segments_by_trajectory = group_by_trajectory(rows)
+        pairs_by_trajectory = {}
 
-            pairs_by_trajectory = {}
+        for trajectory_id in segments_by_trajectory:
+            pairs = trajectory_subpaths(segments_by_trajectory[trajectory_id], box_a, box_b)
 
-            for trajectory_id in segments_by_trajectory:
-                pairs = trajectory_subpaths(segments_by_trajectory[trajectory_id], box_a, box_b)
+            if len(pairs) > 0:
+                pairs_by_trajectory[trajectory_id] = pairs
 
-                if len(pairs) > 0:
-                    pairs_by_trajectory[trajectory_id] = pairs
-
-            points_by_trajectory = self.trajectory_repository.get_trajectory_points(list(pairs_by_trajectory))
-        finally:
-            context.close()
+        points_by_trajectory = self.trajectory_repository.get_trajectory_points(list(pairs_by_trajectory))
 
         subpaths = []
 

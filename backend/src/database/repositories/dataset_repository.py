@@ -1,9 +1,9 @@
 from models.dataset import DataSet
-from mysql.connector.pooling import PooledMySQLConnection
-
+from psycopg import Connection, cursor
+from psycopg.rows import dict_row
 
 class DatasetRepository:
-    def __init__(self, connection: PooledMySQLConnection):
+    def __init__(self, connection: Connection):
         self.connection = connection
 
     def dataset_name_taken(self, name: str) -> bool:
@@ -24,14 +24,17 @@ class DatasetRepository:
         finally:
             cursor.close()
 
-    def create_dataset(self, name: str) -> int:
+    def create_dateset(self, name: str, time_zone: str) -> int:
         """Create a dataset and return its ID."""
         cursor = self.connection.cursor()
 
         try:
-            cursor.execute("INSERT INTO datasets (name) VALUES (%s)", (name,))
-            return cursor.lastrowid
-
+            cursor.execute(
+                "INSERT INTO datasets (name, time_zone) VALUES (%s, %s) RETURNING dataset_id",
+                (name, time_zone),
+            )
+            (dataset_id,) = cursor.fetchone()
+            return dataset_id
         except Exception as error:
             print(f"Failed to create dataset: {error}")
             raise
@@ -40,7 +43,7 @@ class DatasetRepository:
 
     def get_dataset_id(self, dataset_name: str) -> int:
         """Get the ID of a dataset by its name."""
-        cursor = self.connection.cursor(dictionary=True)
+        cursor = self.connection.cursor(row_factory=dict_row)
 
         try:
             cursor.execute("SELECT dataset_id FROM datasets WHERE name = %s", (dataset_name,))
@@ -55,7 +58,7 @@ class DatasetRepository:
 
     def get_trajectories_cities_from_db(self) -> list[DataSet]:
         """Fetch available trajectory cities from the database."""
-        cursor = self.connection.cursor(dictionary=True)
+        cursor = self.connection.cursor(row_factory=dict_row)
 
         try:
             cursor.execute("SELECT * FROM datasets ORDER BY name")

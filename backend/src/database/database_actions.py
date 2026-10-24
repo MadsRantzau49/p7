@@ -1,8 +1,8 @@
-from mysql.connector.pooling import PooledMySQLConnection
+from psycopg import Connection
 
 
 class DatabaseActions:
-    def __init__(self, connection: PooledMySQLConnection):
+    def __init__(self, connection: Connection):
         self.connection = connection
 
     def commit(self):

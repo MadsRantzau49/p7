@@ -2,11 +2,11 @@ import json
 
 from models.beijing_trajectory import BeijingTrajectory
 from models.porto_trajectory import PortoTrajectory
-from mysql.connector.pooling import PooledMySQLConnection
+from psycopg import Connection
 
 
 class ImportRepository:
-    def __init__(self, connection: PooledMySQLConnection) -> None:
+    def __init__(self, connection: Connection) -> None:
         self.connection = connection
 
     def insert_porto_trajectories(self, trajectories: list[PortoTrajectory]) -> None:
