@@ -1,6 +1,7 @@
 import io
 import json
-from datetime import datetime, timedelta
+from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 import pytest
 from helpers.trajectory_csv_parser import InvalidTrajectoryCsvError, parse_trajectory_csv
@@ -91,17 +92,17 @@ def test_convert_porto_trajectory():
     assert result.vehicle_type is VehicleType.TAXI
     assert result.city == "Porto"
     assert result.source_id == "source-1"
-    assert result.trajectory_date == datetime.fromtimestamp(timestamp)
+    assert result.trajectory_date == datetime(2013, 11, 14, 22, 13, 20, tzinfo=UTC)
 
     assert len(result.points) == 2
 
     assert result.points[0].longitude == -8.61
     assert result.points[0].latitude == 41.15
-    assert result.points[0].point_timestamp == datetime.fromtimestamp(timestamp)
+    assert result.points[0].point_timestamp == datetime(2013, 11, 14, 22, 13, 20, tzinfo=UTC)
 
     assert result.points[1].longitude == -8.62
     assert result.points[1].latitude == 41.16
-    assert result.points[1].point_timestamp == (datetime.fromtimestamp(timestamp) + timedelta(seconds=15))
+    assert result.points[1].point_timestamp == datetime(2013, 11, 14, 22, 13, 35, tzinfo=UTC)
 
 
 def test_convert_porto_trajectory_with_json_polyline():
@@ -146,23 +147,25 @@ def test_convert_beijing_trajectory():
         ],
     }
 
+    beijing_zone = ZoneInfo("Asia/Shanghai")
     result = convert_beijing_trajectory(beijing_trajectory)
 
     assert result.vehicle_id == 15
     assert result.vehicle_type is VehicleType.TAXI
     assert result.city == "Beijing"
     assert result.source_id == "source-2"
-    assert result.trajectory_date == datetime(2024, 1, 31, 10, 0)
+    assert result.trajectory_date == datetime(2024, 1, 31, 10, 0, tzinfo=beijing_zone)
+    assert result.trajectory_date == datetime(2024, 1, 31, 2, 0, tzinfo=UTC)
 
     assert len(result.points) == 2
 
     assert result.points[0].longitude == 116.30
     assert result.points[0].latitude == 39.90
-    assert result.points[0].point_timestamp == datetime(2024, 1, 31, 10, 0)
+    assert result.points[0].point_timestamp == datetime(2024, 1, 31, 10, 0, tzinfo=beijing_zone)
 
     assert result.points[1].longitude == 116.31
     assert result.points[1].latitude == 39.91
-    assert result.points[1].point_timestamp == datetime(2024, 1, 31, 10, 0, 5)
+    assert result.points[1].point_timestamp == datetime(2024, 1, 31, 10, 0, 5, tzinfo=beijing_zone)
 
 
 def test_convert_beijing_trajectory_with_json_points():

@@ -1,5 +1,7 @@
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import MagicMock
+from zoneinfo import ZoneInfo
 
 import pytest
 from psycopg import errors
@@ -35,11 +37,22 @@ def setup_service(monkeypatch, trajectories=None):
 
 def test_upload_dataset(monkeypatch):
     """Store parsed trajectories in batches and fill missing metadata."""
-    trajectories = [SimpleNamespace(city=None, source_id=None) for _ in range(service.BATCH_SIZE + 1)]
+    trajectories = [
+        SimpleNamespace(
+            city=None,
+            source_id=None,
+            trajectory_date=datetime(2024, 1, 31, 14, 5),
+            points=[SimpleNamespace(point_timestamp=datetime(2024, 1, 31, 14, 5))],
+        )
+        for _ in range(service.BATCH_SIZE + 1)
+    ]
     uploader, dataset_repository, trajectory_repository, actions = setup_service(monkeypatch, trajectories)
 
     assert uploader.upload_dataset("Aalborg 2024", "Aalborg", "Europe/Copenhagen", ["csv"]) == 7
     assert all(item.city == "Aalborg" and item.source_id for item in trajectories)
+    copenhagen_zone = ZoneInfo("Europe/Copenhagen")
+    assert trajectories[0].trajectory_date == datetime(2024, 1, 31, 14, 5, tzinfo=copenhagen_zone)
+    assert trajectories[0].trajectory_date == datetime(2024, 1, 31, 13, 5, tzinfo=UTC)
     assert trajectory_repository.create_source_trajectories.call_count == 2
     assert trajectory_repository.insert_data_uniformed_trajectories.call_count == 2
     actions.commit.assert_called_once()

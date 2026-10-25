@@ -1,5 +1,6 @@
 import uuid
 from collections.abc import Iterable
+from zoneinfo import ZoneInfo
 
 from database.database_actions import DatabaseActions
 from database.repositories.dataset_repository import DatasetRepository
@@ -62,8 +63,13 @@ class UploadDataset:
 
         trajectories = parse_trajectory_csv(lines)
 
+        zone = ZoneInfo(time_zone)
+
         for trajectory in trajectories:
             trajectory.city = city_name
+            trajectory.trajectory_date = trajectory.trajectory_date.replace(tzinfo=zone)
+            for point in trajectory.points:
+                point.point_timestamp = point.point_timestamp.replace(tzinfo=zone)
             if trajectory.source_id is None:
                 trajectory.source_id = str(uuid.uuid4())
 

@@ -193,8 +193,8 @@ def test_uniformed_insert_error_is_raised_and_cursor_closed():
     trajectory = UniformedTrajectories(
         1,
         VehicleType.CAR,
-        datetime.now(),
-        [UniformedTrajectoryPoint(1, datetime.now(), 2)],
+        datetime.now(UTC),
+        [UniformedTrajectoryPoint(1, datetime.now(UTC), 2)],
     )
 
     with pytest.raises(RuntimeError):

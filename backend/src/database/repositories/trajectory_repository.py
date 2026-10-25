@@ -1,6 +1,7 @@
 from datetime import date, datetime, time, timedelta
 from typing import Any
 
+from helpers.time_helper import to_utc_iso
 from models.bounding_box import BoundingBox
 from models.trajectory_segments import TrajectorySegments
 from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint
@@ -198,7 +199,7 @@ class TrajectoryRepository:
                         {
                             "longitude": point.longitude,
                             "latitude": point.latitude,
-                            "point_timestamp": point.point_timestamp.isoformat(),
+                            "point_timestamp": to_utc_iso(point.point_timestamp),
                         }
                     )
 
@@ -240,7 +241,7 @@ class TrajectoryRepository:
                         {
                             "longitude": point.longitude,
                             "latitude": point.latitude,
-                            "point_timestamp": point.point_timestamp.isoformat(),
+                            "point_timestamp": to_utc_iso(point.point_timestamp),
                         }
                     )
 
