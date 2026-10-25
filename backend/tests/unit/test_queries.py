@@ -2,6 +2,7 @@ import asyncio
 import uuid
 from datetime import UTC, datetime, time, timedelta
 from unittest.mock import MagicMock
+from zoneinfo import ZoneInfo
 
 import pytest
 from database.connection import create_db_connection
@@ -139,7 +140,10 @@ def test_queries_against_configured_database():
             )
             assert len(result) == 1
             assert isinstance(result[0], UniformedTrajectories)
+            assert result[0].trajectory_date == now
+            assert result[0].trajectory_date.tzinfo == ZoneInfo("Europe/Lisbon")
             assert isinstance(result[0].points[0], UniformedTrajectoryPoint)
+            assert result[0].points[0].point_timestamp.tzinfo == ZoneInfo("Europe/Lisbon")
 
             assert isinstance(
                 asyncio.run(

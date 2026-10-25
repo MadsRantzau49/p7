@@ -1,5 +1,6 @@
 from datetime import date, datetime, time, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from helpers.time_helper import to_utc_iso
 from models.bounding_box import BoundingBox
@@ -92,7 +93,8 @@ class TrajectoryRepository:
                                    t.trajectory_date,
                                    t.city,
                                    t.points,
-                                   t.source_id
+                                   t.source_id,
+                                   z.time_zone
                             FROM uniformed_trajectories AS t
                                      CROSS JOIN z
                                      CROSS JOIN LATERAL (
@@ -108,25 +110,31 @@ class TrajectoryRepository:
                             """).format(conditions=sql.SQL(" AND ").join(conditions))
 
             cursor.execute(query, values)
+            rows = cursor.fetchall()
+
+            if not rows:
+                return []
+
+            zone = ZoneInfo(rows[0]["time_zone"])
 
             return [
                 UniformedTrajectories(
                     trajectory_id=trajectory["trajectory_id"],
                     vehicle_id=trajectory["vehicle_id"],
                     vehicle_type=VehicleType(trajectory["vehicle_type"]),
-                    trajectory_date=trajectory["trajectory_date"],
+                    trajectory_date=trajectory["trajectory_date"].astimezone(zone),
                     city=trajectory["city"],
                     points=[
                         UniformedTrajectoryPoint(
                             longitude=point["longitude"],
                             latitude=point["latitude"],
-                            point_timestamp=datetime.fromisoformat(point["point_timestamp"]),
+                            point_timestamp=datetime.fromisoformat(point["point_timestamp"]).astimezone(zone),
                         )
                         for point in trajectory["points"]
                     ],
                     source_id=trajectory["source_id"],
                 )
-                for trajectory in cursor.fetchall()
+                for trajectory in rows
             ]
 
         except Exception as error:

@@ -51,12 +51,25 @@ def test_upload_dataset(monkeypatch):
     assert uploader.upload_dataset("Aalborg 2024", "Aalborg", "Europe/Copenhagen", ["csv"]) == 7
     assert all(item.city == "Aalborg" and item.source_id for item in trajectories)
     copenhagen_zone = ZoneInfo("Europe/Copenhagen")
+    dataset_repository.get_or_create_city.assert_called_once_with("Aalborg", "Europe/Copenhagen")
+    dataset_repository.create_dataset.assert_called_once_with("Aalborg 2024", 3)
     assert trajectories[0].trajectory_date == datetime(2024, 1, 31, 14, 5, tzinfo=copenhagen_zone)
-    assert trajectories[0].trajectory_date == datetime(2024, 1, 31, 13, 5, tzinfo=UTC)
+    assert trajectories[0].points[0].point_timestamp == datetime(2024, 1, 31, 13, 5, tzinfo=UTC)
     assert trajectory_repository.create_source_trajectories.call_count == 2
     assert trajectory_repository.insert_data_uniformed_trajectories.call_count == 2
     actions.commit.assert_called_once()
     actions.rollback.assert_not_called()
+
+
+def test_upload_dataset_unknown_time_zone(monkeypatch):
+    """Reject a time zone PostgreSQL does not know, before anything is written."""
+    uploader, dataset_repository, _, actions = setup_service(monkeypatch)
+
+    with pytest.raises(service.InvalidTimeZoneError):
+        uploader.upload_dataset("Aalborg 2024", "Aalborg", "Asia/Calcutta", [])
+
+    dataset_repository.get_or_create_city.assert_not_called()
+    actions.commit.assert_not_called()
 
 
 def test_upload_dataset_taken(monkeypatch):

@@ -92,17 +92,17 @@ def test_convert_porto_trajectory():
     assert result.vehicle_type is VehicleType.TAXI
     assert result.city == "Porto"
     assert result.source_id == "source-1"
-    assert result.trajectory_date == datetime(2013, 11, 14, 22, 13, 20, tzinfo=UTC)
+    assert result.trajectory_date == datetime(2023, 11, 14, 22, 13, 20, tzinfo=UTC)
 
     assert len(result.points) == 2
 
     assert result.points[0].longitude == -8.61
     assert result.points[0].latitude == 41.15
-    assert result.points[0].point_timestamp == datetime(2013, 11, 14, 22, 13, 20, tzinfo=UTC)
+    assert result.points[0].point_timestamp == datetime(2023, 11, 14, 22, 13, 20, tzinfo=UTC)
 
     assert result.points[1].longitude == -8.62
     assert result.points[1].latitude == 41.16
-    assert result.points[1].point_timestamp == datetime(2013, 11, 14, 22, 13, 35, tzinfo=UTC)
+    assert result.points[1].point_timestamp == datetime(2023, 11, 14, 22, 13, 35, tzinfo=UTC)
 
 
 def test_convert_porto_trajectory_with_json_polyline():
