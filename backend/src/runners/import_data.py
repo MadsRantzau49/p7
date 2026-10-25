@@ -3,8 +3,6 @@ import sys
 from contextlib import contextmanager
 from pathlib import Path
 
-from models.city import City
-
 sys.path.append(str(Path(__file__).parent.parent))
 
 from dependencies import (
