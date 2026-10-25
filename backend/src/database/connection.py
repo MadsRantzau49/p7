@@ -1,3 +1,4 @@
+import atexit
 import os
 from contextlib import AbstractContextManager
 
@@ -24,6 +25,8 @@ database_pool = ConnectionPool(
     max_size=5,
     open=True,
 )
+
+atexit.register(database_pool.close)
 
 
 def create_db_connection() -> AbstractContextManager[Connection]:
