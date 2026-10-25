@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from datetime import datetime, time, timedelta
+from datetime import UTC, datetime, time, timedelta
 from unittest.mock import MagicMock
 
 import pytest
@@ -49,7 +49,15 @@ def _call_dataset_name_taken(context):
 
 
 def _call_create_dataset(context):
-    return DatasetRepository(context).create_dataset("x")
+    return DatasetRepository(context).create_dataset("x", 1)
+
+
+def _call_get_or_create_city(context):
+    return DatasetRepository(context).get_or_create_city("x", "Europe/Lisbon")
+
+
+def _call_get_time_zones(context):
+    return DatasetRepository(context).get_time_zones()
 
 
 def _call_get_trajectories_cities_from_db(context):
@@ -61,83 +69,86 @@ def _call_get_vehicle_type_ids(context):
 
 
 def test_queries_against_configured_database():
-    """Run every query against the database configured by .env."""
-    context = create_db_connection()
-    dataset_repository = DatasetRepository(context)
-    trajectory_repository = TrajectoryRepository(context)
-    import_repository = ImportRepository(context)
-
+    """Run every query against the configured database, then undo all changes"""
     name = f"pytest-{uuid.uuid4()}"
     source_ids = [str(uuid.uuid4()) for _ in range(3)]
-    now = datetime.now().replace(microsecond=0)
+    now = datetime.now(UTC).replace(microsecond=0)
 
-    try:
-        assert {"CAR", "TAXI", "UNKNOWN"} <= trajectory_repository.get_vehicle_type_ids().keys()
-        assert isinstance(dataset_repository.get_trajectories_cities_from_db(), list)
-        assert not dataset_repository.dataset_name_taken(name)
+    with create_db_connection() as connection:
+        dataset_repository = DatasetRepository(connection)
+        trajectory_repository = TrajectoryRepository(connection)
+        import_repository = ImportRepository(connection)
 
-        dataset_id = dataset_repository.create_dataset(name)
-        assert dataset_repository.get_dataset_id(name) == dataset_id
-        assert dataset_repository.dataset_name_taken(name)
+        try:
+            assert {"CAR", "TAXI", "UNKNOWN"} <= trajectory_repository.get_vehicle_type_ids().keys()
+            assert "Europe/Lisbon" in dataset_repository.get_time_zones()
+            assert not dataset_repository.dataset_name_taken(name)
 
-        trajectory_repository.create_source_trajectories(dataset_id, source_ids)
+            city = dataset_repository.get_or_create_city(name, "Europe/Lisbon")
+            assert dataset_repository.get_or_create_city(name, "Europe/Copenhagen") == city
+            assert city in dataset_repository.get_trajectories_cities_from_db()
 
-        import_repository.insert_porto_trajectories(
-            [PortoTrajectory(1, None, None, None, 1, 1, None, False, [[1.0, 2.0]], source_ids[0])]
-        )
-        import_repository.insert_beijing_dataset(
-            [BeijingTrajectory(1, [TrajectoryPoint(str(now), "1", "2")], source_ids[1])]
-        )
-        trajectory_repository.insert_data_uniformed_trajectories(
-            [
-                UniformedTrajectories(
+            dataset_id = dataset_repository.create_dataset(name, city.city_id)
+            assert dataset_repository.get_dataset_id(name) == dataset_id
+            assert dataset_repository.dataset_name_taken(name)
+
+            trajectory_repository.create_source_trajectories(dataset_id, source_ids)
+
+            import_repository.insert_porto_trajectories(
+                [PortoTrajectory(1, None, None, None, 1, 1, None, False, [[1.0, 2.0]], source_ids[0])]
+            )
+            import_repository.insert_beijing_dataset(
+                [BeijingTrajectory(1, [TrajectoryPoint(str(now), "1", "2")], source_ids[1])]
+            )
+            trajectory_repository.insert_data_uniformed_trajectories(
+                [
+                    UniformedTrajectories(
+                        1,
+                        VehicleType.CAR,
+                        now,
+                        [UniformedTrajectoryPoint(1, now, 2)],
+                        city=name,
+                        source_id=source_ids[2],
+                    )
+                ]
+            )
+
+            assert isinstance(import_repository.retrieve_porto_dataset_batch(1, None), list)
+            assert isinstance(import_repository.retrieve_porto_dataset_batch(1, ""), list)
+            assert isinstance(import_repository.retrieve_beijing_data_batch(1, None), list)
+            assert isinstance(import_repository.retrieve_beijing_data_batch(1, ""), list)
+
+            assert (
+                len(
+                    asyncio.run(
+                        trajectory_repository.get_trajectories_from_db(name, None, None, None, None, None)
+                    )
+                )
+                == 1
+            )
+
+            result = asyncio.run(
+                trajectory_repository.get_trajectories_from_db(
+                    name,
+                    (now - timedelta(days=1)).date(),
+                    (now + timedelta(days=1)).date(),
+                    time.min,
+                    time.max,
                     1,
-                    VehicleType.CAR,
-                    now,
-                    [UniformedTrajectoryPoint(1, now, 2)],
-                    city=name,
-                    source_id=source_ids[2],
                 )
-            ]
-        )
+            )
+            assert len(result) == 1
+            assert isinstance(result[0], UniformedTrajectories)
+            assert isinstance(result[0].points[0], UniformedTrajectoryPoint)
 
-        assert isinstance(import_repository.retrieve_porto_dataset_batch(1, None), list)
-        assert isinstance(import_repository.retrieve_porto_dataset_batch(1, ""), list)
-        assert isinstance(import_repository.retrieve_beijing_data_batch(1, None), list)
-        assert isinstance(import_repository.retrieve_beijing_data_batch(1, ""), list)
-
-        assert (
-            len(
+            assert isinstance(
                 asyncio.run(
-                    trajectory_repository.get_trajectories_from_db(name, None, None, None, None, None)
-                )
+                    trajectory_repository.get_trajectories_from_db(name, None, None, time(23), time(2), None)
+                ),
+                list,
             )
-            == 1
-        )
-
-        result = asyncio.run(
-            trajectory_repository.get_trajectories_from_db(
-                name,
-                (now - timedelta(days=1)).date(),
-                (now + timedelta(days=1)).date(),
-                time.min,
-                time.max,
-                1,
-            )
-        )
-        assert len(result) == 1
-        assert isinstance(result[0], UniformedTrajectories)
-        assert isinstance(result[0].points[0], UniformedTrajectoryPoint)
-
-        assert isinstance(
-            asyncio.run(
-                trajectory_repository.get_trajectories_from_db(name, None, None, time(23), time(2), None)
-            ),
-            list,
-        )
-    finally:
-        context.rollback()
-        context.close()
+        finally:
+            connection.rollback()
 
 
 @pytest.mark.parametrize(
@@ -152,6 +163,8 @@ def test_queries_against_configured_database():
         _call_get_trajectories_from_db,
         _call_dataset_name_taken,
         _call_create_dataset,
+        _call_get_or_create_city,
+        _call_get_time_zones,
         _call_get_trajectories_cities_from_db,
         _call_get_vehicle_type_ids,
     ],
