@@ -9,7 +9,7 @@ from fastapi import Depends
 from psycopg import Connection
 from services.cleaning_service import CleanService
 from services.dataset_upload_service import UploadDataset
-from services.subpath_service import SubPathService
+from services.subtrajectory_service import SubtrajectoryService
 from services.trajectory_service import TrajectoryService
 
 
@@ -78,10 +78,10 @@ def get_cleaning_service(
     )
 
 
-def get_subpath_service(
+def get_subtrajectory_service(
     trajectory_repository: Annotated[TrajectoryRepository, Depends(get_trajectory_repository)],
-) -> SubPathService:
-    """Provides a subpath service and closes the connection afterward"""
-    return SubPathService(
+) -> SubtrajectoryService:
+    """Provides a subtrajectory service and closes the connection afterward"""
+    return SubtrajectoryService(
         trajectory_repository=trajectory_repository,
     )

@@ -1,27 +1,27 @@
 import { useState } from "react";
-import type { Subpath } from "../models/subpath";
+import type { Subtrajectory } from "../models/subtrajectory";
 
 interface Props {
-  subpaths: Subpath[];
+  subtrajectories: Subtrajectory[];
   selectedId: number | null;
   showPoints: boolean;
   onSelect: (id: number | null) => void;
   onTogglePoints: () => void;
 }
 
-export default function SubpathResults({ subpaths, selectedId, showPoints, onSelect, onTogglePoints }: Props) {
+export default function SubtrajectoryResults({ subtrajectories, selectedId, showPoints, onSelect, onTogglePoints }: Props) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <section className="trajectory-bottom-bar" aria-label="Retrieved subpaths">
+    <section className="trajectory-bottom-bar" aria-label="Retrieved subtrajectories">
       <div className="trajectory-toolbar">
         <button
           type="button"
           className="trajectory-list-toggle"
           onClick={() => setExpanded((previous) => !previous)}
           aria-expanded={expanded}
-          aria-controls="loaded-subpaths"
+          aria-controls="loaded-subtrajectories"
         >
-          {expanded ? "Hide trajectories" : "Show trajectories"} ({subpaths.length})
+          {expanded ? "Hide trajectories" : "Show trajectories"} ({subtrajectories.length})
         </button>
         {selectedId !== null && (
           <>
@@ -34,13 +34,13 @@ export default function SubpathResults({ subpaths, selectedId, showPoints, onSel
           </>
         )}
       </div>
-      <div id="loaded-subpaths" className="trajectory-list-panel" hidden={!expanded}>
-        {subpaths.length === 0 ? <p>No subpaths loaded yet.</p> : (
+      <div id="loaded-subtrajectories" className="trajectory-list-panel" hidden={!expanded}>
+        {subtrajectories.length === 0 ? <p>No subtrajectories loaded yet.</p> : (
           <table className="trajectory-table">
-            <caption className="trajectory-table-caption">Select a subpath to show it individually on the map.</caption>
+            <caption className="trajectory-table-caption">Select a subtrajectory to show it individually on the map.</caption>
             <thead>
               <tr>
-                <th scope="col">Subpath ID</th>
+                <th scope="col">Subtrajectory ID</th>
                 <th scope="col">Trajectory ID</th>
                 <th scope="col">Exit A</th>
                 <th scope="col">Entry B</th>
@@ -48,27 +48,27 @@ export default function SubpathResults({ subpaths, selectedId, showPoints, onSel
               </tr>
             </thead>
             <tbody>
-              {subpaths.map((subpath) => (
+              {subtrajectories.map((subtrajectory) => (
                 <tr
-                  key={subpath.subpath_id}
-                  className={selectedId === subpath.subpath_id ? "trajectory-row-selected" : ""}
-                  onClick={() => onSelect(subpath.subpath_id)}
+                  key={subtrajectory.subtrajectory_id}
+                  className={selectedId === subtrajectory.subtrajectory_id ? "trajectory-row-selected" : ""}
+                  onClick={() => onSelect(subtrajectory.subtrajectory_id)}
                 >
                   <td>
                     <button
                       type="button"
                       className="trajectory-select-button"
-                      aria-pressed={selectedId === subpath.subpath_id}
+                      aria-pressed={selectedId === subtrajectory.subtrajectory_id}
                       onClick={(event) => {
                         event.stopPropagation();
-                        onSelect(subpath.subpath_id);
+                        onSelect(subtrajectory.subtrajectory_id);
                       }}
-                    >{subpath.subpath_id}</button>
+                    >{subtrajectory.subtrajectory_id}</button>
                   </td>
-                  <td>{subpath.trajectory_id}</td>
-                  <td>{subpath.exit_a_time}</td>
-                  <td>{subpath.entry_b_time}</td>
-                  <td>{subpath.points.length}</td>
+                  <td>{subtrajectory.trajectory_id}</td>
+                  <td>{subtrajectory.exit_a_time}</td>
+                  <td>{subtrajectory.entry_b_time}</td>
+                  <td>{subtrajectory.points.length}</td>
                 </tr>
               ))}
             </tbody>

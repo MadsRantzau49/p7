@@ -1,10 +1,9 @@
-from datetime import date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
 from helpers.time_helper import to_utc_iso
 from models.bounding_box import BoundingBox
-from models.trajectory_segments import TrajectorySegments
 from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint
 from models.upload_row import VehicleType
 from psycopg import Connection, sql
@@ -223,7 +222,7 @@ class TrajectoryRepository:
                 )
 
             cursor.executemany(
-                 """
+                """
                 WITH cleaned AS (
                     INSERT INTO cleaned_uniformed_trajectories
                         (vehicle_id, vehicle_type_id, trajectory_date, city, points, source_id)
@@ -307,42 +306,6 @@ class TrajectoryRepository:
         finally:
             cursor.close()
 
-    def insert_segments_into_db(self, segments: list[TrajectorySegments]) -> None:
-        """Inserts segments into tabel in database"""
-        cursor = self.connection.cursor()
-
-        try:
-            rows = []
-
-            for t_segment in segments:
-                rows.append(
-                    (
-                        t_segment.trajectory_id,
-                        t_segment.segment_index,
-                        t_segment.path,
-                        t_segment.start_time,
-                        t_segment.end_time,
-                    )
-                )
-
-            cursor.executemany(
-                """
-            INSERT IGNORE INTO trajectory_segments (
-                trajectory_id,
-                segment_index,
-                path,
-                start_time,
-                end_time)
-                VALUES (%s, %s, ST_GeomFromText(%s, 4326, 'axis-order=long-lat'), %s, %s)
-                """,
-                rows,
-            )
-        except Exception as error:
-            print(f"Failed to insert segments into database: {error}")
-            raise
-        finally:
-            cursor.close()
-
     async def retrieve_cleaned_uniformed_batch(
         self, batch_size: int, last_trajectory_id: int | None
     ) -> list[dict[str, Any]]:
@@ -379,112 +342,87 @@ class TrajectoryRepository:
         finally:
             cursor.close()
 
-    def get_candidate_segments(
-        self,
-        box_a: BoundingBox,
-        box_b: BoundingBox,
-        start_date: date,
-        end_date: date,
+    def get_subtrajectories(
+        self, box_a: BoundingBox, box_b: BoundingBox, start_date: date, end_date: date
     ) -> list[dict[str, Any]]:
-        """Fetch the segments near box A or box B, for trips that come near both, in the date range."""
+        """Fetch every part of a trip that leaves box A and then enters box B, leaving A in the date range."""
         cursor = self.connection.cursor(row_factory=dict_row)
 
         try:
-            day_after_end = end_date + timedelta(days=1)
+            area_a = sql.SQL(
+                "ST_MakeEnvelope(%(a_min_lon)s, %(a_min_lat)s, %(a_max_lon)s, %(a_max_lat)s, 4326)"
+            )
+            area_b = sql.SQL(
+                "ST_MakeEnvelope(%(b_min_lon)s, %(b_min_lat)s, %(b_max_lon)s, %(b_max_lat)s, 4326)"
+            )
 
-            sql = """
-                WITH hits AS (
-                    SELECT trajectory_id, segment_index,
-                        (min_longitude <= %(a_max_longitude)s AND max_longitude >= %(a_min_longitude)s
-                            AND min_latitude <= %(a_max_latitude)s AND max_latitude >= %(a_min_latitude)s)
-                            AS in_a,
-                        (min_longitude <= %(b_max_longitude)s AND max_longitude >= %(b_min_longitude)s
-                            AND min_latitude <= %(b_max_latitude)s AND max_latitude >= %(b_min_latitude)s)
-                            AS in_b
-                    FROM trajectory_segments FORCE INDEX (idx_segment_time_bounds)
-                    WHERE start_time >= %(start_date)s
-                    AND start_time < %(day_after_end)s
-                    AND ((min_longitude <= %(a_max_longitude)s AND max_longitude >= %(a_min_longitude)s
-                            AND min_latitude <= %(a_max_latitude)s AND max_latitude >= %(a_min_latitude)s)
-                        OR (min_longitude <= %(b_max_longitude)s AND max_longitude >= %(b_min_longitude)s
-                            AND min_latitude <= %(b_max_latitude)s AND max_latitude >= %(b_min_latitude)s))
-                ),
-                both_boxes AS (
-                    SELECT trajectory_id
-                    FROM hits
-                    GROUP BY trajectory_id
-                    HAVING MAX(in_a) = 1 AND MAX(in_b) = 1
-                )
-                SELECT s.trajectory_id, s.segment_index, s.start_time, s.end_time,
-                    ST_Longitude(ST_StartPoint(s.path)) AS start_longitude,
-                    ST_Latitude(ST_StartPoint(s.path))  AS start_latitude,
-                    ST_Longitude(ST_EndPoint(s.path))   AS end_longitude,
-                    ST_Latitude(ST_EndPoint(s.path))    AS end_latitude
-                FROM hits h
-                JOIN both_boxes b ON b.trajectory_id = h.trajectory_id
-                JOIN trajectory_segments s
-                ON s.trajectory_id = h.trajectory_id
-                AND s.segment_index = h.segment_index
-                ORDER BY s.trajectory_id, s.segment_index
-            """
+            query = sql.SQL("""
+            WITH candidates AS (
+                SELECT trips.trajectory_id, trips.trip, cleaned.points, cities.time_zone
+                FROM trips
+                JOIN cleaned_uniformed_trajectories AS cleaned USING (trajectory_id)
+                JOIN cities ON cities.name = cleaned.city
+                WHERE trips.trip && stbox({area_a}, span(%(search_start)s, %(search_end)s))
+                  AND trips.trip && stbox({area_b}, span(%(search_start)s, %(search_end)s))
+                  AND eIntersects(trips.trip, {area_a})
+                  AND eIntersects(trips.trip, {area_b})
+            ),
+            crossings AS (
+                SELECT c.trajectory_id, upper(inside) AS at, 'exit_a' AS kind
+                FROM candidates AS c, unnest(spans(getTime(atGeometry(c.trip, {area_a})))) AS inside
+                WHERE upper(inside) < endTimestamp(c.trip)
+                UNION ALL
+                SELECT c.trajectory_id, lower(inside) AS at, 'entry_b' AS kind
+                FROM candidates AS c, unnest(spans(getTime(atGeometry(c.trip, {area_b})))) AS inside
+                WHERE lower(inside) > startTimestamp(c.trip)
+            ),
+            timeline AS (
+                SELECT trajectory_id, at, kind,
+                    LEAD(at) OVER (PARTITION BY trajectory_id ORDER BY at) AS next_at,
+                    LEAD(kind) OVER (PARTITION BY trajectory_id ORDER BY at) AS next_kind
+                FROM crossings
+            )
+            SELECT timeline.trajectory_id,
+                   timeline.at AS exit_a_time,
+                   timeline.next_at AS entry_b_time,
+                   ST_X(valueAtTimestamp(c.trip, timeline.at)) AS exit_a_longitude,
+                   ST_Y(valueAtTimestamp(c.trip, timeline.at)) AS exit_a_latitude,
+                   ST_X(valueAtTimestamp(c.trip, timeline.next_at)) AS entry_b_longitude,
+                   ST_Y(valueAtTimestamp(c.trip, timeline.next_at)) AS entry_b_latitude,
+                   (SELECT COALESCE(jsonb_agg(e.point ORDER BY e.n), '[]'::jsonb)
+                    FROM jsonb_array_elements(c.points) WITH ORDINALITY AS e(point, n)
+                    WHERE (e.point ->> 'point_timestamp')::timestamptz > timeline.at
+                       AND (e.point ->> 'point_timestamp')::timestamptz < timeline.next_at
+                   ) AS points_between,
+                   c.time_zone
+            FROM timeline
+            JOIN candidates AS c USING (trajectory_id)
+            WHERE timeline.kind = 'exit_a' AND timeline.next_kind = 'entry_b'
+                AND timeline.at >= (%(start_date)s::timestamp AT TIME ZONE c.time_zone)
+                AND timeline.at < (%(day_after_end)s::timestamp AT TIME ZONE c.time_zone)
+            ORDER BY timeline.trajectory_id, timeline.at
+            """).format(area_a=area_a, area_b=area_b)
 
             values = {
+                "a_min_lon": box_a.min_longitude,
+                "a_min_lat": box_a.min_latitude,
+                "a_max_lon": box_a.max_longitude,
+                "a_max_lat": box_a.max_latitude,
+                "b_min_lon": box_b.min_longitude,
+                "b_min_lat": box_b.min_latitude,
+                "b_max_lon": box_b.max_longitude,
+                "b_max_lat": box_b.max_latitude,
+                "search_start": datetime.combine(start_date - timedelta(days=1), time.min, UTC),
+                "search_end": datetime.combine(end_date + timedelta(days=2), time.min, UTC),
                 "start_date": start_date,
-                "day_after_end": day_after_end,
-                "a_min_longitude": box_a.min_longitude,
-                "a_min_latitude": box_a.min_latitude,
-                "a_max_longitude": box_a.max_longitude,
-                "a_max_latitude": box_a.max_latitude,
-                "b_min_longitude": box_b.min_longitude,
-                "b_min_latitude": box_b.min_latitude,
-                "b_max_longitude": box_b.max_longitude,
-                "b_max_latitude": box_b.max_latitude,
+                "day_after_end": end_date + timedelta(days=1),
             }
 
-            cursor.execute(sql, values)
+            cursor.execute(query, values)
 
             return cursor.fetchall()
         except Exception as error:
-            print(f"Failed to get candidate segments: {error}")
-            raise
-        finally:
-            cursor.close()
-
-    def get_trajectory_points(self, trajectory_ids: list[int]) -> dict[int, list[UniformedTrajectoryPoint]]:
-        """Fetch all points of the given trips, as one list per trip"""
-        if len(trajectory_ids) == 0:
-            return {}
-
-        cursor = self.connection.cursor(row_factory=dict_row)
-
-        try:
-            sql = """
-                SELECT trajectory_id, points
-                FROM cleaned_uniformed_trajectories
-                WHERE trajectory_id = ANY(%s)
-            """
-
-            cursor.execute(sql, (trajectory_ids,))
-
-            points_by_trip: dict[int, list[UniformedTrajectoryPoint]] = {}
-
-            for row in cursor.fetchall():
-                points = []
-
-                for point in row["points"]:
-                    points.append(
-                        UniformedTrajectoryPoint(
-                            longitude=point["longitude"],
-                            latitude=point["latitude"],
-                            point_timestamp=datetime.fromisoformat(point["point_timestamp"]),
-                        )
-                    )
-
-                points_by_trip[row["trajectory_id"]] = points
-
-            return points_by_trip
-        except Exception as error:
-            print(f"Failed to get trip points: {error}")
+            print(f"Failed to get subtrajectories: {error}")
             raise
         finally:
             cursor.close()

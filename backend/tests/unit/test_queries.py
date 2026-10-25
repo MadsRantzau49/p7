@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from datetime import UTC, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from unittest.mock import MagicMock
 from zoneinfo import ZoneInfo
 
@@ -10,6 +10,7 @@ from database.repositories.dataset_repository import DatasetRepository
 from database.repositories.import_repository import ImportRepository
 from database.repositories.trajectory_repository import TrajectoryRepository
 from models.beijing_trajectory import BeijingTrajectory, TrajectoryPoint
+from models.bounding_box import BoundingBox
 from models.porto_trajectory import PortoTrajectory
 from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint
 from models.upload_row import VehicleType
@@ -123,7 +124,7 @@ def test_queries_against_configured_database():
                         now,
                         [UniformedTrajectoryPoint(1, now, 2), UniformedTrajectoryPoint(1.5, later, 2.5)],
                         city=name,
-                        source_id=source_ids[2]
+                        source_id=source_ids[2],
                     )
                 ]
             )
@@ -172,6 +173,54 @@ def test_queries_against_configured_database():
                 ),
                 list,
             )
+        finally:
+            connection.rollback()
+
+
+def test_get_subtrajectories_against_configured_database():
+    """Cut a straight trip between two boxes at the expected time and places, then undo all changes."""
+    name = f"pytest-{uuid.uuid4()}"
+    source_id = str(uuid.uuid4())
+    start = datetime(2013, 7, 1, 8, 10, tzinfo=UTC)
+
+    points = [
+        UniformedTrajectoryPoint(-8.62 + 0.01 * minute, start + timedelta(minutes=minute), 41.15)
+        for minute in range(4)
+    ]
+    box_a = BoundingBox(-8.616, 41.14, -8.612, 41.16)
+    box_b = BoundingBox(-8.598, 41.14, -8.594, 41.16)
+
+    with create_db_connection() as connection:
+        dataset_repository = DatasetRepository(connection)
+        trajectory_repository = TrajectoryRepository(connection)
+
+        try:
+            city = dataset_repository.get_or_create_city(name, "Europe/Lisbon")
+            dataset_id = dataset_repository.create_dataset(name, city.city_id)
+            trajectory_repository.create_source_trajectories(dataset_id, [source_id])
+            trajectory_repository.insert_cleaned_uniformed_trajectories(
+                [UniformedTrajectories(1, VehicleType.TAXI, start, points, city=name, source_id=source_id)]
+            )
+            row = connection.execute(
+                "SELECT trajectory_id FROM cleaned_uniformed_trajectories WHERE source_id = %s", (source_id,)
+            ).fetchone()
+            assert row is not None
+            (trajectory_id,) = row
+
+            def subtrajectories(start_date, end_date):
+                rows = trajectory_repository.get_subtrajectories(box_a, box_b, start_date, end_date)
+                return [found for found in rows if found["trajectory_id"] == trajectory_id]
+
+            [found] = subtrajectories(date(2013, 7, 1), date(2013, 7, 1))
+
+            assert abs(found["exit_a_time"] - (start + timedelta(seconds=48))) < timedelta(milliseconds=1)
+            assert abs(found["entry_b_time"] - (start + timedelta(seconds=132))) < timedelta(milliseconds=1)
+            assert found["exit_a_longitude"] == pytest.approx(-8.612)
+            assert found["entry_b_longitude"] == pytest.approx(-8.598)
+            assert [point["longitude"] for point in found["points_between"]] == pytest.approx([-8.61, -8.60])
+            assert found["time_zone"] == "Europe/Lisbon"
+
+            assert subtrajectories(date(2013, 6, 30), date(2013, 6, 30)) == []
         finally:
             connection.rollback()
 
