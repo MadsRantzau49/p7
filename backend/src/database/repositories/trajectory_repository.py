@@ -223,9 +223,24 @@ class TrajectoryRepository:
                 )
 
             cursor.executemany(
-                "INSERT INTO cleaned_uniformed_trajectories "
-                "(vehicle_id, vehicle_type_id, trajectory_date, city, points, source_id) "
-                "VALUES (%s, %s, %s, %s, %s, %s)",
+                 """
+                WITH cleaned AS (
+                    INSERT INTO cleaned_uniformed_trajectories
+                        (vehicle_id, vehicle_type_id, trajectory_date, city, points, source_id)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    RETURNING trajectory_id, points
+                )
+                INSERT INTO trips (trajectory_id, trip)
+                SELECT cleaned.trajectory_id,
+                       (SELECT tgeompointSeq(array_agg(
+                                   tgeompoint(
+                                       ST_SetSRID(ST_MakePoint((e.point ->> 'longitude')::float8,
+                                                               (e.point ->> 'latitude')::float8), 4326),
+                                       (e.point ->> 'point_timestamp')::timestamptz)
+                                   ORDER BY e.n))
+                        FROM jsonb_array_elements(cleaned.points) WITH ORDINALITY AS e(point, n))
+                FROM cleaned
+                """,
                 values,
             )
         except Exception as error:

@@ -114,6 +114,27 @@ def test_queries_against_configured_database():
                 ]
             )
 
+            later = now + timedelta(seconds=15)
+            trajectory_repository.insert_cleaned_uniformed_trajectories(
+                [
+                    UniformedTrajectories(
+                        1,
+                        VehicleType.CAR,
+                        now,
+                        [UniformedTrajectoryPoint(1, now, 2), UniformedTrajectoryPoint(1.5, later, 2.5)],
+                        city=name,
+                        source_id=source_ids[2]
+                    )
+                ]
+            )
+            trip = connection.execute(
+                "SELECT numInstants(trips.trip), startTimestamp(trips.trip) FROM trips "
+                "JOIN cleaned_uniformed_trajectories AS cleaned USING (trajectory_id) "
+                "WHERE cleaned.source_id = %s",
+                (source_ids[2],),
+            ).fetchone()
+            assert trip == (2, now)
+
             assert isinstance(import_repository.retrieve_porto_dataset_batch(1, None), list)
             assert isinstance(import_repository.retrieve_porto_dataset_batch(1, ""), list)
             assert isinstance(import_repository.retrieve_beijing_data_batch(1, None), list)
