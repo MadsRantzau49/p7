@@ -5,6 +5,8 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent.parent))
 
+from itertools import batched
+
 from database.database_actions import DatabaseActions
 from database.repositories.dataset_repository import DatasetRepository
 from database.repositories.import_repository import ImportRepository
@@ -43,13 +45,9 @@ class TrajectoryImportService:
             if porto_path is None:
                 raise ValueError("Path for Porto dataset is None!")
 
-            trajectories = parse_porto_trajectories(porto_path)
-
-            total = len(trajectories)
-
-            for start in range(0, total, batch_size):
+            for batch_tuple in batched(parse_porto_trajectories(porto_path), batch_size):
                 print("Batch started")
-                batch = trajectories[start : start + batch_size]
+                batch = list(batch_tuple)
 
                 # Generate source IDs ourselves
                 for trajectory in batch:
@@ -85,13 +83,9 @@ class TrajectoryImportService:
             if beijing_path is None:
                 raise ValueError("Path for Beijing dataset is None!")
 
-            trajectories = parse_beijing_trajectories(beijing_path)
-
-            total = len(trajectories)
-
-            for start in range(0, total, batch_size):
-                print("batch started")
-                batch = trajectories[start : start + batch_size]
+            for batch_tuple in batched(parse_beijing_trajectories(beijing_path), batch_size):
+                print("Batch started")
+                batch = list(batch_tuple)
 
                 for trajectory in batch:
                     trajectory.source_id = str(uuid.uuid4())
