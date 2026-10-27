@@ -45,16 +45,22 @@ class SubtrajectoryService:
             exit_a_time = row["exit_a_time"].astimezone(zone)
             entry_b_time = row["entry_b_time"].astimezone(zone)
 
+            if exit_a_time.date() < start_date or exit_a_time.date() > end_date:
+                continue
+
             points = [UniformedTrajectoryPoint(row["exit_a_longitude"], exit_a_time, row["exit_a_latitude"])]
 
-            for point in row["points_between"]:
-                points.append(
-                    UniformedTrajectoryPoint(
-                        longitude=point["longitude"],
-                        latitude=point["latitude"],
-                        point_timestamp=datetime.fromisoformat(point["point_timestamp"]).astimezone(zone),
+            for point in row["points"]:
+                point_timestamp = datetime.fromisoformat(point["point_timestamp"]).astimezone(zone)
+
+                if exit_a_time < point_timestamp < entry_b_time:
+                    points.append(
+                        UniformedTrajectoryPoint(
+                            longitude=point["longitude"],
+                            latitude=point["latitude"],
+                            point_timestamp=point_timestamp,
+                        )
                     )
-                )
 
             points.append(
                 UniformedTrajectoryPoint(row["entry_b_longitude"], entry_b_time, row["entry_b_latitude"])

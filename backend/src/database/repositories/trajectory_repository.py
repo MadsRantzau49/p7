@@ -192,8 +192,8 @@ class TrajectoryRepository:
         finally:
             cursor.close()
 
-    def insert_cleaned_uniformed_trajectories(self, trajectories: list[UniformedTrajectories]) -> None:
-        """Bulk-insert cleaned trajectory runs into the cleaned_uniformed_trajectories table."""
+    def insert_cleaned_uniformed_trajectories(self, trajectories: list[UniformedTrajectories]) -> list[int]:
+        """Bulk-insert cleaned trajectory runs and return their new trajectory_ids, in the same order."""
         vehicle_type_ids = self.get_vehicle_type_ids()
         cursor = self.connection.cursor()
         try:
@@ -222,28 +222,49 @@ class TrajectoryRepository:
                 )
 
             cursor.executemany(
-                """
-                WITH cleaned AS (
-                    INSERT INTO cleaned_uniformed_trajectories
-                        (vehicle_id, vehicle_type_id, trajectory_date, city, points, source_id)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    RETURNING trajectory_id, points
-                )
-                INSERT INTO trips (trajectory_id, trip)
-                SELECT cleaned.trajectory_id,
-                       (SELECT tgeompointSeq(array_agg(
-                                   tgeompoint(
-                                       ST_SetSRID(ST_MakePoint((e.point ->> 'longitude')::float8,
-                                                               (e.point ->> 'latitude')::float8), 4326),
-                                       (e.point ->> 'point_timestamp')::timestamptz)
-                                   ORDER BY e.n))
-                        FROM jsonb_array_elements(cleaned.points) WITH ORDINALITY AS e(point, n))
-                FROM cleaned
-                """,
+                (
+                    "INSERT INTO cleaned_uniformed_trajectories "
+                    "(vehicle_id, vehicle_type_id, trajectory_date, city, points, source_id) "
+                    "VALUES (%s, %s, %s, %s, %s, %s) "
+                    "RETURNING trajectory_id"
+                ),
                 values,
+                returning=True,
             )
+
+            trajectory_ids = []
+            for result in cursor.results():
+                for row in result.fetchall():
+                    trajectory_ids.append(row[0])
+
+            return trajectory_ids
         except Exception as error:
             print(f"Failed to insert cleaned uniformed trajectories: {error}")
+            raise
+        finally:
+            cursor.close()
+
+    def insert_trips(self, trajectory_ids: list[int], trajectories: list[UniformedTrajectories]) -> None:
+        """Insert each cleaned trajectory into trips as a MobilityDB trip under its trajectory_id."""
+        cursor = self.connection.cursor()
+
+        try:
+            values = []
+            for trajectory_id, trajectory in zip(trajectory_ids, trajectories, strict=True):
+                instants = []
+
+                for point in trajectory.points:
+                    instants.append(
+                        f"POINT({point.longitude} {point.latitude})@{to_utc_iso(point.point_timestamp)}"
+                    )
+
+                trip = "SRID=4326;[" + ", ".join(instants) + "]"
+                values.append((trajectory_id, trip))
+
+            cursor.executemany("INSERT INTO trips (trajectory_id, trip) VALUES (%s, %s)", values)
+
+        except Exception as error:
+            print(f"Failed to insert trips: {error}")
             raise
         finally:
             cursor.close()
@@ -345,7 +366,11 @@ class TrajectoryRepository:
     def get_subtrajectories(
         self, box_a: BoundingBox, box_b: BoundingBox, start_date: date, end_date: date
     ) -> list[dict[str, Any]]:
-        """Fetch every part of a trip that leaves box A and then enters box B, leaving A in the date range."""
+        """Fetch every part of a trip that leaves box A and then enters box B.
+
+        The search window is one day wider on each side than the date range, because the dates
+        are local to each city. The service keeps only the ones that leave A inside the date range.
+        """
         cursor = self.connection.cursor(row_factory=dict_row)
 
         try:
@@ -355,53 +380,38 @@ class TrajectoryRepository:
             area_b = sql.SQL(
                 "ST_MakeEnvelope(%(b_min_lon)s, %(b_min_lat)s, %(b_max_lon)s, %(b_max_lat)s, 4326)"
             )
+            search_window = sql.SQL("span(%(search_start)s, %(search_end)s)")
 
             query = sql.SQL("""
-            WITH candidates AS (
-                SELECT trips.trajectory_id, trips.trip, cleaned.points, cities.time_zone
+            WITH pieces AS (
+                SELECT trips.trajectory_id,
+                       trips.trip,
+                       cleaned.points,
+                       cities.time_zone,
+                       unnest(sequences(minusGeometry(trips.trip, ST_Union({area_a}, {area_b})))) AS piece
                 FROM trips
-                JOIN cleaned_uniformed_trajectories AS cleaned USING (trajectory_id)
-                JOIN cities ON cities.name = cleaned.city
-                WHERE trips.trip && stbox({area_a}, span(%(search_start)s, %(search_end)s))
-                  AND trips.trip && stbox({area_b}, span(%(search_start)s, %(search_end)s))
+                         JOIN cleaned_uniformed_trajectories AS cleaned USING (trajectory_id)
+                         JOIN cities ON cities.name = cleaned.city
+                WHERE trips.trip && stbox({area_a}, {search_window})
+                  AND trips.trip && stbox({area_b}, {search_window})
                   AND eIntersects(trips.trip, {area_a})
-                  AND eIntersects(trips.trip, {area_b})
-            ),
-            crossings AS (
-                SELECT c.trajectory_id, upper(inside) AS at, 'exit_a' AS kind
-                FROM candidates AS c, unnest(spans(getTime(atGeometry(c.trip, {area_a})))) AS inside
-                WHERE upper(inside) < endTimestamp(c.trip)
-                UNION ALL
-                SELECT c.trajectory_id, lower(inside) AS at, 'entry_b' AS kind
-                FROM candidates AS c, unnest(spans(getTime(atGeometry(c.trip, {area_b})))) AS inside
-                WHERE lower(inside) > startTimestamp(c.trip)
-            ),
-            timeline AS (
-                SELECT trajectory_id, at, kind,
-                    LEAD(at) OVER (PARTITION BY trajectory_id ORDER BY at) AS next_at,
-                    LEAD(kind) OVER (PARTITION BY trajectory_id ORDER BY at) AS next_kind
-                FROM crossings
-            )
-            SELECT timeline.trajectory_id,
-                   timeline.at AS exit_a_time,
-                   timeline.next_at AS entry_b_time,
-                   ST_X(valueAtTimestamp(c.trip, timeline.at)) AS exit_a_longitude,
-                   ST_Y(valueAtTimestamp(c.trip, timeline.at)) AS exit_a_latitude,
-                   ST_X(valueAtTimestamp(c.trip, timeline.next_at)) AS entry_b_longitude,
-                   ST_Y(valueAtTimestamp(c.trip, timeline.next_at)) AS entry_b_latitude,
-                   (SELECT COALESCE(jsonb_agg(e.point ORDER BY e.n), '[]'::jsonb)
-                    FROM jsonb_array_elements(c.points) WITH ORDINALITY AS e(point, n)
-                    WHERE (e.point ->> 'point_timestamp')::timestamptz > timeline.at
-                       AND (e.point ->> 'point_timestamp')::timestamptz < timeline.next_at
-                   ) AS points_between,
-                   c.time_zone
-            FROM timeline
-            JOIN candidates AS c USING (trajectory_id)
-            WHERE timeline.kind = 'exit_a' AND timeline.next_kind = 'entry_b'
-                AND timeline.at >= (%(start_date)s::timestamp AT TIME ZONE c.time_zone)
-                AND timeline.at < (%(day_after_end)s::timestamp AT TIME ZONE c.time_zone)
-            ORDER BY timeline.trajectory_id, timeline.at
-            """).format(area_a=area_a, area_b=area_b)
+                  AND eIntersects(trips.trip, {area_b}))
+            SELECT trajectory_id,
+                   points,
+                   time_zone,
+                   startTimestamp(piece)   AS exit_a_time,
+                   endTimestamp(piece)     AS entry_b_time,
+                   ST_X(startValue(piece)) AS exit_a_longitude,
+                   ST_Y(startValue(piece)) AS exit_a_latitude,
+                   ST_X(endValue(piece))   AS entry_b_longitude,
+                   ST_Y(endValue(piece))   AS entry_b_latitude
+            FROM pieces
+            WHERE startTimestamp(piece) > startTimestamp(trip)
+              AND endTimestamp(piece) < endTimestamp(trip)
+              AND ST_Distance(startValue(piece), {area_a}) < ST_Distance(startValue(piece), {area_b})
+              AND ST_Distance(endValue(piece), {area_b}) < ST_Distance(endValue(piece), {area_a})
+            ORDER BY trajectory_id, exit_a_time
+            """).format(area_a=area_a, area_b=area_b, search_window=search_window)
 
             values = {
                 "a_min_lon": box_a.min_longitude,
@@ -414,8 +424,6 @@ class TrajectoryRepository:
                 "b_max_lat": box_b.max_latitude,
                 "search_start": datetime.combine(start_date - timedelta(days=1), time.min, UTC),
                 "search_end": datetime.combine(end_date + timedelta(days=2), time.min, UTC),
-                "start_date": start_date,
-                "day_after_end": end_date + timedelta(days=1),
             }
 
             cursor.execute(query, values)

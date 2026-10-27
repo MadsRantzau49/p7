@@ -18,9 +18,11 @@ def make_row():
         "exit_a_latitude": 41.15,
         "entry_b_longitude": -8.598,
         "entry_b_latitude": 41.15,
-        "points_between": [
+        "points": [
+            {"longitude": -8.62, "latitude": 41.15, "point_timestamp": "2013-07-01T08:10:00+00:00"},
             {"longitude": -8.61, "latitude": 41.15, "point_timestamp": "2013-07-01T08:11:00+00:00"},
             {"longitude": -8.60, "latitude": 41.15, "point_timestamp": "2013-07-01T08:12:00+00:00"},
+            {"longitude": -8.59, "latitude": 41.15, "point_timestamp": "2013-07-01T08:13:00+00:00"},
         ],
         "time_zone": "Europe/Lisbon",
     }
@@ -68,3 +70,15 @@ def test_find_subtrajectories_rejects_invalid_input(b_longitude, start_date, end
         )
 
     repository.get_subtrajectories.assert_not_called()
+
+
+def test_find_subtrajectories_skips_those_leaving_a_outside_the_date_range():
+    """Skip a subtrajectory that leaves A on a local date outside the range."""
+    repository = MagicMock()
+    repository.get_subtrajectories.return_value = [make_row()]
+
+    found = SubtrajectoryService(repository).find_subtrajectories(
+        -8.614, 41.15, -8.596, 41.15, date(2013, 7, 2), date(2013, 7, 3), 50
+    )
+
+    assert found == []
