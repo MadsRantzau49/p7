@@ -1,5 +1,36 @@
+## Start backend and frontend (locally)
 
-## Start backend and frontend
+The backend and frontend run on your own machine. The database runs only on the UCloud VM,
+and the backend reaches it through an SSH tunnel. Open the tunnel first.
+
+### 1. Env file
+
+The `.env` in the repo root must contain:
+
+```
+DATABASE_HOST=localhost
+DATABASE_PORT=15432
+DATABASE_NAME=p7
+DATABASE_USER=postgres
+DATABASE_PASSWORD=<the password from the VM>
+```
+
+`docker/app.compose.yml` changes `DATABASE_HOST` to `host.docker.internal` inside the
+backend container. So the same `.env` works both for Docker and for running uvicorn directly.
+
+### 2. Open the SSH tunnel
+
+In its own terminal; leave it running:
+
+```bash
+ssh -N -L 15432:localhost:5432 ucloud@ssh.cloud.sdu.dk -p <port>
+```
+
+- `<port>` is the SSH port shown on the VM job's page in UCloud. It can change when the job restarts.
+- `-N` only forwards the port; it opens no shell, so the terminal looks like it hangs. That is correct.
+- `15432` instead of `5432`, so it doesn't clash with a PostgreSQL already running on your machine.
+
+### 3. Start the app
 
 ```bash
 docker compose -f docker/app.compose.yml up --build -d
