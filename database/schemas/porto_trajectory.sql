@@ -9,7 +9,7 @@ CREATE TABLE porto_trajectories (
     timestamp BIGINT NOT NULL,
     day_type VARCHAR(10),
     missing_data BOOLEAN NOT NULL,
-    polyline JSON NOT NULL,
+    polyline JSONB NOT NULL,
 
     FOREIGN KEY (source_id)
         REFERENCES source_trajectories(source_id)

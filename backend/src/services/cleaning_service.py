@@ -47,7 +47,10 @@ class CleanService:
                     source_ids.append(cast(str, run.source_id))
 
                 self.trajectory_repository.create_source_trajectories(dataset_id, source_ids)
-                self.trajectory_repository.insert_cleaned_uniformed_trajectories(cleaned_batch)
+                trajectory_ids = self.trajectory_repository.insert_cleaned_uniformed_trajectories(
+                    cleaned_batch
+                )
+                self.trajectory_repository.insert_trips(trajectory_ids, cleaned_batch)
 
                 self.db_actions.commit()
                 last_id = batch[-1]["trajectory_id"]

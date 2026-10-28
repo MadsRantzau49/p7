@@ -1,6 +1,7 @@
 fastapi
 uvicorn
-mysql-connector-python
+psycopg[binary]
+psycopg_pool
 python-dotenv
 pytest
 ruff
@@ -13,4 +14,5 @@ pytest-cov
 shapely
 httpx2
 starlette
-anyio 
+anyio
+tzdata

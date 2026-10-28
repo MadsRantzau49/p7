@@ -11,7 +11,7 @@ from dependencies import (
     get_trajectory_repository,
 )
 
-CITIES = ("Beijing",)
+CITIES = ("Porto", "Beijing")
 BATCH_SIZE = 1000
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 import type { trajectoryPoint } from "./trajectoryPoint";
 
-export interface Subpath {
-  subpath_id: number;
+export interface Subtrajectory {
+  subtrajectory_id: number;
   trajectory_id: number;
   exit_a_time: string;
   entry_b_time: string;

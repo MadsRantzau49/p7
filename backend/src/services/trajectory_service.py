@@ -3,8 +3,7 @@ from datetime import date, time
 from database.database_actions import DatabaseActions
 from database.repositories.dataset_repository import DatasetRepository
 from database.repositories.trajectory_repository import TrajectoryRepository
-from models.dataset import DataSet
-from models.trajectory_segments import TrajectorySegments
+from models.city import City
 from models.uniformed_trajectories import UniformedTrajectories
 
 
@@ -67,7 +66,7 @@ class TrajectoryService:
             )
             raise
 
-    def get_trajectories_cities(self) -> list[DataSet]:
+    def get_trajectories_cities(self) -> list[City]:
         """Fetch the available trajectory cities from the database."""
 
         try:
@@ -75,48 +74,4 @@ class TrajectoryService:
 
         except Exception as error:
             print(f"Failed to retrieve cities from database: {error}")
-            raise
-
-    async def insert_trajectory_segments(self, trajectories: list[dict]):
-        """Creates segments from cleaned trajectory data"""
-
-        segments = []
-
-        for trajectory in trajectories:
-            points = trajectory["points"]
-
-            for segment_index in range(len(points) - 1):
-                start = points[segment_index]
-                end = points[segment_index + 1]
-
-                start_lon = start["longitude"]
-                start_lat = start["latitude"]
-                end_lon = end["longitude"]
-                end_lat = end["latitude"]
-
-                path = f"LINESTRING({start_lon} {start_lat}, {end_lon} {end_lat})"
-
-                if trajectory["trajectory_id"] is None:
-                    raise ValueError("Trajectory_id is none!")
-
-                segments.append(
-                    TrajectorySegments(
-                        trajectory_id=trajectory["trajectory_id"],
-                        segment_index=segment_index,
-                        path=path,
-                        start_time=start["point_timestamp"],
-                        end_time=end["point_timestamp"],
-                    )
-                )
-
-        if not segments:
-            return 0
-
-        try:
-            self.trajectory_repository.insert_segments_into_db(segments)
-            self.db_actions.commit()
-            return len(segments)
-        except Exception as error:
-            print(f"Failed to insert trajectories segments: {error}")
-            self.db_actions.rollback()
             raise

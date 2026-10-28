@@ -1,14 +1,11 @@
 from database.connection import create_db_connection
-from mysql.connector import pooling
 
 
 def test_create_db_connection():
-    """Test that a database connection can be created."""
-    connection = create_db_connection()
+    """Check a pooled connection reaches PostgreSQL with MobilityDB."""
+    with create_db_connection() as connection:
+        row = connection.execute("SELECT mobilitydb_version()").fetchone()
 
-    try:
-        assert connection is not None
-        assert isinstance(connection, pooling.PooledMySQLConnection)
-        assert connection.is_connected()
-    finally:
-        connection.close()
+    assert row is not None
+    (mobilitydb_version,) = row
+    assert mobilitydb_version.startswith("MobilityDB")

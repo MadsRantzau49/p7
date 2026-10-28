@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import type { SubmitEvent } from "react";
 import type { LatLngTuple } from "leaflet";
 import { isAxiosError } from "axios";
-import { getSubpaths } from "../api/subpathAPI";
-import type { Subpath } from "../models/subpath";
+import { getSubtrajectories } from "../api/subtrajectoryAPI";
+import type { Subtrajectory } from "../models/subtrajectory";
 import { getTrajectories, getTrajectoryCities } from "../api/trajectoryAPI";
 import type { uniformedTrajectoryResponse } from "../models/uniformedTrajectoryResponse";
 import TrajectoryMap from "./trajectoryMap";
-import SubpathResults from "./subpathResults";
+import SubtrajectoryResults from "./subtrajectoryResults";
 import TimeRangeSlider from "./timeRangeSlider.tsx";
 import DatasetUpload from "./datasetUpload";
 import "../css/TrajectoryPage.css";
@@ -25,56 +25,56 @@ export default function TrajectoryPage() {
   const [boxSize, setBoxSize] = useState(2);
   const [activeArea, setActiveArea] = useState<AreaName | null>("A");
   const [areas, setAreas] = useState<Partial<Record<AreaName, SelectedArea>>>({});
-  const [subpaths, setSubpaths] = useState<Subpath[]>([]);
-  const [selectedSubpathId, setSelectedSubpathId] = useState<number | null>(null);
-  const [showSubpathPoints, setShowSubpathPoints] = useState(false);
-  const visibleSubpaths = useMemo(() => selectedSubpathId === null
-    ? subpaths : subpaths.filter((subpath) => subpath.subpath_id === selectedSubpathId),
-  [subpaths, selectedSubpathId]);
+  const [subtrajectories, setSubtrajectories] = useState<Subtrajectory[]>([]);
+  const [selectedSubtrajectoryId, setSelectedSubtrajectoryId] = useState<number | null>(null);
+  const [showSubtrajectoryPoints, setShowSubtrajectoryPoints] = useState(false);
+  const visibleSubtrajectories = useMemo(() => selectedSubtrajectoryId === null
+    ? subtrajectories : subtrajectories.filter((subtrajectory) => subtrajectory.subtrajectory_id === selectedSubtrajectoryId),
+  [subtrajectories, selectedSubtrajectoryId]);
 
-  function selectSubpath(id: number | null) {
-    setSelectedSubpathId(id);
-    setShowSubpathPoints(false);
+  function selectSubtrajectory(id: number | null) {
+    setSelectedSubtrajectoryId(id);
+    setShowSubtrajectoryPoints(false);
   }
-  const [loadingSubpaths, setLoadingSubpaths] = useState(false);
-  const [subpathError, setSubpathError] = useState("");
-  const [hasRetrievedSubpaths, setHasRetrievedSubpaths] = useState(false);
+  const [loadingSubtrajectories, setLoadingSubtrajectories] = useState(false);
+  const [subtrajectoryError, setSubtrajectoryError] = useState("");
+  const [hasRetrievedSubtrajectories, setHasRetrievedSubtrajectories] = useState(false);
 
-  function clearSubpathResults() {
-    selectSubpath(null);
-    setSubpaths([]);
-    setHasRetrievedSubpaths(false);
-    setSubpathError("");
+  function clearSubtrajectoryResults() {
+    selectSubtrajectory(null);
+    setSubtrajectories([]);
+    setHasRetrievedSubtrajectories(false);
+    setSubtrajectoryError("");
   }
 
-  async function handleRetrieveSubpaths(event: SubmitEvent<HTMLFormElement>) {
+  async function handleRetrieveSubtrajectories(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSubpathError("");
+    setSubtrajectoryError("");
     if (!explorerCity || !areas.A || !areas.B || !explorerStartDate || !explorerEndDate) {
-      setSubpathError("Choose a city, both dates, and areas A and B.");
+      setSubtrajectoryError("Choose a city, both dates, and areas A and B.");
       return;
     }
     if (explorerStartDate > explorerEndDate) {
-      setSubpathError("End date must be on or after start date.");
+      setSubtrajectoryError("End date must be on or after start date.");
       return;
     }
-    setLoadingSubpaths(true);
-    clearSubpathResults();
+    setLoadingSubtrajectories(true);
+    clearSubtrajectoryResults();
     try {
-      const data = await getSubpaths(areas.A, areas.B, explorerStartDate, explorerEndDate, boxSize);
-      setSubpaths(data);
-      setHasRetrievedSubpaths(true);
+      const data = await getSubtrajectories(areas.A, areas.B, explorerStartDate, explorerEndDate, boxSize);
+      setSubtrajectories(data);
+      setHasRetrievedSubtrajectories(true);
     } catch (error) {
       const detail = isAxiosError(error) ? error.response?.data?.detail : undefined;
-      setSubpathError(typeof detail === "string" ? detail : "Could not retrieve subpaths. Please try again.");
+      setSubtrajectoryError(typeof detail === "string" ? detail : "Could not retrieve subtrajectories. Please try again.");
     } finally {
-      setLoadingSubpaths(false);
+      setLoadingSubtrajectories(false);
     }
   }
 
   function handleAreaSelect(area: SelectedArea) {
     if (activeArea === null) return;
-    clearSubpathResults();
+    clearSubtrajectoryResults();
     setAreas((previous) => ({ ...previous, [activeArea]: area }));
     setActiveArea(!areas[activeArea] && activeArea === "A" && !areas.B ? "B" : null);
   }
@@ -212,8 +212,8 @@ export default function TrajectoryPage() {
         </button>
 
         {sidebarCleared ? (
-          <form onSubmit={handleRetrieveSubpaths}>
-            <fieldset disabled={loadingSubpaths}>
+          <form onSubmit={handleRetrieveSubtrajectories}>
+            <fieldset disabled={loadingSubtrajectories}>
               <div className="trajectory-field">
                 <label htmlFor="explorer-city">City</label>
                 <select
@@ -237,7 +237,7 @@ export default function TrajectoryPage() {
                       max={explorerEndDate || undefined}
                       onChange={(event) => {
                         setExplorerStartDate(event.target.value);
-                        clearSubpathResults();
+                        clearSubtrajectoryResults();
                       }}
                     />
                   </div>
@@ -251,7 +251,7 @@ export default function TrajectoryPage() {
                       min={explorerStartDate || undefined}
                       onChange={(event) => {
                         setExplorerEndDate(event.target.value);
-                        clearSubpathResults();
+                        clearSubtrajectoryResults();
                       }}
                     />
                   </div>
@@ -270,7 +270,7 @@ export default function TrajectoryPage() {
                       aria-valuetext={`${boxSize} meters`}
                       onChange={(event) => {
                         setBoxSize(Number(event.target.value));
-                        clearSubpathResults();
+                        clearSubtrajectoryResults();
                       }}
                     />
                     <div className="trajectory-slider-limits" aria-hidden="true">
@@ -310,18 +310,18 @@ export default function TrajectoryPage() {
                   <button
                     className="trajectory-submit"
                     type="submit"
-                    disabled={loadingSubpaths || !areas.A || !areas.B || !explorerStartDate || !explorerEndDate || explorerStartDate > explorerEndDate}
+                    disabled={loadingSubtrajectories || !areas.A || !areas.B || !explorerStartDate || !explorerEndDate || explorerStartDate > explorerEndDate}
                   >
-                    {loadingSubpaths ? "Retrieving..." : "Retrieve subpaths"}
+                    {loadingSubtrajectories ? "Retrieving..." : "Retrieve subtrajectories"}
                   </button>
                 </>
               )}
             </fieldset>
-            {subpathError && <p className="trajectory-error" role="alert">{subpathError}</p>}
+            {subtrajectoryError && <p className="trajectory-error" role="alert">{subtrajectoryError}</p>}
             <p className="trajectory-description" role="status">
-              {loadingSubpaths ? "Retrieving subpaths..." : hasRetrievedSubpaths
-                ? subpaths.length === 0 ? "No subpaths found for these areas and dates." : `${subpaths.length} subpaths loaded.`
-                : "Choose dates and mark both areas to retrieve subpaths from A to B."}
+              {loadingSubtrajectories ? "Retrieving subtrajectories..." : hasRetrievedSubtrajectories
+                ? subtrajectories.length === 0 ? "No subtrajectories found for these areas and dates." : `${subtrajectories.length} subtrajectories loaded.`
+                : "Choose dates and mark both areas to retrieve subtrajectories from A to B."}
             </p>
           </form>
         ) : (
@@ -350,7 +350,7 @@ export default function TrajectoryPage() {
                   >
                     {cities.length === 0 && (<option value=""> {loadingCities ? "Loading cities..." : "No cities available"} </option>)}
 
-                    {cities.map((item) => ( <option key={item.dataset_id} value={item.name}> {item.name} </option>))}
+                    {cities.map((item) => ( <option key={item.city_id} value={item.name}> {item.name} </option>))}
                   </select>
                 </div>
 
@@ -411,26 +411,26 @@ export default function TrajectoryPage() {
       </aside>
 
       <main className="trajectory-workspace">
-        <div className="trajectory-map-panel" aria-busy={sidebarCleared ? loadingSubpaths : loading}>
+        <div className="trajectory-map-panel" aria-busy={sidebarCleared ? loadingSubtrajectories : loading}>
           <TrajectoryMap
             trajectories={sidebarCleared ? EMPTY_TRAJECTORIES : visibleTrajectories}
-            subpaths={sidebarCleared ? visibleSubpaths : undefined}
-            onSubpathSelect={sidebarCleared ? selectSubpath : undefined}
-            showTrajectoryDataPoints={sidebarCleared ? showSubpathPoints : showTrajectoryDataPoints}
+            subtrajectories={sidebarCleared ? visibleSubtrajectories : undefined}
+            onSubtrajectorySelect={sidebarCleared ? selectSubtrajectory : undefined}
+            showTrajectoryDataPoints={sidebarCleared ? showSubtrajectoryPoints : showTrajectoryDataPoints}
             cityCenter={sidebarCleared && explorerCity === "Porto" ? PORTO_CENTER : undefined}
             areas={sidebarCleared ? areas : undefined}
             boxSize={boxSize}
-            onAreaSelect={sidebarCleared && explorerCity && !loadingSubpaths && activeArea !== null ? handleAreaSelect : undefined}
+            onAreaSelect={sidebarCleared && explorerCity && !loadingSubtrajectories && activeArea !== null ? handleAreaSelect : undefined}
           />
         </div>
 
         {sidebarCleared && (
-          <SubpathResults
-            subpaths={subpaths}
-            selectedId={selectedSubpathId}
-            showPoints={showSubpathPoints}
-            onSelect={selectSubpath}
-            onTogglePoints={() => setShowSubpathPoints((previous) => !previous)}
+          <SubtrajectoryResults
+            subtrajectories={subtrajectories}
+            selectedId={selectedSubtrajectoryId}
+            showPoints={showSubtrajectoryPoints}
+            onSelect={selectSubtrajectory}
+            onTogglePoints={() => setShowSubtrajectoryPoints((previous) => !previous)}
           />
         )}
 

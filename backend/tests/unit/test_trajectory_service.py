@@ -68,7 +68,7 @@ def test_get_trajectories_returns_query_result(monkeypatch):
         actual = asyncio.run(instance.get_trajectories("Porto", None, None, None, None, 1))
 
     assert actual == result
-    context.close.assert_called_once()
+    context.__exit__.assert_called_once()
 
 
 def test_get_trajectories_cities_returns_query_result(monkeypatch):
@@ -81,7 +81,7 @@ def test_get_trajectories_cities_returns_query_result(monkeypatch):
         actual = instance.get_trajectories_cities()
 
     assert actual == result
-    context.close.assert_called_once()
+    context.__exit__.assert_called_once()
 
 
 def test_get_trajectories_closes_connection_after_query_error(monkeypatch):
@@ -93,7 +93,7 @@ def test_get_trajectories_closes_connection_after_query_error(monkeypatch):
         with trajectory_service_context() as instance:
             asyncio.run(instance.get_trajectories("Porto", None, None, None, None, 1))
 
-    context.close.assert_called_once()
+    context.__exit__.assert_called_once()
 
 
 def test_get_trajectories_cities_closes_connection_after_query_error(monkeypatch):
@@ -105,7 +105,7 @@ def test_get_trajectories_cities_closes_connection_after_query_error(monkeypatch
         with trajectory_service_context() as instance:
             instance.get_trajectories_cities()
 
-    context.close.assert_called_once()
+    context.__exit__.assert_called_once()
 
 
 def test_trajectory_service_ignores_full_day_time_range(monkeypatch):
@@ -118,7 +118,7 @@ def test_trajectory_service_ignores_full_day_time_range(monkeypatch):
         asyncio.run(instance.get_trajectories("Porto", None, None, time.min, time(23, 59), 1))
 
     query.assert_awaited_once_with("Porto", None, None, None, None, 1)
-    context.close.assert_called_once()
+    context.__exit__.assert_called_once()
 
 
 @pytest.mark.parametrize(

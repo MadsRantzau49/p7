@@ -5,7 +5,7 @@ import type { LatLngTuple } from "leaflet";
 import type { Props } from "../models/map/Props"
 import type { MapViewProps } from "../models/map/MapViewProps";
 import type { SelectedArea } from "../models/map/SelectedArea";
-import type { Subpath } from "../models/subpath";
+import type { Subtrajectory } from "../models/subtrajectory";
 import "leaflet/dist/leaflet.css";
 import "../css/trajectoryMap.css"
 
@@ -37,7 +37,7 @@ function MapView({ positions, cityCenter }: MapViewProps) {
   
 }
 
-const EMPTY_SUBPATHS: Subpath[] = [];
+const EMPTY_SUBTRAJECTORIES: Subtrajectory[] = [];
 
 function AreaClickHandler({ onSelect }: { onSelect: (area: SelectedArea) => void }) {
   useMapEvents({
@@ -48,7 +48,7 @@ function AreaClickHandler({ onSelect }: { onSelect: (area: SelectedArea) => void
   return null;
 }
 
-export default function TrajectoryMap({ trajectories, showTrajectoryDataPoints, cityCenter, areas = {}, boxSize = 2, onAreaSelect, subpaths = EMPTY_SUBPATHS, onSubpathSelect }: Props) {
+export default function TrajectoryMap({ trajectories, showTrajectoryDataPoints, cityCenter, areas = {}, boxSize = 2, onAreaSelect, subtrajectories = EMPTY_SUBTRAJECTORIES, onSubtrajectorySelect }: Props) {
   const routes = useMemo(() =>
       trajectories.map((trajectory) => {
         const hue = (trajectory.trajectory_id * 137.508) % 360;
@@ -71,16 +71,16 @@ export default function TrajectoryMap({ trajectories, showTrajectoryDataPoints, 
     [trajectories]
   );
 
-  const subpathRoutes = useMemo(() => subpaths.map((subpath) => ({
-    subpath,
-    positions: subpath.points.map((point): LatLngTuple => [point.latitude, point.longitude]),
-    color: `hsl(${(subpath.subpath_id * 137.508) % 360}, 75%, 40%)`,
-  })), [subpaths]);
+  const subtrajectoryRoutes = useMemo(() => subtrajectories.map((subtrajectory) => ({
+    subtrajectory,
+    positions: subtrajectory.points.map((point): LatLngTuple => [point.latitude, point.longitude]),
+    color: `hsl(${(subtrajectory.subtrajectory_id * 137.508) % 360}, 75%, 40%)`,
+  })), [subtrajectories]);
 
   const allPositions = useMemo(() => [
     ...routes.flatMap((route) => route.positions),
-    ...subpathRoutes.flatMap((route) => route.positions),
-  ], [routes, subpathRoutes]);
+    ...subtrajectoryRoutes.flatMap((route) => route.positions),
+  ], [routes, subtrajectoryRoutes]);
 
   return (
     <div className="trajectory-map-wrapper">
@@ -100,24 +100,24 @@ export default function TrajectoryMap({ trajectories, showTrajectoryDataPoints, 
         <MapView positions={allPositions} cityCenter={cityCenter} />
         {onAreaSelect && <AreaClickHandler onSelect={onAreaSelect} />}
 
-        {subpathRoutes.map(({ subpath, positions, color }) => (
+        {subtrajectoryRoutes.map(({ subtrajectory, positions, color }) => (
           <Polyline
-            key={`subpath-${subpath.subpath_id}`}
+            key={`subtrajectory-${subtrajectory.subtrajectory_id}`}
             positions={positions}
             pathOptions={{ color, weight: 4, opacity: 0.9 }}
             bubblingMouseEvents={false}
           >
             <Popup>
-              <strong>Subpath {subpath.subpath_id}</strong><br />
-              Trajectory {subpath.trajectory_id}<br />
-              Exit A: {subpath.exit_a_time}<br />
-              Entry B: {subpath.entry_b_time}<br />
-              Points: {subpath.points.length}
-              {onSubpathSelect && (
+              <strong>Subtrajectory {subtrajectory.subtrajectory_id}</strong><br />
+              Trajectory {subtrajectory.trajectory_id}<br />
+              Exit A: {subtrajectory.exit_a_time}<br />
+              Entry B: {subtrajectory.entry_b_time}<br />
+              Points: {subtrajectory.points.length}
+              {onSubtrajectorySelect && (
                 <>
                   <br />
-                  <button type="button" className="trajectory-select-button" onClick={() => onSubpathSelect(subpath.subpath_id)}>
-                    Show only this subpath
+                  <button type="button" className="trajectory-select-button" onClick={() => onSubtrajectorySelect(subtrajectory.subtrajectory_id)}>
+                    Show only this subtrajectory
                   </button>
                 </>
               )}
@@ -125,20 +125,20 @@ export default function TrajectoryMap({ trajectories, showTrajectoryDataPoints, 
           </Polyline>
         ))}
 
-        {showTrajectoryDataPoints && subpathRoutes.flatMap(({ subpath, positions, color }) =>
+        {showTrajectoryDataPoints && subtrajectoryRoutes.flatMap(({ subtrajectory, positions, color }) =>
           positions.map((position, index) => (
             <CircleMarker
-              key={`subpath-${subpath.subpath_id}-point-${index}`}
+              key={`subtrajectory-${subtrajectory.subtrajectory_id}-point-${index}`}
               center={position}
               radius={4}
               pathOptions={{ color, weight: 2, fillColor: "#ffffff", fillOpacity: 1 }}
               bubblingMouseEvents={false}
             >
               <Popup>
-                <strong>Subpath {subpath.subpath_id}, point {index + 1}</strong><br />
+                <strong>Subtrajectory {subtrajectory.subtrajectory_id}, point {index + 1}</strong><br />
                 Latitude: {position[0]}<br />
                 Longitude: {position[1]}<br />
-                Time: {subpath.points[index].point_timestamp}
+                Time: {subtrajectory.points[index].point_timestamp}
               </Popup>
             </CircleMarker>
           ))

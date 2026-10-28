@@ -1,15 +1,15 @@
 import { apiclient } from "./apiclient";
 import type { SelectedArea } from "../models/map/SelectedArea";
-import type { Subpath } from "../models/subpath";
+import type { Subtrajectory } from "../models/subtrajectory";
 
-export async function getSubpaths(
+export async function getSubtrajectories(
   areaA: SelectedArea,
   areaB: SelectedArea,
   startDate: string,
   endDate: string,
   boxSize: number,
 ) {
-  const response = await apiclient.get<Subpath[]>("subpaths/get", {
+  const response = await apiclient.get<Subtrajectory[]>("subtrajectories/get", {
     params: {
       a_longitude: areaA.longitude,
       a_latitude: areaA.latitude,

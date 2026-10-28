@@ -1,12 +1,14 @@
-import json
+from typing import Any
 
 from models.beijing_trajectory import BeijingTrajectory
 from models.porto_trajectory import PortoTrajectory
-from mysql.connector.pooling import PooledMySQLConnection
+from psycopg import Connection
+from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 
 
 class ImportRepository:
-    def __init__(self, connection: PooledMySQLConnection) -> None:
+    def __init__(self, connection: Connection) -> None:
         self.connection = connection
 
     def insert_porto_trajectories(self, trajectories: list[PortoTrajectory]) -> None:
@@ -28,7 +30,7 @@ class ImportRepository:
                         trajectory.timestamp,
                         trajectory.day_type,
                         trajectory.missing_data,
-                        json.dumps(trajectory.polyline),
+                        Jsonb(trajectory.polyline),
                     )
                 )
 
@@ -72,7 +74,7 @@ class ImportRepository:
                         }
                     )
 
-                values.append((trajectory.source_id, trajectory.taxi_id, json.dumps(points)))
+                values.append((trajectory.source_id, trajectory.taxi_id, Jsonb(points)))
 
             cursor.executemany(
                 "INSERT INTO beijing_trajectories (source_id, taxi_id, points) VALUES (%s, %s, %s)",
@@ -85,13 +87,15 @@ class ImportRepository:
         finally:
             cursor.close()
 
-    def retrieve_porto_dataset_batch(self, batch_size: int, last_source_id: str | None) -> dict:
+    def retrieve_porto_dataset_batch(
+        self, batch_size: int, last_source_id: str | None
+    ) -> list[dict[str, Any]]:
         """Fetch a batch of Porto trajectories from the database."""
-        cursor = self.connection.cursor(dictionary=True)
+        cursor = self.connection.cursor(row_factory=dict_row)
 
         try:
             if last_source_id is None:
-                cursor.execute("SELECT * FROM porto_trajectories LIMIT %s", (batch_size,))
+                cursor.execute("SELECT * FROM porto_trajectories ORDER BY source_id LIMIT %s", (batch_size,))
 
             else:
                 cursor.execute(
@@ -106,13 +110,17 @@ class ImportRepository:
         finally:
             cursor.close()
 
-    def retrieve_beijing_data_batch(self, batch_size: int, last_source_id: str | None) -> dict:
+    def retrieve_beijing_data_batch(
+        self, batch_size: int, last_source_id: str | None
+    ) -> list[dict[str, Any]]:
         """Fetch a batch of Beijing trajectories from the database."""
-        cursor = self.connection.cursor(dictionary=True)
+        cursor = self.connection.cursor(row_factory=dict_row)
 
         try:
             if last_source_id is None:
-                cursor.execute("SELECT * FROM beijing_trajectories LIMIT %s", (batch_size,))
+                cursor.execute(
+                    "SELECT * FROM beijing_trajectories ORDER BY source_id LIMIT %s", (batch_size,)
+                )
             else:
                 cursor.execute(
                     "SELECT * FROM beijing_trajectories WHERE source_id > %s ORDER BY source_id LIMIT %s",

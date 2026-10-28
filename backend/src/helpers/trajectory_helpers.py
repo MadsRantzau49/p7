@@ -5,10 +5,12 @@ from pathlib import Path
 from models.upload_row import UploadRow, VehicleType
 
 sys.path.append(str(Path(__file__).parent.parent))
-
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint
+
+BEIJING_TIME_ZONE = ZoneInfo("Asia/Shanghai")
 
 
 def convert_porto_trajectory(porto_trajectory: dict) -> UniformedTrajectories:
@@ -18,7 +20,7 @@ def convert_porto_trajectory(porto_trajectory: dict) -> UniformedTrajectories:
     while isinstance(polyline, str):
         polyline = json.loads(polyline)
 
-    start_time = datetime.fromtimestamp(int(porto_trajectory["timestamp"]))
+    start_time = datetime.fromtimestamp(int(porto_trajectory["timestamp"]), UTC)
 
     current_time = start_time
     points = []
@@ -36,7 +38,7 @@ def convert_porto_trajectory(porto_trajectory: dict) -> UniformedTrajectories:
     return UniformedTrajectories(
         vehicle_id=porto_trajectory["taxi_id"],
         vehicle_type=VehicleType.TAXI,
-        trajectory_date=datetime.fromtimestamp(porto_trajectory["timestamp"]),
+        trajectory_date=start_time,
         points=points,
         city="Porto",
         source_id=porto_trajectory["source_id"],
@@ -53,7 +55,9 @@ def convert_beijing_trajectory(beijing_trajectory: dict) -> UniformedTrajectorie
     points = []
 
     for point in beijing_points:
-        point_datetime = datetime.strptime(point["date_time"], "%Y-%m-%d %H:%M:%S")
+        point_datetime = datetime.strptime(point["date_time"], "%Y-%m-%d %H:%M:%S").replace(
+            tzinfo=BEIJING_TIME_ZONE
+        )
 
         points.append(
             UniformedTrajectoryPoint(
@@ -63,12 +67,10 @@ def convert_beijing_trajectory(beijing_trajectory: dict) -> UniformedTrajectorie
             )
         )
 
-    first_datetime = datetime.strptime(beijing_points[0]["date_time"], "%Y-%m-%d %H:%M:%S")
-
     return UniformedTrajectories(
         vehicle_id=int(beijing_trajectory["taxi_id"]),
         vehicle_type=VehicleType.TAXI,
-        trajectory_date=first_datetime,
+        trajectory_date=points[0].point_timestamp,
         city="Beijing",
         source_id=beijing_trajectory["source_id"],
         points=points,

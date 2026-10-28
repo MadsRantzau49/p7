@@ -8,6 +8,27 @@ jobs:
   backend:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: mobilitydb/mobilitydb:18-3.6-1.3
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: p7
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d p7"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_HOST: localhost
+      DATABASE_PORT: 5432
+      DATABASE_NAME: p7
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+
     steps:
       - uses: actions/checkout@v4
 
@@ -38,13 +59,12 @@ jobs:
             echo "::warning::Vulture found unused code"
           fi
 
-      - name: Test with coverage
+      - name: Create database schema
         env:
-          DATABASE_HOST: ${{ secrets.DATABASE_HOST }}
-          DATABASE_PORT: ${{ secrets.DATABASE_PORT }}
-          DATABASE_NAME: ${{ secrets.DATABASE_NAME }}
-          DATABASE_USER: ${{ secrets.DATABASE_USER }}
-          DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
+          PGPASSWORD: postgres
+        run: psql -h localhost -U postgres -d p7 -f database/schema.sql
+
+      - name: Test with coverage
         run: |
           pytest --cov=backend/src --cov-report=term-missing
 

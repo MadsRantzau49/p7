@@ -10,7 +10,7 @@ def test_parse_porto_trajectories(tmp_path):
         '1,,,,2,3,,true,"[[1, 2]]"\n'
     )
 
-    result = parsers.parse_porto_trajectories(str(path))
+    result = list(parsers.parse_porto_trajectories(str(path)))
 
     assert len(result) == 1
     assert result[0].missing_data is True
@@ -21,7 +21,7 @@ def test_parse_beijing_trajectories(tmp_path):
     """Split Beijing points when their time gap exceeds 30 minutes."""
     (tmp_path / "taxi.txt").write_text("1,2024-01-01 00:00:00,1,2\n1,2024-01-01 00:31:00,3,4\n")
 
-    result = parsers.parse_beijing_trajectories(str(tmp_path))
+    result = list(parsers.parse_beijing_trajectories(str(tmp_path)))
 
     assert len(result) == 2
     assert result[0].points[0].longitude == "1"
@@ -38,4 +38,4 @@ def test_parse_beijing_rejects_missing_taxi_id(tmp_path, monkeypatch):
     monkeypatch.setattr(parsers, "int", parse_missing_taxi_id, raising=False)
 
     with pytest.raises(ValueError, match="Taxi ID is missing"):
-        parsers.parse_beijing_trajectories(str(tmp_path))
+        list(parsers.parse_beijing_trajectories(str(tmp_path)))
