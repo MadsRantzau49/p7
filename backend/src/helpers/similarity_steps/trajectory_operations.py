@@ -1,11 +1,11 @@
 from models.similarity import (
     ProjectedTrajectory,
-    TrajectorySegment,
     TrajectorySection,
+    TrajectorySegment,
 )
 
-class TrajectoryOperations:
 
+class TrajectoryOperations:
     def generate_segments(
         self,
         trajectories: list[ProjectedTrajectory],
@@ -31,8 +31,6 @@ class TrajectoryOperations:
 
         return segments
 
-
-
     def _extend_section(
         self,
         section: TrajectorySection,
@@ -49,7 +47,6 @@ class TrajectoryOperations:
             end_index=next_index,
             points=section.points + [trajectory.projected_points[next_index]],
         )
-
 
     def _sections_from_segment_indices(
         self,
@@ -70,7 +67,7 @@ class TrajectoryOperations:
                         trajectory_id=trajectory.trajectory_id,
                         start_index=start_index,
                         end_index=index,
-                        points=trajectory.projected_points[start_index:index + 1],
+                        points=trajectory.projected_points[start_index : index + 1],
                     )
                 )
                 start_index = None

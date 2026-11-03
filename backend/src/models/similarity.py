@@ -1,25 +1,31 @@
 from dataclasses import dataclass, field
 
+
 @dataclass
 class Projection:
     x: float
     y: float
+
 
 @dataclass
 class ProjectedTrajectory:
     trajectory_id: int
     projected_points: list[Projection]
 
+
 @dataclass
 class GPSCoordinate:
     latitude: float
     longitude: float
 
+
 @dataclass
 class Pathlet:
     """A selected pathlet with all GPS points in travel order."""
+
     points: list[GPSCoordinate]
     count: int
+
 
 @dataclass
 class TrajectorySegment:
@@ -28,16 +34,20 @@ class TrajectorySegment:
     start: Projection
     end: Projection
 
+
 @dataclass
 class MatchingSegmentPair:
     """Two matching original segments."""
+
     segment_a: TrajectorySegment
     segment_b: TrajectorySegment
+
 
 @dataclass
 class CandidateCluster:
     representative: TrajectorySegment
     segments: list[TrajectorySegment]
+
 
 @dataclass
 class TrajectorySection:
@@ -46,17 +56,21 @@ class TrajectorySection:
     end_index: int
     points: list[Projection]
 
+
 @dataclass
 class ProjectedPathlet:
     """A selected representative and its newly covered sections, in meters."""
+
     representative: TrajectorySection
     sections: list[TrajectorySection]
     count: int
+
 
 @dataclass
 class ExtendedPathletCandidate:
     representative: TrajectorySection
     sections: list[TrajectorySection]
+
 
 @dataclass
 class BoundingBox:
@@ -67,6 +81,7 @@ class BoundingBox:
 
     @property
     def center(self) -> tuple[float, float]:
+        """Get center of a bounding box."""
         return ((self.min_x + self.max_x) / 2, (self.min_y + self.max_y) / 2)
 
     def intersects(self, other: "BoundingBox") -> bool:
@@ -88,10 +103,12 @@ class BoundingBox:
             max_y=max(box.max_y for box in boxes),
         )
 
+
 @dataclass
 class RTreeEntry:
     box: BoundingBox
     segment: TrajectorySegment
+
 
 @dataclass
 class RTreeNode:
@@ -101,4 +118,5 @@ class RTreeNode:
 
     @property
     def is_leaf(self) -> bool:
+        """Return whether a node is a leaf."""
         return not self.children

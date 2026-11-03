@@ -148,3 +148,4 @@ logs/
 outputs/
 runs/
 docs/rendered/*
+backend/tests/data/pathlets.json

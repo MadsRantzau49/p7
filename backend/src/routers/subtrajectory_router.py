@@ -4,8 +4,9 @@ from typing import Annotated
 from dependencies import get_subtrajectory_service
 from fastapi import APIRouter, Depends, HTTPException
 from models.subtrajectory import Subtrajectory
-from services.subtrajectory_service import SubtrajectoryService
 from services.similarity_service import SimilarityService
+from services.subtrajectory_service import SubtrajectoryService
+
 router = APIRouter(prefix="/api/subtrajectories")
 
 

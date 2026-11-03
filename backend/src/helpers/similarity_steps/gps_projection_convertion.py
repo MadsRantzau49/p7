@@ -1,16 +1,8 @@
-from models.similarity import (
-    GPSCoordinate,
-    Pathlet,
-    ProjectedTrajectory,
-    Projection,
-    ProjectedPathlet
-)
-
+from models.similarity import GPSCoordinate, Pathlet, ProjectedPathlet, ProjectedTrajectory, Projection
+from models.subtrajectory import Subtrajectory
 from pyproj import Transformer
 from pyproj.enums import TransformDirection
 
-from models.subtrajectory import Subtrajectory
-from models.similarity import Pathlet
 
 class GpsProjectionConverter:
     def __init__(self) -> None:
@@ -20,7 +12,7 @@ class GpsProjectionConverter:
         self,
         trajectories: list[Subtrajectory],
     ) -> list[ProjectedTrajectory]:
-
+        """MAKE DOCSTRING"""
         if not trajectories:
             raise ValueError("Projection requires at least one trajectory.")
 

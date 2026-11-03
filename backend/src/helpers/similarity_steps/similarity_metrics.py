@@ -1,15 +1,15 @@
 import math
-from models.similarity import (
-    ProjectedTrajectory,
-    TrajectorySegment,
-    TrajectorySection,
-    Projection,
-)
 
 from helpers.similarity_steps.trajectory_operations import TrajectoryOperations
+from models.similarity import (
+    ProjectedTrajectory,
+    Projection,
+    TrajectorySection,
+    TrajectorySegment,
+)
+
 
 class SimilarityMetrics(TrajectoryOperations):
-
     def _spd(self, points: list[Projection], target_segments: list[TrajectorySegment]) -> float:
         """Average each source point's shortest distance to the target path."""
         total_distance = 0.0
@@ -40,7 +40,6 @@ class SimilarityMetrics(TrajectoryOperations):
             [segment_b],
         )
 
-
     def path_sspd(self, path_a: TrajectorySection, path_b: TrajectorySection) -> float:
         """Compare full paths using every vertex's distance to the other polyline."""
         if len(path_a.points) < 2 or len(path_b.points) < 2:
@@ -50,7 +49,6 @@ class SimilarityMetrics(TrajectoryOperations):
         segments_b = self.generate_segments([ProjectedTrajectory(path_b.trajectory_id, path_b.points)])
 
         return self._sspd(path_a.points, path_b.points, segments_a, segments_b)
-
 
     def point_to_segment_distance(self, point: Projection, segment: TrajectorySegment) -> float:
         """Return the shortest Euclidean distance to the finite original segment."""
@@ -62,12 +60,8 @@ class SimilarityMetrics(TrajectoryOperations):
             return math.hypot(point.x - segment.start.x, point.y - segment.start.y)
 
         # Project onto the line, then clamp to the segment's endpoints.
-        fraction = (
-            (point.x - segment.start.x) * dx + (point.y - segment.start.y) * dy
-        ) / length_squared
+        fraction = ((point.x - segment.start.x) * dx + (point.y - segment.start.y) * dy) / length_squared
         fraction = max(0.0, min(1.0, fraction))
         closest_x = segment.start.x + fraction * dx
         closest_y = segment.start.y + fraction * dy
         return math.hypot(point.x - closest_x, point.y - closest_y)
-
-

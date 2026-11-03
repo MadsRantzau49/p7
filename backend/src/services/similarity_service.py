@@ -1,61 +1,85 @@
 import math
-from models.similarity import (
-    CandidateCluster,
-    MatchingSegmentPair,
-    Pathlet,
-    ProjectedTrajectory,
-    RTreeNode,
-    TrajectorySegment,
-    TrajectorySection,
-    ExtendedPathletCandidate,
-    ProjectedPathlet,
-)
-
-from models.subtrajectory import Subtrajectory
-from models.similarity import Pathlet
 
 from helpers.similarity_steps.gps_projection_convertion import GpsProjectionConverter
 from helpers.similarity_steps.r_tree import RTree
 from helpers.similarity_steps.similarity_metrics import SimilarityMetrics
 from helpers.similarity_steps.trajectory_operations import TrajectoryOperations
+from models.similarity import (
+    CandidateCluster,
+    ExtendedPathletCandidate,
+    MatchingSegmentPair,
+    Pathlet,
+    ProjectedPathlet,
+    ProjectedTrajectory,
+    RTreeNode,
+    TrajectorySection,
+    TrajectorySegment,
+)
+from models.subtrajectory import Subtrajectory
 
-class SimilarityService(
-    GpsProjectionConverter, RTree, SimilarityMetrics, TrajectoryOperations
-):
+from services.logging import Logging
+
+
+class SimilarityService(GpsProjectionConverter, RTree, SimilarityMetrics, TrajectoryOperations, Logging):
+    
     def find_similar_trajectories(
-            self, 
-            subtrajectory_list: list[Subtrajectory] | None, 
-            epsilon: float,
-            r_tree_max_entries: int = 10, #HARDCODED FOR NOW!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHANGE BEFORE PUBLISH
-
+        self,
+        subtrajectory_list: list[Subtrajectory] | None,
+        epsilon: float,
+        r_tree_max_entries: int = 10,
     ) -> list[Pathlet] | None:
+
         if subtrajectory_list is None:
             return None
-        # Step 1: Projection
-        projected_trajectories = self.projection(subtrajectory_list)
 
-        # Step 2: Genereate Segments
-        segments = self.generate_segments(projected_trajectories)
-        
-        #Step 3: Build R-tree
-        rtree = self.build_rtree(segments, epsilon, r_tree_max_entries)
-
-        # Step 4: Find Matching Segment Pairs
-        matching_pairs = self.find_matching_segment_pairs(segments, rtree, epsilon)
-
-        # Step 5: Construct Candidate Clusters
-        candidate_clusters = self.construct_candidate_clusters(segments, matching_pairs)
-
-        # Step 6: Extend Candidate Clusters
-        extended_candidates = self.extend_candidate_clusters(
-            candidate_clusters, projected_trajectories, epsilon
+        self.logger.info(
+            "Starting clustering: %d trajectories, epsilon=%.2f",
+            len(subtrajectory_list),
+            epsilon,
         )
 
-        # Step 7: Select Final Pathlets
-        selected_pathlets = self.select_final_pathlets(extended_candidates, projected_trajectories)
+        with self.log_step("Step 1: Projection"):
+            projected = self.projection(subtrajectory_list)
 
-        # Step 8: Inverse Projection
-        gps_pathlets = self.inverse_projection(selected_pathlets)
+        with self.log_step("Step 2: Generate segments"):
+            segments = self.generate_segments(projected)
+            self.logger.info("Generated %d segments", len(segments))
+
+        with self.log_step("Step 3: Build R-tree"):
+            rtree = self.build_rtree(
+                segments, epsilon, r_tree_max_entries
+            )
+
+        with self.log_step("Step 4: Find matching pairs"):
+            matching_pairs = self.find_matching_segment_pairs(
+                segments, rtree, epsilon
+            )
+            self.logger.info(
+                "Found %d matching pairs", len(matching_pairs)
+            )
+
+        with self.log_step("Step 5: Construct clusters"):
+            clusters = self.construct_candidate_clusters(
+                segments, matching_pairs
+            )
+            self.logger.info("Constructed %d clusters", len(clusters))
+
+        with self.log_step("Step 6: Extend clusters"):
+            extended = self.extend_candidate_clusters(
+                clusters, projected, epsilon
+            )
+            self.logger.info(
+                "Generated %d extended candidates", len(extended)
+            )
+
+        with self.log_step("Step 7: Select final pathlets"):
+            selected = self.select_final_pathlets(
+                extended, projected
+            )
+            self.logger.info("Selected %d pathlets", len(selected))
+
+        with self.log_step("Step 8: Inverse projection"):
+            gps_pathlets = self.inverse_projection(selected)
 
         return gps_pathlets
 
@@ -126,8 +150,6 @@ class SimilarityService(
 
         return clusters
 
-
-
     def extend_candidate_clusters(
         self,
         clusters: list[CandidateCluster],
@@ -184,7 +206,10 @@ class SimilarityService(
                 extended_matches = []
                 for section in matching_sections:
                     next_section = self._extend_section(section, trajectories_by_id[section.trajectory_id])
-                    if next_section is not None and self.path_sspd(next_representative, next_section) <= epsilon:
+                    if (
+                        next_section is not None
+                        and self.path_sspd(next_representative, next_section) <= epsilon
+                    ):
                         extended_matches.append(next_section)
 
                 if not extended_matches:
@@ -193,7 +218,6 @@ class SimilarityService(
                 matching_sections = extended_matches
 
         return candidates
-
 
     def select_final_pathlets(
         self,
@@ -210,7 +234,7 @@ class SimilarityService(
         segment_lengths = {}
         for trajectory in trajectories:
             lengths = []
-            for start, end in zip(trajectory.projected_points, trajectory.projected_points[1:]):
+            for start, end in zip(trajectory.projected_points, trajectory.projected_points[1:], strict=False):
                 lengths.append(math.hypot(end.x - start.x, end.y - start.y))
             segment_lengths[trajectory.trajectory_id] = lengths
 
@@ -276,12 +300,19 @@ class SimilarityService(
 
 
 if __name__ == "__main__":
+    import logging
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(levelname)-2s | %(message)s",
+    )
 
     from collections.abc import Iterable
 
     from helpers.trajectory_csv_parser import parse_trajectory_csv
     from models.subtrajectory import Subtrajectory
-
+    import json
+    from dataclasses import asdict
 
     def parse_subpath_csv(lines: Iterable[str]) -> list[Subtrajectory]:
         """Treat each CSV route as a complete subpath for similarity processing."""
@@ -317,32 +348,23 @@ if __name__ == "__main__":
         with Path(path).open(encoding="utf-8-sig", newline="") as fixture_file:
             return parse_subpath_csv(fixture_file)
 
-    from pprint import pprint
-
     service = SimilarityService()
 
     BACKEND_DIR = Path(__file__).resolve().parents[2]
+    DATA_PATH = BACKEND_DIR / "tests/data/"
     file = "aalborg_germany.csv"
-    data_path = BACKEND_DIR / f"tests/data/trajectories/{file}"
     result = service.find_similar_trajectories(
-        load_subpaths(data_path),
-        10000,
-    )
-    import json
-    from dataclasses import asdict
-
-    import json
-    from dataclasses import asdict
-
-    service = SimilarityService()
-
-    result = service.find_similar_trajectories(
-        load_subpaths(data_path),
-        50000,
-        10,
+        load_subpaths(f"{DATA_PATH}/trajectories/{file}"),
+        100,
     )
 
-    print(json.dumps(
-        [asdict(pathlet) for pathlet in result or []],
-        indent=2,
-    ))
+    output_path = DATA_PATH / "pathlets.json"
+
+    output_path.write_text(
+        json.dumps(
+            [asdict(pathlet) for pathlet in result or []],
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
