@@ -322,11 +322,27 @@ if __name__ == "__main__":
     service = SimilarityService()
 
     BACKEND_DIR = Path(__file__).resolve().parents[2]
-    file = "skagen_to_aalborg.csv"
+    file = "aalborg_germany.csv"
     data_path = BACKEND_DIR / f"tests/data/trajectories/{file}"
     result = service.find_similar_trajectories(
         load_subpaths(data_path),
-        10,
+        10000,
+    )
+    import json
+    from dataclasses import asdict
+
+    import json
+    from dataclasses import asdict
+
+    service = SimilarityService()
+
+    result = service.find_similar_trajectories(
+        load_subpaths(data_path),
+        50000,
         10,
     )
-    pprint(result, sort_dicts=False, width=100)
+
+    print(json.dumps(
+        [asdict(pathlet) for pathlet in result or []],
+        indent=2,
+    ))
