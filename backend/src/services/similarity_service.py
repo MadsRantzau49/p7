@@ -275,55 +275,58 @@ class SimilarityService(
         return pathlets
 
 
+if __name__ == "__main__":
+
+    from collections.abc import Iterable
+
+    from helpers.trajectory_csv_parser import parse_trajectory_csv
+    from models.subtrajectory import Subtrajectory
 
 
-from collections.abc import Iterable
+    def parse_subpath_csv(lines: Iterable[str]) -> list[Subtrajectory]:
+        """Treat each CSV route as a complete subpath for similarity processing."""
+        trajectories = parse_trajectory_csv(lines)
+        next_trajectory_id = 1
+        for trajectory in trajectories:
+            if trajectory.trajectory_id is not None:
+                next_trajectory_id = max(next_trajectory_id, trajectory.trajectory_id + 1)
 
-from helpers.trajectory_csv_parser import parse_trajectory_csv
-from models.subtrajectory import Subtrajectory
+        subpaths = []
+        for index, trajectory in enumerate(trajectories, start=1):
+            trajectory_id = trajectory.trajectory_id
+            if trajectory_id is None:
+                trajectory_id = next_trajectory_id
+                next_trajectory_id += 1
 
-
-def parse_subpath_csv(lines: Iterable[str]) -> list[Subtrajectory]:
-    """Treat each CSV route as a complete subpath for similarity processing."""
-    trajectories = parse_trajectory_csv(lines)
-    next_trajectory_id = 1
-    for trajectory in trajectories:
-        if trajectory.trajectory_id is not None:
-            next_trajectory_id = max(next_trajectory_id, trajectory.trajectory_id + 1)
-
-    subpaths = []
-    for index, trajectory in enumerate(trajectories, start=1):
-        trajectory_id = trajectory.trajectory_id
-        if trajectory_id is None:
-            trajectory_id = next_trajectory_id
-            next_trajectory_id += 1
-
-        subpaths.append(
-            Subtrajectory(
-                subtrajectory_id=index,
-                trajectory_id=trajectory_id,
-                exit_a_time=trajectory.points[0].point_timestamp,
-                entry_b_time=trajectory.points[-1].point_timestamp,
-                points=trajectory.points,
+            subpaths.append(
+                Subtrajectory(
+                    subtrajectory_id=index,
+                    trajectory_id=trajectory_id,
+                    exit_a_time=trajectory.points[0].point_timestamp,
+                    entry_b_time=trajectory.points[-1].point_timestamp,
+                    points=trajectory.points,
+                )
             )
-        )
 
-    return subpaths
+        return subpaths
 
-from pathlib import Path
+    from pathlib import Path
 
-def load_subpaths(path: str | Path) -> list[Subtrajectory]:
-    """Treat each drawn route as a complete subpath, without a database lookup."""
-    with Path(path).open(encoding="utf-8-sig", newline="") as fixture_file:
-        return parse_subpath_csv(fixture_file)
+    def load_subpaths(path: str | Path) -> list[Subtrajectory]:
+        """Treat each drawn route as a complete subpath, without a database lookup."""
+        with Path(path).open(encoding="utf-8-sig", newline="") as fixture_file:
+            return parse_subpath_csv(fixture_file)
 
-from pprint import pprint
+    from pprint import pprint
 
-service = SimilarityService()
-result = service.find_similar_trajectories(
-    load_subpaths("/home/madsr/uni/p7/backend/tests/data/trajectories/aalborg_germany.csv"),
-    100000,
-    10,
-)
+    service = SimilarityService()
 
-pprint(result, sort_dicts=False, width=100)
+    BACKEND_DIR = Path(__file__).resolve().parents[2]
+    file = "skagen_to_aalborg.csv"
+    data_path = BACKEND_DIR / f"tests/data/trajectories/{file}"
+    result = service.find_similar_trajectories(
+        load_subpaths(data_path),
+        10,
+        10,
+    )
+    pprint(result, sort_dicts=False, width=100)
