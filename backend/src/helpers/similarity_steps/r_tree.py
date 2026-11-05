@@ -1,142 +1,94 @@
-import math
+import numpy as np
+import shapely
+from shapely import STRtree
 
-from models.similarity import (
-    BoundingBox,
-    RTreeEntry,
-    RTreeNode,
-    TrajectorySegment,
-)
+from models.similarity import TrajectorySegment
 
 
 class RTree:
-    def center_x(self, item: RTreeEntry | RTreeNode) -> float:
-        """Sort key: the x-coordinate of an item's box center."""
-        return item.box.center[0]
-
-    def center_y(self, item: RTreeEntry | RTreeNode) -> float:
-        """Sort key: the y-coordinate of an item's box center."""
-        return item.box.center[1]
-
-    def _box_around(self, items):
-        """MAKE DOCSTRING"""
-        boxes = []
-        for item in items:
-            boxes.append(item.box)
-        return BoundingBox.enclosing(boxes)
-
-    def bounding_box(
+    def _segment_bounds(
         self,
-        segment: TrajectorySegment,
-        epsilon: float = 0,
-    ) -> BoundingBox:
-        """MAKE DOCSTRING"""
-        return BoundingBox(
-            min_x=min(segment.start.x, segment.end.x) - epsilon,
-            min_y=min(segment.start.y, segment.end.y) - epsilon,
-            max_x=max(segment.start.x, segment.end.x) + epsilon,
-            max_y=max(segment.start.y, segment.end.y) + epsilon,
+        segments: list[TrajectorySegment],
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Return the tight bounding box of every segment as four arrays.
+
+        Position i in each array (min_x, min_y, max_x, max_y) belongs to segments[i].
+        """
+        coordinates = np.array(
+            [[segment.start.x, segment.start.y, segment.end.x, segment.end.y] for segment in segments],
+            dtype=float,
         )
+        min_x = np.minimum(coordinates[:, 0], coordinates[:, 2])
+        min_y = np.minimum(coordinates[:, 1], coordinates[:, 3])
+        max_x = np.maximum(coordinates[:, 0], coordinates[:, 2])
+        max_y = np.maximum(coordinates[:, 1], coordinates[:, 3])
+        return min_x, min_y, max_x, max_y
 
     def build_rtree(
         self,
         segments: list[TrajectorySegment],
         epsilon: float,
         max_entries: int,
-    ) -> RTreeNode | None:
-        """MAKE DOCSTRING"""
+    ) -> STRtree | None:
+        """Build an STR-packed R-tree over every segment's epsilon-expanded box (Step 3).
+
+        Tree item i is the bounding box of segments[i], grown by epsilon on every
+        side. Queries then use the tight (unexpanded) boxes, so two boxes overlap
+        whenever an endpoint of one segment lies within epsilon of the other's box.
+        That is always true for pairs with SSPD <= epsilon, so the filter never
+        drops a real match.
+
+        Args:
+            segments: Segments from Step 2, in metres.
+            epsilon: Matching distance in metres; must be non-negative.
+            max_entries: Maximum children per tree node (shapely's node_capacity).
+
+        Returns:
+            The tree, or None when there are no segments.
+        """
+        if epsilon < 0:
+            raise ValueError("epsilon must be non-negative.")
+        if max_entries < 2:
+            raise ValueError("max_entries must be at least 2.")
         if not segments:
             return None
 
-        entries = []
-        for segment in segments:
-            box = self.bounding_box(segment, epsilon)
-            entries.append(RTreeEntry(box=box, segment=segment))
-
-        # Make the leaves._str_groups
-        nodes = []
-        for group in self._str_groups(entries, max_entries):
-            leaf = RTreeNode(box=self._box_around(group), entries=group)
-            nodes.append(leaf)
-
-        # Bottom up from leaves to root.
-        while len(nodes) > 1:
-            parents = []
-            for group in self._str_groups(nodes, max_entries):
-                parent = RTreeNode(box=self._box_around(group), children=group)
-                parents.append(parent)
-            nodes = parents
-        return nodes[0]
+        min_x, min_y, max_x, max_y = self._segment_bounds(segments)
+        expanded_boxes = shapely.box(
+            min_x - epsilon,
+            min_y - epsilon,
+            max_x + epsilon,
+            max_y + epsilon,
+        )
+        return STRtree(expanded_boxes, node_capacity=max_entries)
 
     def query_rtree(
         self,
-        root: RTreeNode | None,
-        query_box: BoundingBox,
-    ) -> list[TrajectorySegment]:
-        """Return segments whose stored (expanded) box intersects query_box."""
-        if root is None:
-            return []
+        tree: STRtree | None,
+        segments: list[TrajectorySegment],
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Find every (query, stored) pair of overlapping boxes in one batched query.
 
-        results = []
-        stack = [root]
+        Pair k means the tight box of segments[query_index[k]] intersects the
+        stored, epsilon-expanded box of segments[tree_index[k]]. Touching boxes
+        count as overlapping. The result includes self pairs and both directions
+        of every pair; the caller filters those. Pairs are sorted by query
+        index, then tree index, so the output order is stable.
 
-        while stack:
-            node = stack.pop()
-            if not node.box.intersects(query_box):
-                continue  # Nothing below this node can match.
+        Args:
+            tree: The tree from build_rtree, built from the same segments list.
+            segments: The same list, in the same order, that built the tree.
 
-            if node.is_leaf:
-                results.extend(entry.segment for entry in node.entries if entry.box.intersects(query_box))
-            else:
-                stack.extend(node.children)
+        Returns:
+            Two equal-length integer arrays (query_index, tree_index).
+        """
+        if tree is None:
+            empty = np.array([], dtype=np.intp)
+            return empty, empty
 
-        return results
+        min_x, min_y, max_x, max_y = self._segment_bounds(segments)
+        query_boxes = shapely.box(min_x, min_y, max_x, max_y)
+        query_index, tree_index = tree.query(query_boxes)
 
-    def _str_groups(self, items: list, max_entries: int) -> list[list]:
-        """MAKE DOCSTRING"""
-        # Number of leafs/nodes needed, rounded up.
-        node_count = math.ceil(len(items) / max_entries)
-
-        # Width and height of the area covered by the box centres.
-        min_x, min_y = items[0].box.center
-        max_x, max_y = items[0].box.center
-        for item in items:
-            x, y = item.box.center
-            min_x = min(min_x, x)
-            max_x = max(max_x, x)
-            min_y = min(min_y, y)
-            max_y = max(max_y, y)
-        width = max_x - min_x
-        height = max_y - min_y
-
-        # Number of vertical slices.
-        # Wide data gets more slices and tall data fewer, keeping the groups square.
-        if height == 0:
-            # All centres on one horizontal line: one group per slice.
-            slice_count = node_count
-        elif width == 0:
-            # All centres on one vertical line: a single slice.
-            slice_count = 1
-        else:
-            slice_count = math.ceil(math.sqrt(node_count * width / height))
-
-        slice_count = max(1, min(slice_count, node_count))
-
-        # The amount of items per slice
-        slice_size = math.ceil(node_count / slice_count) * max_entries
-
-        # Sort everything left → right by box centre.
-        by_x = sorted(items, key=self.center_x)
-
-        # Cut into slices, sort each by y, cut into groups.
-        groups = []
-
-        # Start at 0 and jump forward by slice_size until the end.
-        for start in range(0, len(by_x), slice_size):
-            vertical_slice = by_x[start : start + slice_size]
-            vertical_slice = sorted(vertical_slice, key=self.center_y)
-            # Sort the slice bottom -> top, then cut it into groups of max_entries.
-            for i in range(0, len(vertical_slice), max_entries):
-                group = vertical_slice[i : i + max_entries]
-                groups.append(group)
-
-        return groups
+        order = np.lexsort((tree_index, query_index))
+        return query_index[order], tree_index[order]

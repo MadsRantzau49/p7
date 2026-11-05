@@ -1,5 +1,7 @@
 import math
 
+import numpy as np
+
 from helpers.similarity_steps.trajectory_operations import TrajectoryOperations
 from models.similarity import (
     ProjectedTrajectory,
@@ -86,3 +88,40 @@ class SimilarityMetrics(TrajectoryOperations):
         for distance in nearest:  # same summation order as _spd, so results match path_sspd exactly
             total += distance
         return total / len(nearest)
+
+    def _distances_to_segments(
+        self,
+        point_x: np.ndarray,
+        point_y: np.ndarray,
+        start_x: np.ndarray,
+        start_y: np.ndarray,
+        end_x: np.ndarray,
+        end_y: np.ndarray,
+    ) -> np.ndarray:
+        """Array version of _distance_to_segment: element k is point k to segment k."""
+        dx = end_x - start_x
+        dy = end_y - start_y
+        length_squared = dx * dx + dy * dy
+
+        # Zero-length segments divide by zero here; their fraction is replaced by 0
+        # below, which gives the distance to the single point, as in the scalar version.
+        with np.errstate(divide="ignore", invalid="ignore"):
+            fraction = ((point_x - start_x) * dx + (point_y - start_y) * dy) / length_squared
+        fraction = np.where(length_squared == 0, 0.0, np.clip(fraction, 0.0, 1.0))
+        closest_x = start_x + fraction * dx
+        closest_y = start_y + fraction * dy
+        return np.hypot(point_x - closest_x, point_y - closest_y)
+
+    def sspd_many(self, coordinates: np.ndarray, index_a: np.ndarray, index_b: np.ndarray) -> np.ndarray:
+        """SSPD for many segment pairs at once; element k compares segments index_a[k] and index_b[k].
+
+        coordinates has one row (start_x, start_y, end_x, end_y) per segment.
+        Uses the same arithmetic, in the same order, as sspd().
+        """
+        a = coordinates[index_a]
+        b = coordinates[index_b]
+        a_start_to_b = self._distances_to_segments(a[:, 0], a[:, 1], b[:, 0], b[:, 1], b[:, 2], b[:, 3])
+        a_end_to_b = self._distances_to_segments(a[:, 2], a[:, 3], b[:, 0], b[:, 1], b[:, 2], b[:, 3])
+        b_start_to_a = self._distances_to_segments(b[:, 0], b[:, 1], a[:, 0], a[:, 1], a[:, 2], a[:, 3])
+        b_end_to_a = self._distances_to_segments(b[:, 2], b[:, 3], a[:, 0], a[:, 1], a[:, 2], a[:, 3])
+        return ((a_start_to_b + a_end_to_b) / 2 + (b_start_to_a + b_end_to_a) / 2) / 2

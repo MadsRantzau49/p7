@@ -1,5 +1,7 @@
 import math
 
+import numpy as np
+
 from helpers.similarity_steps.gps_projection_convertion import GpsProjectionConverter
 from helpers.similarity_steps.r_tree import RTree
 from helpers.similarity_steps.similarity_metrics import SimilarityMetrics
@@ -20,6 +22,7 @@ from models.subtrajectory import Subtrajectory
 from services.logging import Logging
 import heapq
 import math
+from shapely import STRtree
 
 
 class SimilarityService(GpsProjectionConverter, RTree, SimilarityMetrics, TrajectoryOperations, Logging):
@@ -89,37 +92,40 @@ class SimilarityService(GpsProjectionConverter, RTree, SimilarityMetrics, Trajec
     def find_matching_segment_pairs(
         self,
         segments: list[TrajectorySegment],
-        root: RTreeNode | None,
+        tree: STRtree | None,
         epsilon: float,
     ) -> list[MatchingSegmentPair]:
         """Find cross-trajectory pairs passing the R-tree and SSPD tests (Step 4).
         The tree stores epsilon-expanded boxes. Queries use original boxes,
         and distance calculations use the original segment coordinates.
+
+        The ID filter and the SSPD test run on numpy arrays for all candidate
+        pairs at once; MatchingSegmentPair objects are only built for matches.
         """
         if epsilon < 0:
             raise ValueError("epsilon must be non-negative.")
+        if not segments:
+            return []
 
-        matches = []
-        candidate_count = 0
-        for segment in segments:
-            query_box = self.bounding_box(segment)
-            candidates = self.query_rtree(root, query_box)
-            for candidate in candidates:
-                # i < k excludes the same trajectory and counts each pair once.
-                if segment.trajectory_id >= candidate.trajectory_id:
-                    continue
+        query_index, tree_index = self.query_rtree(tree, segments)
 
-                candidate_count += 1
-                distance = self.sspd(segment, candidate)
-                if distance <= epsilon:
-                    matches.append(
-                        MatchingSegmentPair(
-                            segment_a=segment,
-                            segment_b=candidate,
-                        )
-                    )
+        # i < k excludes the same trajectory and counts each pair once.
+        trajectory_ids = np.array([segment.trajectory_id for segment in segments])
+        keep = trajectory_ids[query_index] < trajectory_ids[tree_index]
+        query_index = query_index[keep]
+        tree_index = tree_index[keep]
 
-        return matches
+        coordinates = np.array(
+            [[segment.start.x, segment.start.y, segment.end.x, segment.end.y] for segment in segments],
+            dtype=float,
+        )
+        is_match = self.sspd_many(coordinates, query_index, tree_index) <= epsilon
+
+        return [
+            MatchingSegmentPair(segment_a=segments[i], segment_b=segments[j])
+            for i, j in zip(query_index[is_match].tolist(), tree_index[is_match].tolist(), strict=True)
+        ]
+
 
     def construct_candidate_clusters(
         self,
@@ -389,7 +395,7 @@ if __name__ == "__main__":
 
     BACKEND_DIR = Path(__file__).resolve().parents[2]
     DATA_PATH = BACKEND_DIR / "tests/data/"
-    file = "aarhus_randers_10000_points.csv"
+    file = "aarhus_city_10000_points.csv"
     result = service.find_similar_trajectories(
         load_subpaths(f"{DATA_PATH}/trajectories/{file}"),
         100,
