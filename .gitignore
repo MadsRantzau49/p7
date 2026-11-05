@@ -149,3 +149,4 @@ outputs/
 runs/
 docs/rendered/*
 backend/tests/data/pathlets.json
+backend/tests/data/large_trajectories/*.csv*
