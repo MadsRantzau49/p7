@@ -77,13 +77,48 @@ class SimilarityMetrics(TrajectoryOperations):
 
         Old points can only get closer through the other path's new last segment;
         the new last point is measured against every segment. Returns the average.
+
+        The distance formula is written out inline (same arithmetic as
+        _distance_to_segment) because this is the hottest loop in the pipeline:
+        it avoids one method call per point-segment pair.
         """
-        new_start, new_end = other_points[-2], other_points[-1]
+        hypot = math.hypot
+
+        # Old points vs the other path's new segment.
+        start, end = other_points[-2], other_points[-1]
+        sx, sy = start.x, start.y
+        dx, dy = end.x - sx, end.y - sy
+        length_squared = dx * dx + dy * dy
         for index in range(len(nearest)):
-            nearest[index] = min(nearest[index], self._distance_to_segment(points[index], new_start, new_end))
-        nearest.append(
-            min(self._distance_to_segment(points[-1], a, b) for a, b in zip(other_points, other_points[1:], strict=False))
-        )
+            point = points[index]
+            px, py = point.x, point.y
+            if length_squared == 0:
+                distance = hypot(px - sx, py - sy)
+            else:
+                fraction = ((px - sx) * dx + (py - sy) * dy) / length_squared
+                fraction = max(0.0, min(1.0, fraction))
+                distance = hypot(px - (sx + fraction * dx), py - (sy + fraction * dy))
+            if distance < nearest[index]:
+                nearest[index] = distance
+
+        # The new point vs every segment of the other path.
+        point = points[-1]
+        px, py = point.x, point.y
+        best = math.inf
+        for start, end in zip(other_points, other_points[1:], strict=False):
+            sx, sy = start.x, start.y
+            dx, dy = end.x - sx, end.y - sy
+            length_squared = dx * dx + dy * dy
+            if length_squared == 0:
+                distance = hypot(px - sx, py - sy)
+            else:
+                fraction = ((px - sx) * dx + (py - sy) * dy) / length_squared
+                fraction = max(0.0, min(1.0, fraction))
+                distance = hypot(px - (sx + fraction * dx), py - (sy + fraction * dy))
+            if distance < best:
+                best = distance
+        nearest.append(best)
+
         total = 0.0
         for distance in nearest:  # same summation order as _spd, so results match path_sspd exactly
             total += distance
