@@ -18,6 +18,8 @@ from models.similarity import (
 from models.subtrajectory import Subtrajectory
 
 from services.logging import Logging
+import heapq
+import math
 
 
 class SimilarityService(GpsProjectionConverter, RTree, SimilarityMetrics, TrajectoryOperations, Logging):
@@ -251,32 +253,41 @@ class SimilarityService(GpsProjectionConverter, RTree, SimilarityMetrics, Trajec
                 lengths.append(math.hypot(end.x - start.x, end.y - start.y))
             segment_lengths[trajectory.trajectory_id] = lengths
 
-        remaining = []
+        coverages = []
         for candidate in candidates:
             coverage = {}
             for section in candidate.sections:
                 coverage.setdefault(section.trajectory_id, set()).update(
                     range(section.start_index, section.end_index)
                 )
-            remaining.append((candidate, coverage))
+            coverages.append(coverage)
+
+        # Max-heap (heapq is a min-heap, so gains are stored negated) of
+        # (-gain, candidate position). A gain can only shrink as coverage grows,
+        # so every stored gain is an upper bound on the candidate's real gain.
+        # Equal gains pop in candidate order, like the original "first wins" scan.
+        heap = []
+        for position, coverage in enumerate(coverages):
+            gain = self._new_coverage(coverage, represented, segment_lengths)
+            if gain > 0:
+                heap.append((-gain, position))
+        heapq.heapify(heap)
 
         pathlets = []
-        while remaining:
-            best_index = None
-            best_new_coverage = 0.0
-            for index, (_, coverage) in enumerate(remaining):
-                new_coverage = 0.0
-                for trajectory_id, indices in coverage.items():
-                    for segment_index in indices - represented[trajectory_id]:
-                        new_coverage += segment_lengths[trajectory_id][segment_index]
-                if new_coverage > best_new_coverage:
-                    best_index = index
-                    best_new_coverage = new_coverage
+        while heap:
+            negative_stored_gain, position = heapq.heappop(heap)
+            coverage = coverages[position]
+            gain = self._new_coverage(coverage, represented, segment_lengths)
+            if gain <= 0:
+                continue  # Covers nothing new, and never will again.
+            if gain < -negative_stored_gain:
+                # Stale: put it back with its real gain and look at the new top.
+                heapq.heappush(heap, (-gain, position))
+                continue
 
-            if best_index is None:
-                break
+            # Its gain is up to date and no stored upper bound beats it: the true best.
+            candidate = candidates[position]
 
-            candidate, coverage = remaining.pop(best_index)
             new_sections = []
             contributing_ids = []
             for trajectory_id, indices in coverage.items():
@@ -311,7 +322,18 @@ class SimilarityService(GpsProjectionConverter, RTree, SimilarityMetrics, Trajec
 
         return pathlets
 
-
+    def _new_coverage(
+    self,
+    coverage: dict[int, set[int]],
+    represented: dict[int, set[int]],
+    segment_lengths: dict[int, list[float]],
+) -> float:
+        """Total length of the candidate's segments that are not represented yet."""
+        new_coverage = 0.0
+        for trajectory_id, indices in coverage.items():
+            for segment_index in indices - represented[trajectory_id]:
+                new_coverage += segment_lengths[trajectory_id][segment_index]
+        return new_coverage
 if __name__ == "__main__":
     import logging
 
@@ -354,6 +376,8 @@ if __name__ == "__main__":
 
         return subpaths
 
+
+
     from pathlib import Path
 
     def load_subpaths(path: str | Path) -> list[Subtrajectory]:
@@ -365,7 +389,7 @@ if __name__ == "__main__":
 
     BACKEND_DIR = Path(__file__).resolve().parents[2]
     DATA_PATH = BACKEND_DIR / "tests/data/"
-    file = "aalborg_germany.csv"
+    file = "aarhus_randers_10000_points.csv"
     result = service.find_similar_trajectories(
         load_subpaths(f"{DATA_PATH}/trajectories/{file}"),
         100,
