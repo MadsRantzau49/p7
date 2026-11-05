@@ -44,16 +44,13 @@ class GpsProjectionConverter:
         projected_trajectories = []
 
         for trajectory in trajectories:
-            projected_points = []
-
-            for point in trajectory.points:
-                # always_xy=True means the inputs must be longitude, then latitude.
-                x, y = transformer.transform(
-                    point.longitude,
-                    point.latitude,
-                )
-
-                projected_points.append(Projection(x=x, y=y))
+            # Transform a complete section in native code instead of making a
+            # Python/PROJ call for every original observation.
+            xs, ys = transformer.transform(
+                [point.longitude for point in trajectory.points],
+                [point.latitude for point in trajectory.points],
+            )
+            projected_points = [Projection(x=x, y=y) for x, y in zip(xs, ys, strict=True)]
 
             projected_trajectories.append(
                 ProjectedTrajectory(
@@ -85,6 +82,7 @@ class GpsProjectionConverter:
                 Pathlet(
                     count=pathlet.count,
                     points=gps_points,
+                    support=pathlet.support,
                 )
             )
 

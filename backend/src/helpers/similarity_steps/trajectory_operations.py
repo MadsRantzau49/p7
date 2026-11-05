@@ -16,7 +16,7 @@ class TrajectoryOperations:
 
         segments = []
 
-        for trajectory in trajectories:
+        for section_index, trajectory in enumerate(trajectories):
             points = trajectory.projected_points
             # One segment per pair of consecutive points: (a,b,c,d) -> (a,b),(b,c),(c,d)
             for j in range(len(points) - 1):
@@ -26,6 +26,7 @@ class TrajectoryOperations:
                         segment_index=j,
                         start=points[j],
                         end=points[j + 1],
+                        section_index=section_index,
                     )
                 )
 

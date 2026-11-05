@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
 
-@dataclass
+@dataclass(slots=True)
 class Projection:
     x: float
     y: float
@@ -19,12 +19,22 @@ class GPSCoordinate:
     longitude: float
 
 
+@dataclass(slots=True)
+class SupportInterval:
+    """Distinct source trajectories supporting this arc-length interval, in projected metres."""
+
+    start_m: float
+    end_m: float
+    count: int
+
+
 @dataclass
 class Pathlet:
-    """A selected pathlet with all GPS points in travel order."""
+    """Extended original geometry; count is distinct trajectories contributing anywhere along it."""
 
     points: list[GPSCoordinate]
     count: int
+    support: list[SupportInterval] = field(default_factory=list)
 
 
 @dataclass
@@ -33,6 +43,16 @@ class TrajectorySegment:
     segment_index: int
     start: Projection
     end: Projection
+    # Position of the input section, independent of its original trajectory ID.
+    section_index: int = 0
+
+
+@dataclass
+class SegmentCluster:
+    """Disjoint assignments: each member and its orientation relative to the representative."""
+
+    representative: TrajectorySegment
+    members: list[tuple[TrajectorySegment, int]]
 
 
 @dataclass
@@ -49,21 +69,26 @@ class CandidateCluster:
     segments: list[TrajectorySegment]
 
 
-@dataclass
+@dataclass(slots=True)
 class TrajectorySection:
     trajectory_id: int
     start_index: int
     end_index: int
     points: list[Projection]
+    section_index: int = 0
+    representative_start_m: float = 0.0
+    representative_end_m: float = 0.0
+    reversed: bool = False
 
 
 @dataclass
 class ProjectedPathlet:
-    """A selected representative and its newly covered sections, in meters."""
+    """An extended representative with disjoint source assignments and partial-support intervals."""
 
     representative: TrajectorySection
     sections: list[TrajectorySection]
     count: int
+    support: list[SupportInterval] = field(default_factory=list)
 
 
 @dataclass
