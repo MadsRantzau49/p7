@@ -6,10 +6,10 @@ With the virtual environment active, run from the repository root:
 PYTHONPATH=backend/src python -m services.similarity_service
 ```
 
-The example currently selects the million-point Aarhus city fixture and writes
-`backend/tests/data/pathlets.json`. It logs projection, continuous extension,
-inverse projection and the total pipeline time. CSV loading and JSON output are
-outside the logged pipeline total.
+The example currently selects the 10,000-point Aarhus city fixture at epsilon
+300 metres and writes `backend/tests/data/pathlets.json`. It logs projection,
+continuous extension, inverse projection and the total pipeline time. CSV loading
+and JSON output are outside the logged pipeline total.
 
 ## Long representatives and partial support
 
@@ -115,12 +115,12 @@ Example local measurements at epsilon 100 metres:
 | Aarhus–Randers, 100,000 points | 0.70 s | 44 | 43.77 km | 97.8% |
 | Aarhus–Randers, 1,000,000 points | 7.18 s | 47 | 43.77 km | 96.8% |
 
-These are observed timings, not hard runtime limits. The complete default
-million-point command took 26.12 seconds including CSV parsing, startup, support
-metadata serialization and JSON writing; its logged clustering pipeline took
-9.35 seconds. CSV loading alone takes approximately 11 seconds on these
-million-point fixtures. Both million-point fixtures passed exact segment
-coverage and independent matched-interval distance verification.
+These are observed timings, not hard runtime limits. The complete
+million-point example command took 26.12 seconds including CSV parsing, startup,
+support metadata serialization and JSON writing; its logged clustering pipeline
+took 9.35 seconds. CSV loading alone takes approximately 11 seconds on these
+million-point fixtures. Both million-point fixtures passed exact segment coverage
+and independent matched-interval distance verification.
 
 ## Correctness tests
 
