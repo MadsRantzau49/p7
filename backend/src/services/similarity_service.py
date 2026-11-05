@@ -174,6 +174,7 @@ class SimilarityService(GpsProjectionConverter, RTree, SimilarityMetrics, Trajec
                 points=[segment.start, segment.end],
             )
             matching_sections = []
+            nearest = []  # nearest[i] belongs to matching_sections[i]: (representative -> match, match -> representative)
             for member in cluster.segments:
                 if member.trajectory_id == representative.trajectory_id:
                     continue
@@ -183,6 +184,12 @@ class SimilarityService(GpsProjectionConverter, RTree, SimilarityMetrics, Trajec
                         start_index=member.segment_index,
                         end_index=member.segment_index + 1,
                         points=[member.start, member.end],
+                    )
+                )
+                nearest.append(
+                    (
+                        [self.point_to_segment_distance(p, member) for p in (segment.start, segment.end)],
+                        [self.point_to_segment_distance(p, segment) for p in (member.start, member.end)],
                     )
                 )
 
@@ -204,18 +211,24 @@ class SimilarityService(GpsProjectionConverter, RTree, SimilarityMetrics, Trajec
                     break
 
                 extended_matches = []
-                for section in matching_sections:
+                extended_matches = []
+                extended_nearest = []
+                for section, (from_rep, from_match) in zip(matching_sections, nearest, strict=True):
                     next_section = self._extend_section(section, trajectories_by_id[section.trajectory_id])
-                    if (
-                        next_section is not None
-                        and self.path_sspd(next_representative, next_section) <= epsilon
-                    ):
+                    if next_section is None:
+                        continue
+                    # Same value as path_sspd(next_representative, next_section), in O(k) instead of O(k²).
+                    rep_to_match = self.update_nearest(from_rep, next_representative.points, next_section.points)
+                    match_to_rep = self.update_nearest(from_match, next_section.points, next_representative.points)
+                    if (rep_to_match + match_to_rep) / 2 <= epsilon:
                         extended_matches.append(next_section)
+                        extended_nearest.append((from_rep, from_match))
 
                 if not extended_matches:
                     break
                 representative = next_representative
                 matching_sections = extended_matches
+                nearest = extended_nearest
 
         return candidates
 
