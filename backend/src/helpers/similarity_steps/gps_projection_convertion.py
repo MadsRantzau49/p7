@@ -14,6 +14,7 @@ def centre_longitude(points) -> float:
     y = sum(math.sin(math.radians(point.longitude)) for point in points)
     return math.degrees(math.atan2(y, x))
 
+
 def projection(
     trajectories: list[Subtrajectory],
 ) -> tuple[list[ProjectedTrajectory], Transformer]:
@@ -36,9 +37,9 @@ def projection(
     centre_lon = centre_longitude(points)
 
     transformer = Transformer.from_crs(
-    "EPSG:4326",
-    f"+proj=tmerc +lat_0={centre_lat} +lon_0={centre_lon} +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m",
-    always_xy=True,
+        "EPSG:4326",
+        f"+proj=tmerc +lat_0={centre_lat} +lon_0={centre_lon} +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m",
+        always_xy=True,
     )
 
     projected_trajectories = []
@@ -60,7 +61,11 @@ def projection(
 
     return projected_trajectories, transformer
 
-def inverse_projection(pathlets: list[ProjectedPathlet], transformer: Transformer,) -> list[Pathlet]:
+
+def inverse_projection(
+    pathlets: list[ProjectedPathlet],
+    transformer: Transformer,
+) -> list[Pathlet]:
     """Convert projected pathlet points back to GPS coordinates in degrees."""
     if not pathlets:
         return []

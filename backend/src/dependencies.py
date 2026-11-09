@@ -87,6 +87,7 @@ def get_subtrajectory_service(
         trajectory_repository=trajectory_repository,
     )
 
+
 def get_similarity_service() -> SimilarityService:
     """Provides a similarity service"""
     return SimilarityService()

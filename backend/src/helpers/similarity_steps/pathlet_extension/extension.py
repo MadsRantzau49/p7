@@ -17,9 +17,9 @@ from models.similarity import (
 def extend_pathlets(trajectories: list[ProjectedTrajectory], epsilon: float) -> list[ProjectedPathlet]:
     """Build pathlets using an epsilon distance bound in metres.
 
-        Process longer trajectories first and assign every source segment once.
-        Return representative points with overall and local support counts.
-        """
+    Process longer trajectories first and assign every source segment once.
+    Return representative points with overall and local support counts.
+    """
     lines = []
     for _, trajectory in enumerate(trajectories):
         polyline = Polyline.from_points(trajectory.projected_points)
@@ -91,10 +91,10 @@ def assign_trajectory(
         # Everything from start to end becomes a new representative.
         representative_line = Polyline.from_points(polyline.points[start : end + 1])
         own_section = TrajectorySection(
-                trajectory_id=line.trajectory_id,
-                representative_start_m=0.0,
-                representative_end_m=representative_line.total_length,
-            )
+            trajectory_id=line.trajectory_id,
+            representative_start_m=0.0,
+            representative_end_m=representative_line.total_length,
+        )
         representative = Representative(representative_line, own_section)
         representatives.append(representative)
         grid.add(representative)
@@ -125,7 +125,7 @@ def to_projected_pathlet(representative: Representative) -> ProjectedPathlet:
         trajectory_ids.add(section.trajectory_id)
 
     return ProjectedPathlet(
-    points=representative.polyline.points,
-    count=len(trajectory_ids),
-    support=support_intervals(sections, total_length_m),
-)
+        points=representative.polyline.points,
+        count=len(trajectory_ids),
+        support=support_intervals(sections, total_length_m),
+    )

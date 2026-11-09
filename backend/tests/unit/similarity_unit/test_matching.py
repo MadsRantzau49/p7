@@ -125,7 +125,8 @@ def test_advance_returns_none_when_the_first_segment_cuts_a_corner():
     [(112.5, True), (112.0, False)],
 )
 def test_corners_within_epsilon_uses_steady_pace_pairing(
-    epsilon_squared, accepted,
+    epsilon_squared,
+    accepted,
 ):
     """Steady pacing."""
     result = _corners_within_epsilon(

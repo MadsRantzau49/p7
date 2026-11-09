@@ -3,6 +3,7 @@
 Only representative geometry is indexed. Assigned source sections contribute
 support without becoming additional geometry for matching.
 """
+
 import math
 
 from helpers.similarity_steps.pathlet_extension.geometry import (
@@ -47,7 +48,10 @@ class RepresentativeGrid:
         points = representative.polyline.points
         for segment_index in range(len(points) - 1):
             segment = self._indexed_segment(
-                representative, segment_index, points[segment_index], points[segment_index + 1],
+                representative,
+                segment_index,
+                points[segment_index],
+                points[segment_index + 1],
             )
             first_column = self.cell_coordinate(segment.min_x)
             last_column = self.cell_coordinate(segment.max_x)
@@ -79,7 +83,11 @@ class RepresentativeGrid:
                 if not box_contains(segment, point):
                     continue
                 fraction = project_onto_segment(
-                    point, segment.start, segment.dx, segment.dy, segment.length_squared,
+                    point,
+                    segment.start,
+                    segment.dx,
+                    segment.dy,
+                    segment.length_squared,
                 )
                 x, y = point_at_fraction(segment.start, segment.end, segment.dx, segment.dy, fraction)
 
@@ -89,7 +97,11 @@ class RepresentativeGrid:
         return seeds
 
     def _indexed_segment(
-        self, representative: Representative, segment_index: int, start: ProjectedPoint, end: ProjectedPoint,
+        self,
+        representative: Representative,
+        segment_index: int,
+        start: ProjectedPoint,
+        end: ProjectedPoint,
     ) -> IndexedSegment:
         """Build a segment record with cached geometry for spatial queries.
 

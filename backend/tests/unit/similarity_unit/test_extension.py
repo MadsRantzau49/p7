@@ -44,6 +44,7 @@ def test_trajectories_far_apart_give_separate_pathlets():
 
     assert [pathlet.count for pathlet in pathlets] == [1, 1]
 
+
 def test_longest_trajectory_becomes_the_representative():
     """Longer trajectories go first even when a shorter one comes first in the input."""
     long_line = [(0, 0), (10, 0), (20, 0), (30, 0)]
@@ -53,7 +54,6 @@ def test_longest_trajectory_becomes_the_representative():
     assert _coordinates(pathlet) == long_line
     assert pathlet.count == 2
     assert pathlet.support == [SupportInterval(0, 10, 2), SupportInterval(10, 30, 1)]
-
 
 
 def test_trajectory_leaving_a_representative_continues_as_a_new_pathlet():
@@ -68,6 +68,7 @@ def test_trajectory_leaving_a_representative_continues_as_a_new_pathlet():
     assert second.count == 1
     assert first.count == 2
     assert second.support == [SupportInterval(0, 20, 1)]
+
 
 def test_trajectory_joining_a_representative_starts_as_a_new_pathlet():
     """The unmatched start becomes a pathlet that ends where the shared part begins."""

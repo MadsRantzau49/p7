@@ -10,9 +10,8 @@ from services.logging import Logging
 
 class SimilarityService(Logging):
     def find_similar_trajectories(
-        self,
-        subtrajectory_list: list[Subtrajectory] | None,
-        epsilon: float) -> list[Pathlet] | None:
+        self, subtrajectory_list: list[Subtrajectory] | None, epsilon: float
+    ) -> list[Pathlet] | None:
         """Extend continuous pathlets with an epsilon distance bound in metres.
 
         Every original segment is assigned exactly once. Members may support
@@ -34,7 +33,6 @@ class SimilarityService(Logging):
             len(subtrajectory_list),
             epsilon,
         )
-
 
         with self.log_step("Clustering total"):
             with self.log_step("Step 1: Projection"):
