@@ -19,6 +19,7 @@ BACKWARD = -1
 # Angles between 45 and 135 degrees count as crossings.
 CROSSING_COS_SQUARED = 0.5
 
+
 def find_match(trajectory: Polyline, start: int, grid: RepresentativeGrid) -> Match | None:
     """Return the first accepted match starting at trajectory point start.
 
@@ -38,7 +39,7 @@ def find_match(trajectory: Polyline, start: int, grid: RepresentativeGrid) -> Ma
 
 
 def _rank_seeds(
-    seeds: list[Seed], trajectory: Polyline, start: int,epsilon : float
+    seeds: list[Seed], trajectory: Polyline, start: int, epsilon: float
 ) -> list[tuple[Seed, int]]:
     """Rank seeds by length suitability, available room, crossing, and proximity.
 
@@ -60,11 +61,7 @@ def _rank_seeds(
         direction = FORWARD if alignment >= 0 else BACKWARD
 
         position = distance_along(line, seed.segment_index, seed.fraction)
-        available = (
-            line.total_length - position
-            if direction == FORWARD
-            else position
-        )
+        available = line.total_length - position if direction == FORWARD else position
 
         is_crossing = alignment * alignment < (
             CROSSING_COS_SQUARED * trajectory_squared * segment.length_squared
@@ -81,22 +78,27 @@ def _rank_seeds(
     ranked.sort(key=itemgetter(0))
     return [(seed, direction) for _, seed, direction in ranked]
 
+
 def _advance(
-    trajectory: Polyline, start: int, seed: Seed, direction: int, epsilon: float,
+    trajectory: Polyline,
+    start: int,
+    seed: Seed,
+    direction: int,
+    epsilon: float,
 ) -> Match | None:
     """Greedily match trajectory segments onto the seed's representative.
 
-        Starting at trajectory point ``start`` and the seed's position on the
-        representative, walk the trajectory one segment at a time while moving
-        along the representative in ``direction`` only. A segment is accepted when
-        its end point lies within ``epsilon`` of the representative ahead of the
-        current position, and every representative corner passed on the way lies
-        within ``epsilon`` of the segment under a steady-pace pairing. The walk
-        stops at the first segment that fails, so the match is one contiguous run
-        starting at ``start``.
+    Starting at trajectory point ``start`` and the seed's position on the
+    representative, walk the trajectory one segment at a time while moving
+    along the representative in ``direction`` only. A segment is accepted when
+    its end point lies within ``epsilon`` of the representative ahead of the
+    current position, and every representative corner passed on the way lies
+    within ``epsilon`` of the segment under a steady-pace pairing. The walk
+    stops at the first segment that fails, so the match is one contiguous run
+    starting at ``start``.
 
-        Returns None if not even the first segment can be matched.
-        """
+    Returns None if not even the first segment can be matched.
+    """
     rep_line = seed.representative.polyline
     points = rep_line.points
     cumulative_distances = rep_line.cumulative_lengths
@@ -128,7 +130,8 @@ def _advance(
             fraction = project_onto_segment(trajectory_end, rep_start, dx, dy, length_squared)
             if candidate_segment == current_segment:
                 if (direction == FORWARD and fraction < current_fraction) or (
-                    direction == BACKWARD and fraction > current_fraction):
+                    direction == BACKWARD and fraction > current_fraction
+                ):
                     fraction = current_fraction
 
             projected_x, projected_y = point_at_fraction(rep_start, rep_end, dx, dy, fraction)
@@ -158,8 +161,13 @@ def _advance(
             corners = range(current_segment, next_segment, -1)
 
         if not _corners_within_epsilon(
-            rep_line, corners, current_distance, next_distance,
-            trajectory_start, trajectory_end, epsilon_squared,
+            rep_line,
+            corners,
+            current_distance,
+            next_distance,
+            trajectory_start,
+            trajectory_end,
+            epsilon_squared,
         ):
             break
         # Commit only after the endpoint and every traversed corner pass.
@@ -174,6 +182,7 @@ def _advance(
         start_m=start_distance,
         end_m=current_distance,
     )
+
 
 def _corners_within_epsilon(
     rep_line: Polyline,

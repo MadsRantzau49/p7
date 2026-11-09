@@ -9,6 +9,7 @@ from itertools import pairwise
 @dataclass
 class GPSCoordinate:
     """Geographic latitude and longitude, both expressed in degrees."""
+
     latitude: float
     longitude: float
 
@@ -31,6 +32,7 @@ class ProjectedTrajectory:
 
     trajectory_id: int
     projected_points: list[ProjectedPoint]
+
 
 @dataclass
 class SupportInterval:
@@ -55,9 +57,11 @@ class TrajectorySection:
     They are stored with start <= end, including for backward matches, and may
     be equal when the matched source stretch maps to a single position.
     """
+
     trajectory_id: int
     representative_start_m: float
     representative_end_m: float
+
 
 @dataclass
 class ProjectedPathlet:
@@ -68,6 +72,7 @@ class ProjectedPathlet:
     trajectory IDs count. support contains local counts over metre intervals;
     these can be smaller than the overall count.
     """
+
     points: list[ProjectedPoint]
     count: int
     support: list[SupportInterval] = field(default_factory=list)
@@ -97,9 +102,11 @@ class TrajectoryLine:
     trajectory_id: int
     polyline: Polyline
 
+
 @dataclass
 class Match:
     """An accepted source run and its positions along a representative."""
+
     representative: Representative
     end_index: int
     start_m: float
@@ -130,6 +137,7 @@ class Polyline:
             segment_lengths.append(length)
             cumulative_lengths.append(cumulative_lengths[-1] + length)
         return cls(points, segment_lengths, cumulative_lengths)
+
     @property
     def segment_count(self) -> int:
         """Number of segments (one fewer than the number of points)."""
@@ -182,6 +190,7 @@ class Seed:
     def segment_index(self) -> int:
         """Candidate segment's index within the representative's polyline."""
         return self.segment.segment_index
+
 
 @dataclass
 class Representative:

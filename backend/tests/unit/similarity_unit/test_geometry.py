@@ -64,4 +64,3 @@ def test_distance_along_adds_earlier_segments_and_part_of_the_current_one():
     polyline = Polyline.from_points([ORIGIN, ProjectedPoint(10, 0), ProjectedPoint(10, 20)])
 
     assert distance_along(polyline, 1, 0.5) == pytest.approx(20)
-

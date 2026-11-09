@@ -17,7 +17,11 @@ def squared_distance(ax: float, ay: float, bx: float, by: float) -> float:
 
 
 def project_onto_segment(
-    point: ProjectedPoint, start: ProjectedPoint, dx: float, dy: float, length_squared: float,
+    point: ProjectedPoint,
+    start: ProjectedPoint,
+    dx: float,
+    dy: float,
+    length_squared: float,
 ) -> float:
     """Fraction t in [0, 1] of the spot on a segment closest to the point (x, y).
 
@@ -37,7 +41,11 @@ def project_onto_segment(
 
 
 def point_at_fraction(
-    start: ProjectedPoint, end: ProjectedPoint, dx: float, dy: float, fraction: float,
+    start: ProjectedPoint,
+    end: ProjectedPoint,
+    dx: float,
+    dy: float,
+    fraction: float,
 ) -> tuple[float, float]:
     """The point a fraction of the way along a segment: start + fraction · (dx, dy).
 
@@ -59,8 +67,10 @@ def interpolate(start: ProjectedPoint, end: ProjectedPoint, fraction: float) -> 
 def box_contains(segment: IndexedSegment, point: ProjectedPoint) -> bool:
     """Return whether the point lies inside or on the expanded bounding box."""
     return not (
-        point.x < segment.min_x or point.x > segment.max_x
-        or point.y < segment.min_y or point.y > segment.max_y
+        point.x < segment.min_x
+        or point.x > segment.max_x
+        or point.y < segment.min_y
+        or point.y > segment.max_y
     )
 
 
@@ -70,7 +80,4 @@ def distance_along(
     fraction: float,
 ) -> float:
     """Metres from the polyline's start to a position on a segment."""
-    return (
-        polyline.cumulative_lengths[segment_index]
-        + fraction * polyline.segment_lengths[segment_index]
-    )
+    return polyline.cumulative_lengths[segment_index] + fraction * polyline.segment_lengths[segment_index]

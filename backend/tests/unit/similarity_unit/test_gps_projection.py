@@ -18,8 +18,9 @@ def _point(longitude: float, latitude: float) -> UniformedTrajectoryPoint:
     return UniformedTrajectoryPoint(longitude=longitude, point_timestamp=MOMENT, latitude=latitude)
 
 
-def _subtrajectory(trajectory_id: int, subtrajectory_id: int,
-                   coordinates: list[tuple[float, float]]) -> Subtrajectory:
+def _subtrajectory(
+    trajectory_id: int, subtrajectory_id: int, coordinates: list[tuple[float, float]]
+) -> Subtrajectory:
     """Build a subtrajectory from (longitude, latitude) pairs."""
     points = [_point(longitude, latitude) for longitude, latitude in coordinates]
     return Subtrajectory(trajectory_id, trajectory_id, MOMENT, MOMENT, points)
@@ -39,15 +40,17 @@ def test_projection_requires_at_least_one_trajectory():
 def test_projection_requires_every_trajectory_to_have_points():
     """A trajectory without points is rejected."""
     with pytest.raises(ValueError, match="at least one point"):
-        projection([
-            _subtrajectory(1,104, [(10.2, 56.15)]),
-            _subtrajectory(2, 204,[]),
-        ])
+        projection(
+            [
+                _subtrajectory(1, 104, [(10.2, 56.15)]),
+                _subtrajectory(2, 204, []),
+            ]
+        )
 
 
 def test_projection_is_centred_on_the_input():
     """A single location lies at the origin of its own projection."""
-    [projected], _ = projection([_subtrajectory(1,104, [(10.2, 56.15)])])
+    [projected], _ = projection([_subtrajectory(1, 104, [(10.2, 56.15)])])
 
     assert projected.projected_points[0].x == pytest.approx(0, abs=1e-6)
     assert projected.projected_points[0].y == pytest.approx(0, abs=1e-6)
@@ -55,7 +58,7 @@ def test_projection_is_centred_on_the_input():
 
 def test_projection_gives_distances_in_metres():
     """A thousandth of a degree of latitude is about 111 metres."""
-    [projected], _ = projection([_subtrajectory(1,104, [(10.2, 56.15), (10.2, 56.151)])])
+    [projected], _ = projection([_subtrajectory(1, 104, [(10.2, 56.15), (10.2, 56.151)])])
 
     first, second = projected.projected_points
     assert second.y - first.y == pytest.approx(111.3, rel=0.01)
@@ -67,7 +70,8 @@ def test_projection_keeps_trajectory_ids_and_the_number_of_points():
     trajectories = [
         _subtrajectory(4, 194, [(10.2, 56.15), (10.201, 56.15)]),
         _subtrajectory(
-            9, 2432,
+            9,
+            2432,
             [(10.2, 56.16), (10.201, 56.16), (10.202, 56.16)],
         ),
     ]
@@ -84,7 +88,7 @@ def test_projection_keeps_trajectory_ids_and_the_number_of_points():
 def test_inverse_projection_returns_the_original_gps_coordinates():
     """Projecting and converting back ends where it started."""
     coordinates = [(10.2, 56.15), (10.201, 56.151)]
-    [projected], transformer = projection([_subtrajectory(1,232, coordinates)])
+    [projected], transformer = projection([_subtrajectory(1, 232, coordinates)])
     pathlet = ProjectedPathlet(points=projected.projected_points, count=1)
 
     [gps_pathlet] = inverse_projection([pathlet], transformer)
@@ -96,7 +100,7 @@ def test_inverse_projection_returns_the_original_gps_coordinates():
 
 def test_inverse_projection_keeps_count_and_support_in_metres():
     """Only the points are converted, so count and support are unchanged."""
-    [projected], transformer = projection([_subtrajectory(1,232, [(10.2, 56.15), (10.201, 56.151)])])
+    [projected], transformer = projection([_subtrajectory(1, 232, [(10.2, 56.15), (10.201, 56.151)])])
     support = [SupportInterval(0.0, 50.0, 3)]
     pathlet = ProjectedPathlet(points=projected.projected_points, count=3, support=support)
 
@@ -109,6 +113,6 @@ def test_inverse_projection_keeps_count_and_support_in_metres():
 
 def test_inverse_projection_of_nothing_is_empty():
     """No pathlets means nothing to convert."""
-    _, transformer = projection([_subtrajectory(1, 2323,[(10.2, 56.15)])])
+    _, transformer = projection([_subtrajectory(1, 2323, [(10.2, 56.15)])])
 
     assert inverse_projection([], transformer) == []
