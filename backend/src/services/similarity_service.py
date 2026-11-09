@@ -1,21 +1,18 @@
 import math
 
-from helpers.similarity_steps.gps_projection_convertion import GpsProjectionConverter
-from helpers.similarity_steps.greedy_clustering import GreedyClustering
-from helpers.similarity_steps.trajectory_operations import TrajectoryOperations
+from helpers.similarity_steps.gps_projection_convertion import inverse_projection, projection
+from helpers.similarity_steps.pathlet_extension.extension import extend_pathlets
 from models.similarity import Pathlet
 from models.subtrajectory import Subtrajectory
 
 from services.logging import Logging
 
 
-class SimilarityService(GpsProjectionConverter, GreedyClustering, TrajectoryOperations, Logging):
+class SimilarityService(Logging):
     def find_similar_trajectories(
         self,
         subtrajectory_list: list[Subtrajectory] | None,
-        epsilon: float,
-        r_tree_max_entries: int = 10,
-    ) -> list[Pathlet] | None:
+        epsilon: float) -> list[Pathlet] | None:
         """Extend continuous pathlets with an epsilon distance bound in metres.
 
         Every original segment is assigned exactly once. Members may support
@@ -28,26 +25,27 @@ class SimilarityService(GpsProjectionConverter, GreedyClustering, TrajectoryOper
             return None
         if not math.isfinite(epsilon) or epsilon < 0:
             raise ValueError("epsilon must be finite and non-negative.")
-        if r_tree_max_entries < 2:
-            raise ValueError("r_tree_max_entries must be at least 2.")
         if not subtrajectory_list:
             return []
+        if any(len(subtrajectory.points) < 2 for subtrajectory in subtrajectory_list):
+            raise ValueError("Every subtrajectory must contain at least two points.")
         self.logger.info(
             "Starting clustering: %d trajectories, epsilon=%.2f",
             len(subtrajectory_list),
             epsilon,
         )
 
+
         with self.log_step("Clustering total"):
             with self.log_step("Step 1: Projection"):
-                projected = self.projection(subtrajectory_list)
+                projected, transformer = projection(subtrajectory_list)
 
             with self.log_step("Step 2: Extend continuous pathlets"):
-                selected = self.extend_pathlets(projected, epsilon)
+                selected = extend_pathlets(projected, epsilon)
                 self.logger.info("Selected %d pathlets", len(selected))
 
             with self.log_step("Step 3: Inverse projection"):
-                gps_pathlets = self.inverse_projection(selected)
+                gps_pathlets = inverse_projection(selected, transformer)
 
         return gps_pathlets
 
