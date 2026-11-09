@@ -127,6 +127,7 @@ def test_advance_returns_none_when_the_first_segment_cuts_a_corner():
 def test_corners_within_epsilon_uses_steady_pace_pairing(
     epsilon_squared, accepted,
 ):
+    """Steady pacing."""
     result = _corners_within_epsilon(
         _polyline([(0, 0), (10, 0), (10, 30)]),
         range(1, 2),

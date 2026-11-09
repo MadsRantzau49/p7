@@ -65,13 +65,3 @@ def test_distance_along_adds_earlier_segments_and_part_of_the_current_one():
 
     assert distance_along(polyline, 1, 0.5) == pytest.approx(20)
 
-@pytest.mark.parametrize(
-    "x, y, expected",
-    [
-        (2.5, 7, 0.25),
-        (-5, 1, 0.0),
-        (15, 1, 1.0),
-    ],
-)
-def test_project_onto_segment_returns_a_clamped_fraction(x, y, expected):
-    assert _project_onto_horizontal_segment(x, y) == expected

@@ -18,7 +18,8 @@ def _point(longitude: float, latitude: float) -> UniformedTrajectoryPoint:
     return UniformedTrajectoryPoint(longitude=longitude, point_timestamp=MOMENT, latitude=latitude)
 
 
-def _subtrajectory(trajectory_id: int, subtrajectory_id: int, coordinates: list[tuple[float, float]]) -> Subtrajectory:
+def _subtrajectory(trajectory_id: int, subtrajectory_id: int,
+                   coordinates: list[tuple[float, float]]) -> Subtrajectory:
     """Build a subtrajectory from (longitude, latitude) pairs."""
     points = [_point(longitude, latitude) for longitude, latitude in coordinates]
     return Subtrajectory(trajectory_id, trajectory_id, MOMENT, MOMENT, points)
@@ -64,14 +65,20 @@ def test_projection_gives_distances_in_metres():
 def test_projection_keeps_trajectory_ids_and_the_number_of_points():
     """Every trajectory keeps its identity, in the same order as the input."""
     trajectories = [
-        _subtrajectory(4,194, [(10.2, 56.15), (10.201, 56.15)]),
-        _subtrajectory(9, 2432,[(10.2, 56.16), (10.201, 56.16), (10.202, 56.16)]),
+        _subtrajectory(4, 194, [(10.2, 56.15), (10.201, 56.15)]),
+        _subtrajectory(
+            9, 2432,
+            [(10.2, 56.16), (10.201, 56.16), (10.202, 56.16)],
+        ),
     ]
+
+    # Check whether the IDs are already wrong before projection.
+    assert [t.trajectory_id for t in trajectories] == [4, 9]
 
     projected, _ = projection(trajectories)
 
-    assert [trajectory.trajectory_id for trajectory in projected] == [4, 9]
-    assert [len(trajectory.projected_points) for trajectory in projected] == [2, 3]
+    assert [t.trajectory_id for t in projected] == [4, 9]
+    assert [len(t.projected_points) for t in projected] == [2, 3]
 
 
 def test_inverse_projection_returns_the_original_gps_coordinates():
@@ -94,7 +101,7 @@ def test_inverse_projection_keeps_count_and_support_in_metres():
     pathlet = ProjectedPathlet(points=projected.projected_points, count=3, support=support)
 
     [gps_pathlet] = inverse_projection([pathlet], transformer)
-    
+
     assert gps_pathlet.count == 3
     assert gps_pathlet.support == [SupportInterval(0.0, 50.0, 3)]
     assert pathlet.support == [SupportInterval(0.0, 50.0, 3)]

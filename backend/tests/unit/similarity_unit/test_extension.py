@@ -53,7 +53,7 @@ def test_longest_trajectory_becomes_the_representative():
     assert _coordinates(pathlet) == long_line
     assert pathlet.count == 2
     assert pathlet.support == [SupportInterval(0, 10, 2), SupportInterval(10, 30, 1)]
-    
+
 
 
 def test_trajectory_leaving_a_representative_continues_as_a_new_pathlet():
