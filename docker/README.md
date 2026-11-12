@@ -51,7 +51,12 @@ docker compose -f docker/trajectory-builder.compose.yml down
 
 ## Start the database (when on the server)
 
+The database does **not** start automatically when the VM boots. Docker would start it before
+UCloud has mounted `/work/P7`, and Postgres would then create a new, empty database on the
+local disk. After a VM restart, check the drive is mounted first, then start it by hand:
+
 ```bash
+df -h /work/P7          # must show the ucloud-... filesystem, not the local disk
 docker compose -f docker/database.compose.yml up -d
 ```
 
