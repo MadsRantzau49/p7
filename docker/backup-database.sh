@@ -2,7 +2,8 @@
 set -euo pipefail
 
 BACKUP_DIR=/work/P7/backups
-KEEP_DAYS=7
+# Backups run weekly (see crontab on the VM); keep the last ~4 weeks
+KEEP_DAYS=28
 COMPOSE_FILE=/work/P7/p7/docker/database.compose.yml
 # A core table that must exist and contain rows. If it doesn't, the database is
 # empty or wrong (e.g. Postgres started on an empty data folder) and we must not
