@@ -9,6 +9,7 @@ from fastapi import Depends
 from psycopg import Connection
 from services.cleaning_service import CleanService
 from services.dataset_upload_service import UploadDataset
+from services.similarity_service import SimilarityService
 from services.subtrajectory_service import SubtrajectoryService
 from services.trajectory_service import TrajectoryService
 
@@ -85,3 +86,8 @@ def get_subtrajectory_service(
     return SubtrajectoryService(
         trajectory_repository=trajectory_repository,
     )
+
+
+def get_similarity_service() -> SimilarityService:
+    """Provides a similarity service"""
+    return SimilarityService()
