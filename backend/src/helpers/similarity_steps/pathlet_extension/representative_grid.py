@@ -14,15 +14,12 @@ from helpers.similarity_steps.pathlet_extension.geometry import (
 )
 from models.similarity import IndexedSegment, ProjectedPoint, Representative, Seed
 
-MAX_CELLS_PER_SEGMENT = 256
-
 
 class RepresentativeGrid:
     """Find nearby representative segments using a uniform grid of square cells.
 
     Each segment's bounding box is expanded by epsilon and indexed in every
-    cell it touches. Queries inspect their own cell and a separate list of
-    segments whose expanded boxes exceed MAX_CELLS_PER_SEGMENT.
+    cell it touches, so a query only needs to inspect its own cell.
     """
 
     def __init__(self, epsilon: float, cell_size: float) -> None:
@@ -30,7 +27,6 @@ class RepresentativeGrid:
         self.epsilon_squared = epsilon * epsilon
         self.cell_size = cell_size
         self.cells: dict[tuple[int, int], list[IndexedSegment]] = {}
-        self.long_segments: list[IndexedSegment] = []
 
     def cell_coordinate(self, value: float) -> int:
         """Return the cell index for a coordinate, using floor to handle negatives."""
@@ -40,8 +36,7 @@ class RepresentativeGrid:
         """Index every segment of a new representative.
 
         Expand each segment's bounding box by epsilon and store its cached
-        record in every cell touched by that box. Records exceeding
-        MAX_CELLS_PER_SEGMENT are stored in long_segments instead.
+        record in every cell touched by that box.
 
         Add each representative once and keep its geometry unchanged while indexed.
         """
@@ -57,10 +52,6 @@ class RepresentativeGrid:
             last_column = self.cell_coordinate(segment.max_x)
             first_row = self.cell_coordinate(segment.min_y)
             last_row = self.cell_coordinate(segment.max_y)
-            cell_count = (last_column - first_column + 1) * (last_row - first_row + 1)
-            if cell_count > MAX_CELLS_PER_SEGMENT:
-                self.long_segments.append(segment)
-                continue
             for column in range(first_column, last_column + 1):
                 for row in range(first_row, last_row + 1):
                     self.cells.setdefault((column, row), []).append(segment)
@@ -68,8 +59,8 @@ class RepresentativeGrid:
     def seeds_near(self, point: ProjectedPoint) -> list[Seed]:
         """Return candidate match starts within epsilon metres of the query point.
 
-        Search the point's grid cell together with all long_segments. First
-        reject candidates outside their expanded bounding boxes, then project
+        Search the point's grid cell. First reject candidates outside their
+        expanded bounding boxes, then project
         the point onto each remaining segment and check its squared distance.
 
         Each seed contains the segment, closest fraction, and squared distance.
@@ -77,23 +68,21 @@ class RepresentativeGrid:
         """
         cell = (self.cell_coordinate(point.x), self.cell_coordinate(point.y))
         seeds = []
+        for segment in self.cells.get(cell, []):
+            if not box_contains(segment, point):
+                continue
+            fraction = project_onto_segment(
+                point,
+                segment.start,
+                segment.dx,
+                segment.dy,
+                segment.length_squared,
+            )
+            x, y = point_at_fraction(segment.start, segment.end, segment.dx, segment.dy, fraction)
 
-        for candidates in (self.cells.get(cell, []), self.long_segments):
-            for segment in candidates:
-                if not box_contains(segment, point):
-                    continue
-                fraction = project_onto_segment(
-                    point,
-                    segment.start,
-                    segment.dx,
-                    segment.dy,
-                    segment.length_squared,
-                )
-                x, y = point_at_fraction(segment.start, segment.end, segment.dx, segment.dy, fraction)
-
-                distance_squared = squared_distance(point.x, point.y, x, y)
-                if distance_squared <= self.epsilon_squared:
-                    seeds.append(Seed(segment, fraction, distance_squared))
+            distance_squared = squared_distance(point.x, point.y, x, y)
+            if distance_squared <= self.epsilon_squared:
+                seeds.append(Seed(segment, fraction, distance_squared))
         return seeds
 
     def _indexed_segment(

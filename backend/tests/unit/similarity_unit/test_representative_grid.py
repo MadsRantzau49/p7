@@ -68,13 +68,3 @@ def test_segment_in_negative_coordinates_is_found():
 
     assert grid.cell_coordinate(-0.1) == -1
     assert len(grid.seeds_near(ProjectedPoint(-15, -5))) == 1
-
-
-def test_very_long_segment_goes_to_the_fallback_list_and_is_still_found():
-    """A segment touching too many cells is kept out of the grid but still searched."""
-    grid, _ = _grid_with([(0, 0), (20000, 0)])
-
-    assert grid.cells == {}
-    assert len(grid.long_segments) == 1
-    [seed] = grid.seeds_near(ProjectedPoint(5000, 0.5))
-    assert seed.fraction == 0.25

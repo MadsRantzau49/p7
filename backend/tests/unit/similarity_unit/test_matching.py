@@ -2,11 +2,8 @@ from collections.abc import Sequence
 
 import pytest
 from helpers.similarity_steps.pathlet_extension.matching import (
-    BACKWARD,
-    FORWARD,
     _advance,
     _corners_within_epsilon,
-    _rank_seeds,
     find_match,
 )
 from helpers.similarity_steps.pathlet_extension.representative_grid import RepresentativeGrid
@@ -38,19 +35,19 @@ def _grid_with(*representative_lines: Coordinates) -> tuple[RepresentativeGrid, 
     return grid, representatives
 
 
-def _advance_along(representative_line: Coordinates, trajectory_line: Coordinates, direction: int):
+def _advance_along(representative_line: Coordinates, trajectory_line: Coordinates):
     """Run _advance from the first trajectory point, seeded on the only nearby representative segment."""
     grid, _ = _grid_with(representative_line)
     trajectory = _polyline(trajectory_line)
     [seed] = grid.seeds_near(trajectory.points[0])
-    return _advance(trajectory, 0, seed, direction, EPSILON)
+    return _advance(trajectory, 0, seed, EPSILON)
 
 
 # find_match
 
 
-def test_find_match_returns_the_match_on_the_best_ranked_representative():
-    """The crossing representative is closer and would also accept this short segment."""
+def test_find_match_skips_a_closer_representative_it_cannot_move_along():
+    """The crossing representative is closer, but the segment makes no progress along it."""
     grid, [_, aligned] = _grid_with(CROSSING_LINE, ALIGNED_LINE)
 
     match = find_match(_polyline([(0, 0), (0.5, 0)]), 0, grid)
@@ -66,46 +63,26 @@ def test_find_match_returns_none_when_no_representative_is_nearby():
     assert find_match(_polyline([(500, 500), (510, 500)]), 0, grid) is None
 
 
-# _rank_seeds
-
-
-def test_rank_seeds_puts_an_aligned_representative_before_a_closer_crossing_one():
-    """Alignment outranks distance, and a segment running the opposite way prefers going backward."""
-    grid, [crossing, aligned] = _grid_with(CROSSING_LINE, ALIGNED_LINE)
-    trajectory = _polyline([(0, 0), (-0.5, 0)])
-
-    ranked = _rank_seeds(grid.seeds_near(trajectory.points[0]), trajectory, 0, EPSILON)
-
-    (first_seed, first_direction), (second_seed, _) = ranked
-    assert first_seed.representative is aligned
-    assert first_direction == BACKWARD
-    assert second_seed.representative is crossing
-
-
 # _advance
 
 
-def test_advance_forward_follows_the_whole_representative():
+def test_advance_follows_the_whole_representative():
     """An identical trajectory is accepted from the first representative point to the last."""
-    match = _advance_along(STRAIGHT_LINE, STRAIGHT_LINE, FORWARD)
+    match = _advance_along(STRAIGHT_LINE, STRAIGHT_LINE)
 
     assert match is not None
     assert match.end_index == 2
     assert (match.start_m, match.end_m) == (0, 20)
 
 
-def test_advance_backward_walks_towards_the_start_of_the_representative():
-    """A backward match begins at the far end, so start_m is larger than end_m."""
-    match = _advance_along(STRAIGHT_LINE, STRAIGHT_LINE[::-1], BACKWARD)
-
-    assert match is not None
-    assert match.end_index == 2
-    assert (match.start_m, match.end_m) == (20, 0)
+def test_advance_rejects_a_trajectory_running_the_opposite_way():
+    """Matching only moves forward, so a reversed trajectory does not match."""
+    assert _advance_along(STRAIGHT_LINE, STRAIGHT_LINE[::-1]) is None
 
 
 def test_advance_stops_at_the_first_segment_that_leaves_the_representative():
     """The match is one continuous run that ends where the trajectory turns away."""
-    match = _advance_along(STRAIGHT_LINE, L_SHAPE, FORWARD)
+    match = _advance_along(STRAIGHT_LINE, L_SHAPE)
 
     assert match is not None
     assert match.end_index == 1
@@ -114,7 +91,7 @@ def test_advance_stops_at_the_first_segment_that_leaves_the_representative():
 
 def test_advance_returns_none_when_the_first_segment_cuts_a_corner():
     """Reaching the far end is not enough if the corner passed on the way is too far away."""
-    assert _advance_along(L_SHAPE, [(0, 0), (10, 10)], FORWARD) is None
+    assert _advance_along(L_SHAPE, [(0, 0), (10, 10)]) is None
 
 
 # _corners_within_epsilon

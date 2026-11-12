@@ -14,12 +14,19 @@ from models.similarity import (
 )
 
 
-def extend_pathlets(trajectories: list[ProjectedTrajectory], epsilon: float) -> list[ProjectedPathlet]:
-    """Build pathlets using an epsilon distance bound in metres.
-
-    Process longer trajectories first and assign every source segment once.
-    Return representative points with overall and local support counts.
+def generate_pathlet(trajectories: list[ProjectedTrajectory], epsilon: float,  greedy_ranking: bool) -> list[ProjectedPathlet]:
     """
+        Cluster subtrajectories into shared pathlets using an epsilon
+        distance threshold in metres.
+        
+        Each input segment is assigned exactly once, either to an existing
+        pathlet or to a newly created one.
+        
+        Pathlets may be supported by different trajectories along different
+        sections. The overall count represents the number of distinct
+        original trajectory IDs contributing to a pathlet, while support
+        intervals describe local counts along its geometry.
+        """
     lines = []
     for _, trajectory in enumerate(trajectories):
         polyline = Polyline.from_points(trajectory.projected_points)
@@ -28,20 +35,21 @@ def extend_pathlets(trajectories: list[ProjectedTrajectory], epsilon: float) -> 
     lengths = []
     for line in lines:
         for length in line.polyline.segment_lengths:
+            # If they stand still
             if length > 0:
                 lengths.append(length)
 
     if lengths:
         cell_size = max(epsilon, median(lengths), 1.0)
     else:
-        cell_size = max(epsilon, 1.0)
+        raise ValueError("No non-zero-length segments: trajectories are empty, single-point, or stationary")
 
     grid = RepresentativeGrid(epsilon, cell_size)
     representatives: list[Representative] = []
 
     sorted_trajectories = sorted(lines, key=attrgetter("polyline.total_length"), reverse=True)
     for trajectory in sorted_trajectories:
-        assign_trajectory(trajectory, grid, representatives)
+        assign_trajectory(trajectory, grid, representatives, greedy_ranking)
 
     projected_pathlets = []
     for representative in representatives:
@@ -53,6 +61,7 @@ def assign_trajectory(
     line: TrajectoryLine,
     grid: RepresentativeGrid,
     representatives: list[Representative],
+    greedy_ranking
 ) -> None:
     """Walk one trajectory and assign each stretch: to a representative, or as a new one.
 
@@ -62,18 +71,18 @@ def assign_trajectory(
     start = 0
     pending = None  # a match already found while scanning ahead
     while start < polyline.segment_count:
-        if pending is not None:
+        if pending:
             match = pending
         else:
-            match = find_match(polyline, start, grid)
+            match = find_match(polyline, start, grid, greedy_ranking)
         pending = None
 
         # Match found: assign the stretch to that representative.
-        if match is not None:
+        if match:
             section = TrajectorySection(
                 trajectory_id=line.trajectory_id,
-                representative_start_m=min(match.start_m, match.end_m),
-                representative_end_m=max(match.start_m, match.end_m),
+                representative_start_m=match.start_m,
+                representative_end_m=match.end_m,
             )
 
             match.representative.assigned_sections.append(section)
@@ -83,8 +92,8 @@ def assign_trajectory(
         # No match: scan ahead to the first point where a match begins (or the last point).
         end = start + 1
         while end < polyline.segment_count:
-            pending = find_match(polyline, end, grid)
-            if pending is not None:
+            pending = find_match(polyline, end, grid, greedy_ranking)
+            if pending:
                 break
             end += 1
 
@@ -111,14 +120,10 @@ def to_projected_pathlet(representative: Representative) -> ProjectedPathlet:
     sections.extend(representative.assigned_sections)
 
     total_length_m = representative.polyline.total_length
-    if total_length_m == 0:
-        # Degenerate representative: every section has zero length, so count them all.
-        covering = sections
-    else:
-        covering = []
-        for section in sections:
-            if section.representative_end_m > section.representative_start_m:
-                covering.append(section)
+    covering = []
+    for section in sections:
+        if section.representative_end_m > section.representative_start_m:
+            covering.append(section)
 
     trajectory_ids = set()
     for section in covering:

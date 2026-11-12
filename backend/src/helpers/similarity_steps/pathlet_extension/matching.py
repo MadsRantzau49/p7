@@ -1,9 +1,8 @@
 import math
-from operator import itemgetter
+from operator import attrgetter
 
 from helpers.similarity_steps.pathlet_extension.geometry import (
     distance_along,
-    dot,
     interpolate,
     point_at_fraction,
     project_onto_segment,
@@ -14,90 +13,57 @@ from helpers.similarity_steps.pathlet_extension.representative_grid import (
 )
 from models.similarity import Match, Polyline, ProjectedPoint, Seed
 
-FORWARD = 1
-BACKWARD = -1
-# Angles between 45 and 135 degrees count as crossings.
-CROSSING_COS_SQUARED = 0.5
+#FIXME CONSTANT
+REACH_MULTIPLIER = 2
 
 
-def find_match(trajectory: Polyline, start: int, grid: RepresentativeGrid) -> Match | None:
+def find_match(trajectory: Polyline, start: int, grid: RepresentativeGrid, greedy_ranking: bool) -> Match | None:
     """Return the first accepted match starting at trajectory point start.
 
-    Try ranked seeds in their preferred direction, then the opposite direction.
-    Return None if no attempt accepts at least one whole source segment.
+    Try seeds from closest to farthest. Return None if no seed accepts at
+    least one whole source segment.
     """
     seeds = grid.seeds_near(trajectory.points[start])
-    if not seeds:
-        return None
+    seeds.sort(key=attrgetter("distance_squared"))
 
-    for seed, preferred in _rank_seeds(seeds, trajectory, start, grid.epsilon):
-        for direction in (preferred, -preferred):
-            match = _advance(trajectory, start, seed, direction, grid.epsilon)
+    if  greedy_ranking:
+        for seed in seeds:
+            match = _advance(trajectory, start, seed, grid.epsilon)
             if match is not None:
                 return match
-    return None
-
-
-def _rank_seeds(
-    seeds: list[Seed], trajectory: Polyline, start: int, epsilon: float
-) -> list[tuple[Seed, int]]:
-    """Rank seeds by length suitability, available room, crossing, and proximity.
-
-    Prefer representatives at least epsilon long, room for half the source
-    segment, and non-crossing alignment. Return (seed, preferred_direction) pairs.
-    """
-    a, b = trajectory.points[start], trajectory.points[start + 1]
-    dx, dy = b.x - a.x, b.y - a.y
-    trajectory_squared = dx * dx + dy * dy
-    half_segment_length = trajectory.segment_lengths[start] / 2
-
-    ranked = []
-
-    for seed in seeds:
-        segment = seed.segment
-        line = seed.representative.polyline
-
-        alignment = dot(segment.dx, segment.dy, dx, dy)
-        direction = FORWARD if alignment >= 0 else BACKWARD
-
-        position = distance_along(line, seed.segment_index, seed.fraction)
-        available = line.total_length - position if direction == FORWARD else position
-
-        is_crossing = alignment * alignment < (
-            CROSSING_COS_SQUARED * trajectory_squared * segment.length_squared
-        )
-
-        priority = (
-            line.total_length < epsilon,
-            available < half_segment_length,
-            is_crossing,
-            seed.distance_squared,
-        )
-        ranked.append((priority, seed, direction))
-
-    ranked.sort(key=itemgetter(0))
-    return [(seed, direction) for _, seed, direction in ranked]
+        return None
+        
+    else:
+        best = None
+        for seed in seeds:
+            match = _advance(trajectory, start, seed, grid.epsilon)
+            if match is not None and (best is None or match.end_index > best.end_index):
+                best = match
+                if best.end_index == trajectory.segment_count:
+                    break
+        return best        
+       
 
 
 def _advance(
     trajectory: Polyline,
     start: int,
     seed: Seed,
-    direction: int,
     epsilon: float,
 ) -> Match | None:
     """Greedily match trajectory segments onto the seed's representative.
 
     Starting at trajectory point ``start`` and the seed's position on the
     representative, walk the trajectory one segment at a time while moving
-    along the representative in ``direction`` only. A segment is accepted when
+    forward along the representative only. A segment is accepted when
     its end point lies within ``epsilon`` of the representative ahead of the
     current position, and every representative corner passed on the way lies
     within ``epsilon`` of the segment under a steady-pace pairing. The walk
     stops at the first segment that fails, so the match is one contiguous run
     starting at ``start``.
 
-    Returns None if not even the first segment can be matched.
+    Returns None if not even the first segment can be matched, or if the
+    match never moves forward along the representative.
     """
     rep_line = seed.representative.polyline
     points = rep_line.points
@@ -113,7 +79,7 @@ def _advance(
     for trajectory_segment in range(start, trajectory.segment_count):
         trajectory_start = trajectory.points[trajectory_segment]
         trajectory_end = trajectory.points[trajectory_segment + 1]
-        reach = trajectory.segment_lengths[trajectory_segment] + 2 * epsilon
+        reach = trajectory.segment_lengths[trajectory_segment] + REACH_MULTIPLIER * epsilon
 
         best_distance_squared = math.inf
         next_segment = current_segment
@@ -121,18 +87,15 @@ def _advance(
         candidate_segment = current_segment
 
         # Search for the closest position on the representative
-        while 0 <= candidate_segment < rep_line.segment_count:
+        while candidate_segment < rep_line.segment_count:
             rep_start = points[candidate_segment]
             rep_end = points[candidate_segment + 1]
             dx = rep_end.x - rep_start.x
             dy = rep_end.y - rep_start.y
             length_squared = dx * dx + dy * dy
             fraction = project_onto_segment(trajectory_end, rep_start, dx, dy, length_squared)
-            if candidate_segment == current_segment:
-                if (direction == FORWARD and fraction < current_fraction) or (
-                    direction == BACKWARD and fraction > current_fraction
-                ):
-                    fraction = current_fraction
+            if candidate_segment == current_segment and fraction < current_fraction:
+                fraction = current_fraction
 
             projected_x, projected_y = point_at_fraction(rep_start, rep_end, dx, dy, fraction)
             distance_squared = squared_distance(trajectory_end.x, trajectory_end.y, projected_x, projected_y)
@@ -143,10 +106,9 @@ def _advance(
             elif length_squared and best_distance_squared <= epsilon_squared:
                 break
 
-            candidate_segment += direction
-            boundary = candidate_segment if direction == FORWARD else candidate_segment + 1
-            if 0 <= boundary < len(cumulative_distances):
-                if abs(cumulative_distances[boundary] - current_distance) > reach:
+            candidate_segment += 1
+            if candidate_segment < len(cumulative_distances):
+                if cumulative_distances[candidate_segment] - current_distance > reach:
                     break
 
         if best_distance_squared > epsilon_squared:
@@ -155,10 +117,7 @@ def _advance(
         # Check every traversed corner using a steady-pace pairing.
         # Together with the endpoints, these checks cover the entire segment.
         next_distance = distance_along(rep_line, next_segment, next_fraction)
-        if direction == FORWARD:
-            corners = range(current_segment + 1, next_segment + 1)
-        else:
-            corners = range(current_segment, next_segment, -1)
+        corners = range(current_segment + 1, next_segment + 1)
 
         if not _corners_within_epsilon(
             rep_line,
@@ -174,7 +133,7 @@ def _advance(
         current_segment, current_fraction, current_distance = next_segment, next_fraction, next_distance
         end = trajectory_segment + 1
 
-    if end == start:
+    if end == start or current_distance == start_distance:
         return None
     return Match(
         representative=seed.representative,
