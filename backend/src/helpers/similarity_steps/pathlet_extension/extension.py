@@ -14,19 +14,17 @@ from models.similarity import (
 )
 
 
-def generate_pathlet(trajectories: list[ProjectedTrajectory], epsilon: float,  greedy_ranking: bool) -> list[ProjectedPathlet]:
+def generate_pathlet(
+    trajectories: list[ProjectedTrajectory], epsilon: float, greedy_ranking=False
+) -> list[ProjectedPathlet]:
     """
-        Cluster subtrajectories into shared pathlets using an epsilon
-        distance threshold in metres.
-        
-        Each input segment is assigned exactly once, either to an existing
-        pathlet or to a newly created one.
-        
-        Pathlets may be supported by different trajectories along different
-        sections. The overall count represents the number of distinct
-        original trajectory IDs contributing to a pathlet, while support
-        intervals describe local counts along its geometry.
-        """
+    Cluster subtrajectories into shared pathlets using an epsilon
+    distance threshold in metres. Each input segment is assigned exactly once, either to an existing
+    pathlet or to a newly created one. Pathlets may be supported by different trajectories along different
+    sections. The overall count represents the number of distinct
+    original trajectory IDs contributing to a pathlet, while support
+    intervals describe local counts along its geometry.
+    """
     lines = []
     for _, trajectory in enumerate(trajectories):
         polyline = Polyline.from_points(trajectory.projected_points)
@@ -58,10 +56,7 @@ def generate_pathlet(trajectories: list[ProjectedTrajectory], epsilon: float,  g
 
 
 def assign_trajectory(
-    line: TrajectoryLine,
-    grid: RepresentativeGrid,
-    representatives: list[Representative],
-    greedy_ranking
+    line: TrajectoryLine, grid: RepresentativeGrid, representatives: list[Representative], greedy_ranking
 ) -> None:
     """Walk one trajectory and assign each stretch: to a representative, or as a new one.
 

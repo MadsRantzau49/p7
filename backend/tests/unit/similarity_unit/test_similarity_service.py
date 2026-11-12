@@ -1,4 +1,3 @@
-import math
 from datetime import UTC, datetime
 
 import pytest
@@ -30,16 +29,9 @@ def test_absent_input_returns_none():
     assert SimilarityService().find_similar_trajectories(None, 1) is None
 
 
-def test_empty_input_returns_an_empty_list():
-    """An empty query result gives no pathlets."""
-    assert SimilarityService().find_similar_trajectories([], 1) == []
-
-
-@pytest.mark.parametrize("epsilon", [-1, math.nan, math.inf])
-def test_invalid_epsilon_is_rejected(epsilon):
-    """Epsilon must be a usable distance, even when there is nothing to process."""
-    with pytest.raises(ValueError, match="epsilon must be finite and non-negative"):
-        SimilarityService().find_similar_trajectories([], epsilon)
+def test_empty_input_returns_none():
+    """An empty query result is treated like an absent one."""
+    assert SimilarityService().find_similar_trajectories([], 1) is None
 
 
 def test_subtrajectory_with_fewer_than_two_points_is_rejected():

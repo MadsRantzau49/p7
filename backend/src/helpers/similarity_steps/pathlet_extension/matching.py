@@ -13,11 +13,13 @@ from helpers.similarity_steps.pathlet_extension.representative_grid import (
 )
 from models.similarity import Match, Polyline, ProjectedPoint, Seed
 
-#FIXME CONSTANT
+# FIXME CONSTANT
 REACH_MULTIPLIER = 2
 
 
-def find_match(trajectory: Polyline, start: int, grid: RepresentativeGrid, greedy_ranking: bool) -> Match | None:
+def find_match(
+    trajectory: Polyline, start: int, grid: RepresentativeGrid, greedy_ranking=False
+) -> Match | None:
     """Return the first accepted match starting at trajectory point start.
 
     Try seeds from closest to farthest. Return None if no seed accepts at
@@ -26,13 +28,13 @@ def find_match(trajectory: Polyline, start: int, grid: RepresentativeGrid, greed
     seeds = grid.seeds_near(trajectory.points[start])
     seeds.sort(key=attrgetter("distance_squared"))
 
-    if  greedy_ranking:
+    if greedy_ranking:
         for seed in seeds:
             match = _advance(trajectory, start, seed, grid.epsilon)
             if match is not None:
                 return match
         return None
-        
+
     else:
         best = None
         for seed in seeds:
@@ -41,8 +43,7 @@ def find_match(trajectory: Polyline, start: int, grid: RepresentativeGrid, greed
                 best = match
                 if best.end_index == trajectory.segment_count:
                     break
-        return best        
-       
+        return best
 
 
 def _advance(
