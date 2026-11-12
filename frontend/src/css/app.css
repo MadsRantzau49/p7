@@ -1,0 +1,325 @@
+/* Basic reset so the app can fill the whole window. */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: system-ui, Arial, sans-serif;
+  color: #1f2933;
+  background: #f4f6f8;
+}
+
+/* Overall page layout: a header on top, then panel + map below. */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.app-header {
+  padding: 12px 20px;
+  background: #fff;
+  border-bottom: 1px solid #e0e4e8;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.app-body {
+  flex: 1;
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  min-height: 0; /* lets the map area shrink correctly */
+}
+
+/* Left column holds the search panel and the route list. */
+.left-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 340px;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+
+.search-panel,
+.overview {
+  background: #fff;
+  border: 1px solid #e0e4e8;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.search-panel h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.panel-section {
+  margin-bottom: 18px;
+}
+
+.panel-section h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: #52606d;
+}
+
+/* The two "select area" buttons. */
+.pick-button {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 6px;
+  border: 1px solid #c7ced6;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.pick-button:hover {
+  background: #f0f3f6;
+}
+
+.pick-button.active {
+  border-color: #2f6fd1;
+  background: #eaf1fb;
+  color: #2f6fd1;
+  font-weight: 600;
+}
+
+.coords {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #7b8794;
+}
+
+/* Date and time inputs sit side by side. */
+.field-row {
+  display: flex;
+  gap: 8px;
+}
+
+.field-row label {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 4px;
+  font-size: 12px;
+  color: #52606d;
+}
+
+.field-row input {
+  padding: 8px;
+  border: 1px solid #c7ced6;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.field-group-title {
+  margin: 12px 0 4px;
+  font-size: 12px;
+  color: #52606d;
+}
+
+.help-text {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #7b8794;
+}
+
+/* Similarity level blocks (Low / Mid / High). */
+.slider-label {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.level-group {
+  display: flex;
+  gap: 8px;
+}
+
+.level-button {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #c7ced6;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.level-button:hover:not(:disabled) {
+  background: #f0f3f6;
+}
+
+.level-button.active {
+  border-color: #2f6fd1;
+  background: #eaf1fb;
+  color: #2f6fd1;
+  font-weight: 600;
+}
+
+.level-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  margin-top: 10px;
+}
+
+.panel-section input[type='number'] {
+  margin-top: 8px;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #c7ced6;
+  border-radius: 8px;
+}
+
+/* Find routes button. */
+.find-button {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: #2f6fd1;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.find-button:hover:not(:disabled) {
+  background: #275fb3;
+}
+
+.find-button:disabled {
+  background: #a9b4c0;
+  cursor: not-allowed;
+}
+
+.error-text {
+  margin: 10px 0 0;
+  color: #c23b3b;
+  font-size: 13px;
+}
+
+/* Loading spinner shown inside the Find routes button. */
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Route list (the overview). */
+.overview h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.route-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.route-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.route-row:hover,
+.route-row.active {
+  background: #f0f3f6;
+}
+
+.swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.route-name {
+  flex: 1;
+}
+
+.route-count {
+  color: #52606d;
+  font-size: 13px;
+}
+
+/* The map fills the rest of the width, inside a rounded card like the sketch. */
+.map-card {
+  flex: 1;
+  min-width: 0;
+  background: #fff;
+  border: 2px solid #2f6fd1;
+  border-radius: 16px;
+  padding: 6px;
+}
+
+.map {
+  height: 100%;
+  width: 100%;
+  border-radius: 12px;
+}
+
+.count-label {
+  background: #fff;
+  border: 1px solid #c7ced6;
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-weight: 700;
+  font-size: 12px;
+  color: #1f2933;
+}
+
+/* phone width */
+@media (max-width: 800px) {
+  .app-body {
+    flex-direction: column;
+  }
+
+  .left-column {
+    width: 100%;
+  }
+
+  .map-card {
+    min-height: 400px;
+  }
+}
