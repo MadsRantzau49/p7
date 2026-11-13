@@ -111,13 +111,18 @@ export default function SearchPanel({
         <p className="field-group-title">Daily hours (each day)</p>
         <div className="field-row">
           <label>
+            From
             <input type="time" value={fromHour} onChange={(e) => setFromHour(e.target.value)} />
           </label>
           <label>
+            To
             <input type="time" value={toHour} onChange={(e) => setToHour(e.target.value)} />
           </label>
         </div>
-        <p className="help-text">Vi har ikke tid på backend</p>
+        <p className="help-text">
+          Optional. Only routes leaving the start area in this window are shown. If From is later
+          than To, the window wraps past midnight (e.g. 22:00–02:00).
+        </p>
       </section>
 
       {/* 3. Route preferences */}

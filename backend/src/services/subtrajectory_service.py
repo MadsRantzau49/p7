@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
 from database.repositories.trajectory_repository import TrajectoryRepository
@@ -21,8 +21,15 @@ class SubtrajectoryService:
         start_date: date,
         end_date: date,
         box_half_width_m: float,
+        start_time: time | None = None,
+        end_time: time | None = None,
     ) -> list[Subtrajectory]:
-        """Find the subtrajectories from location A to location B in the date range given."""
+        """Find the subtrajectories from location A to location B in the date range given.
+        
+        start_time and end_time is optional, since users might not need to look at specific time periods. 
+        the start_time indicates when a trajectory has left the start area and wise versa for end_time.
+    
+        """
         if start_date > end_date:
             raise ValueError("start_date must be on or before end_date")
         if box_half_width_m <= 0:
@@ -35,7 +42,7 @@ class SubtrajectoryService:
             raise ValueError("box A and box B must not overlap")
 
         rows = self.trajectory_repository.get_subtrajectories(
-            BoundingBox(*box_a.bounds), BoundingBox(*box_b.bounds), start_date, end_date
+            BoundingBox(*box_a.bounds), BoundingBox(*box_b.bounds), start_date, end_date, start_time, end_time
         )
 
         subtrajectories = []

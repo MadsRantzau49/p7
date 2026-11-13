@@ -9,6 +9,8 @@ export type FindRoutesParams = {
   end: LatLng
   fromDate: string 
   toDate: string 
+  fromHour: string // "" = no time filter
+  toHour: string // "" = no time filter
   epsilon: number
 }
 
@@ -22,6 +24,8 @@ export async function findRoutes(params: FindRoutesParams): Promise<Pathlet[]> {
       b_latitude: params.end.lat,
       start_date: params.fromDate,
       end_date: params.toDate,
+      start_time: params.fromHour || undefined,
+      end_time: params.toHour || undefined,
       epsilon: params.epsilon,
       box_half_width_m: BOX_HALF_WIDTH_M,
     },

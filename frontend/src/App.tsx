@@ -37,7 +37,7 @@ export default function App() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
 
-  // Ikke live endnu 
+  // daily time window (optional)
   const [fromHour, setFromHour] = useState('')
   const [toHour, setToHour] = useState('')
 
@@ -77,6 +77,8 @@ export default function App() {
         end: endPoint,
         fromDate,
         toDate,
+        fromHour,
+        toHour,
         epsilon: epsilonMeters,
       })
       setRoutes(result)
