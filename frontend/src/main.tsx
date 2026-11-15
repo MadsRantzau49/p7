@@ -1,9 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import TrajectoryPage from './components/trajectoryPage'
+import 'leaflet/dist/leaflet.css'
+import './css/app.css'
+import App from './App'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <TrajectoryPage />
+    <App />
   </StrictMode>,
 )
