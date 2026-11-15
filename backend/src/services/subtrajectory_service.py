@@ -25,10 +25,8 @@ class SubtrajectoryService:
         end_time: time | None = None,
     ) -> list[Subtrajectory]:
         """Find the subtrajectories from location A to location B in the date range given.
-        
-        start_time and end_time is optional, since users might not need to look at specific time periods. 
+        start_time and end_time is optional, since users might not need to look at specific time periods.
         the start_time indicates when a trajectory has left the start area and wise versa for end_time.
-    
         """
         if start_date > end_date:
             raise ValueError("start_date must be on or before end_date")
