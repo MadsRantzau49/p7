@@ -5,10 +5,12 @@ from routers.subtrajectory_router import router as subtrajectory_router
 from routers.trajectory_router import router as trajectory_router
 
 app = FastAPI(title="Trajectory API", version="0.0.1")
-
+# It seems we run on different ports for frontend, so we need this for now.
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
 ]
 
 app.add_middleware(

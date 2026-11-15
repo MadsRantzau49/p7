@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, time
 from unittest.mock import MagicMock
 from zoneinfo import ZoneInfo
 
@@ -37,12 +37,13 @@ def test_find_subtrajectories():
         -8.614, 41.15, -8.596, 41.15, date(2013, 7, 1), date(2013, 7, 2), 50
     )
 
-    box_a, box_b, start_date, end_date = repository.get_subtrajectories.call_args.args
+    box_a, box_b, start_date, end_date, start_time, end_time = repository.get_subtrajectories.call_args.args
     # Each box is centred on its location
     assert (box_a.min_longitude + box_a.max_longitude) / 2 == pytest.approx(-8.614)
     assert (box_a.min_latitude + box_a.max_latitude) / 2 == pytest.approx(41.15)
     assert (box_b.min_longitude + box_b.max_longitude) / 2 == pytest.approx(-8.596)
     assert (start_date, end_date) == (date(2013, 7, 1), date(2013, 7, 2))
+    assert (start_time, end_time) == (None, None)
 
     assert found.subtrajectory_id == 1
     assert found.trajectory_id == 7
@@ -82,3 +83,15 @@ def test_find_subtrajectories_skips_those_leaving_a_outside_the_date_range():
     )
 
     assert found == []
+
+
+def test_find_subtrajectories_passes_time_window_to_repository():
+    """Pass start_time and end_time on to the repository, which filters on them."""
+    repository = MagicMock()
+    repository.get_subtrajectories.return_value = []
+
+    SubtrajectoryService(repository).find_subtrajectories(
+        -8.614, 41.15, -8.596, 41.15, date(2013, 7, 1), date(2013, 7, 1), 50, time(22, 0), time(2, 0)
+    )
+
+    assert repository.get_subtrajectories.call_args.args[-2:] == (time(22, 0), time(2, 0))

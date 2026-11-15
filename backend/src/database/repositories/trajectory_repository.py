@@ -364,12 +364,21 @@ class TrajectoryRepository:
             cursor.close()
 
     def get_subtrajectories(
-        self, box_a: BoundingBox, box_b: BoundingBox, start_date: date, end_date: date
+        self,
+        box_a: BoundingBox,
+        box_b: BoundingBox,
+        start_date: date,
+        end_date: date,
+        start_time: time | None = None,
+        end_time: time | None = None,
     ) -> list[dict[str, Any]]:
         """Fetch every part of a trip that leaves box A and then enters box B.
 
         The search window is one day wider on each side than the date range, because the dates
         are local to each city. The service keeps only the ones that leave A inside the date range.
+
+        If start_time or end_time is given, only parts that leave A between them (in the city's
+        local time) are returned. If start_time is after end_time, the window wraps around midnight.
         """
         cursor = self.connection.cursor(row_factory=dict_row)
 
@@ -381,6 +390,19 @@ class TrajectoryRepository:
                 "ST_MakeEnvelope(%(b_min_lon)s, %(b_min_lat)s, %(b_max_lon)s, %(b_max_lat)s, 4326)"
             )
             search_window = sql.SQL("span(%(search_start)s, %(search_end)s)")
+
+            time_filter = sql.SQL("")
+            if start_time is not None or end_time is not None:
+                start_time = start_time or time.min
+                end_time = end_time or time.max
+                exit_a_local_time = "(startTimestamp(piece) AT TIME ZONE time_zone)::time"
+                if start_time <= end_time:
+                    condition = f"{exit_a_local_time} BETWEEN %(start_time)s AND %(end_time)s"
+                else:
+                    condition = (
+                        f"({exit_a_local_time} >= %(start_time)s OR {exit_a_local_time} <= %(end_time)s)"
+                    )
+                time_filter = sql.SQL("AND " + condition)
 
             query = sql.SQL("""
             WITH pieces AS (
@@ -410,8 +432,9 @@ class TrajectoryRepository:
               AND endTimestamp(piece) < endTimestamp(trip)
               AND ST_Distance(startValue(piece), {area_a}) < ST_Distance(startValue(piece), {area_b})
               AND ST_Distance(endValue(piece), {area_b}) < ST_Distance(endValue(piece), {area_a})
+              {time_filter}
             ORDER BY trajectory_id, exit_a_time
-            """).format(area_a=area_a, area_b=area_b, search_window=search_window)
+            """).format(area_a=area_a, area_b=area_b, search_window=search_window, time_filter=time_filter)
 
             values = {
                 "a_min_lon": box_a.min_longitude,
@@ -424,6 +447,8 @@ class TrajectoryRepository:
                 "b_max_lat": box_b.max_latitude,
                 "search_start": datetime.combine(start_date - timedelta(days=1), time.min, UTC),
                 "search_end": datetime.combine(end_date + timedelta(days=2), time.min, UTC),
+                "start_time": start_time,
+                "end_time": end_time,
             }
 
             cursor.execute(query, values)

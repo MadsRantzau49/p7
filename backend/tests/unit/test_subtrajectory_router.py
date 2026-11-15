@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, time
 from types import SimpleNamespace
 
 import routers.subtrajectory_router as subtrajectory_router
@@ -51,8 +51,45 @@ def test_get_subtrajectories(monkeypatch):
     assert response.json()[0]["count"] == 2
     assert response.json()[0]["points"][0]["longitude"] == -8.61
     assert response.json()[0]["support"][0]["end_m"] == 50.0
-    assert received["arguments"] == (-8.614, 41.15, -8.596, 41.15, date(2013, 7, 1), date(2013, 7, 1), 50)
+    assert received["arguments"] == (
+        -8.614,
+        41.15,
+        -8.596,
+        41.15,
+        date(2013, 7, 1),
+        date(2013, 7, 1),
+        50,
+        None,
+        None,
+    )
     assert received["similarity_arguments"] == (subtrajectories, 100)
+
+
+def test_get_subtrajectories_passes_time_window(monkeypatch):
+    """Check start_time and end_time are parsed and passed to the service."""
+    received = {}
+
+    def find_subtrajectories(*arguments):
+        received["arguments"] = arguments
+        return []
+
+    monkeypatch.setitem(
+        app.dependency_overrides,
+        subtrajectory_router.get_subtrajectory_service,
+        lambda: SimpleNamespace(find_subtrajectories=find_subtrajectories),
+    )
+    monkeypatch.setitem(
+        app.dependency_overrides,
+        subtrajectory_router.get_similarity_service,
+        lambda: SimpleNamespace(find_similar_trajectories=lambda *arguments: []),
+    )
+
+    response = client.get(
+        "/api/subtrajectories/get", params={**QUERY, "start_time": "22:00", "end_time": "02:30"}
+    )
+
+    assert response.status_code == 200
+    assert received["arguments"][-2:] == (time(22, 0), time(2, 30))
 
 
 def test_get_subtrajectories_invalid_input(monkeypatch):
