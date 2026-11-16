@@ -5,6 +5,8 @@ services:
     build:
       context: ..
       dockerfile: docker/backend/Dockerfile
+      # Use the host resolver when bridge-network DNS is unavailable.
+      network: host
     env_file:
       - ../.env
     environment:
@@ -16,6 +18,8 @@ services:
     build:
       context: ..
       dockerfile: docker/frontend/Dockerfile
+      # Use the host resolver when bridge-network DNS is unavailable.
+      network: host
       args:
         VITE_BACKEND_API_PATH: http://localhost:8000/api/
     depends_on:
