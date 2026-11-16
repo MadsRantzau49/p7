@@ -6,55 +6,27 @@ from zoneinfo import ZoneInfo
 import pytest
 from database.connection import create_db_connection
 from database.repositories.dataset_repository import DatasetRepository
-from database.repositories.import_repository import ImportRepository
 from database.repositories.trajectory_repository import TrajectoryRepository
-from models.beijing_trajectory import BeijingTrajectory, TrajectoryPoint
 from models.bounding_box import BoundingBox
-from models.porto_trajectory import PortoTrajectory
 from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint, VehicleType
 
 
 def test_queries_against_configured_database():
     """Run every query against the configured database, then undo all changes"""
     name = f"pytest-{uuid.uuid4()}"
-    source_ids = [str(uuid.uuid4()) for _ in range(3)]
-    now = datetime.now(UTC).replace(microsecond=0)
+    # Fixed noon time, so the 15 second trajectory never crosses midnight in the city's zone
+    now = datetime(2024, 1, 15, 12, 0, tzinfo=UTC)
 
     with create_db_connection() as connection:
         dataset_repository = DatasetRepository(connection)
         trajectory_repository = TrajectoryRepository(connection)
-        import_repository = ImportRepository(connection)
 
         try:
-            assert {"CAR", "TAXI", "UNKNOWN"} <= trajectory_repository.get_vehicle_type_ids().keys()
-
             city = dataset_repository.get_or_create_city(name, "Europe/Lisbon")
             assert dataset_repository.get_or_create_city(name, "Europe/Copenhagen") == city
             assert city in dataset_repository.get_trajectories_cities_from_db()
 
             dataset_id = dataset_repository.create_dataset(name, city.city_id)
-            assert dataset_repository.get_dataset_id(name) == dataset_id
-
-            trajectory_repository.create_source_trajectories(dataset_id, source_ids)
-
-            import_repository.insert_porto_trajectories(
-                [PortoTrajectory(1, None, None, None, 1, 1, None, False, [[1.0, 2.0]], source_ids[0])]
-            )
-            import_repository.insert_beijing_dataset(
-                [BeijingTrajectory(1, [TrajectoryPoint(str(now), "1", "2")], source_ids[1])]
-            )
-            trajectory_repository.insert_data_uniformed_trajectories(
-                [
-                    UniformedTrajectories(
-                        1,
-                        VehicleType.CAR,
-                        now,
-                        [UniformedTrajectoryPoint(1, now, 2)],
-                        city=name,
-                        source_id=source_ids[2],
-                    )
-                ]
-            )
 
             later = now + timedelta(seconds=15)
             cleaned = [
@@ -64,23 +36,15 @@ def test_queries_against_configured_database():
                     now,
                     [UniformedTrajectoryPoint(1, now, 2), UniformedTrajectoryPoint(1.5, later, 2.5)],
                     city=name,
-                    source_id=source_ids[2],
                 )
             ]
-            trajectory_ids = trajectory_repository.insert_cleaned_uniformed_trajectories(cleaned)
+            trajectory_ids = trajectory_repository.insert_uniformed_trajectories(dataset_id, cleaned)
             trajectory_repository.insert_trips(trajectory_ids, cleaned)
             trip = connection.execute(
-                "SELECT numInstants(trips.trip), startTimestamp(trips.trip) FROM trips "
-                "JOIN cleaned_uniformed_trajectories AS cleaned USING (trajectory_id) "
-                "WHERE cleaned.source_id = %s",
-                (source_ids[2],),
+                "SELECT numInstants(trip), startTimestamp(trip) FROM trips WHERE trajectory_id = %s",
+                (trajectory_ids[0],),
             ).fetchone()
             assert trip == (2, now)
-
-            assert isinstance(import_repository.retrieve_porto_dataset_batch(1, None), list)
-            assert isinstance(import_repository.retrieve_porto_dataset_batch(1, ""), list)
-            assert isinstance(import_repository.retrieve_beijing_data_batch(1, None), list)
-            assert isinstance(import_repository.retrieve_beijing_data_batch(1, ""), list)
 
             assert (
                 len(
@@ -121,7 +85,6 @@ def test_queries_against_configured_database():
 def test_get_subtrajectories_against_configured_database():
     """Cut a straight trip between two boxes at the expected time and places, then undo all changes."""
     name = f"pytest-{uuid.uuid4()}"
-    source_id = str(uuid.uuid4())
     start = datetime(2013, 7, 1, 8, 10, tzinfo=UTC)
 
     points = [
@@ -138,11 +101,8 @@ def test_get_subtrajectories_against_configured_database():
         try:
             city = dataset_repository.get_or_create_city(name, "Europe/Lisbon")
             dataset_id = dataset_repository.create_dataset(name, city.city_id)
-            trajectory_repository.create_source_trajectories(dataset_id, [source_id])
-            cleaned = [
-                UniformedTrajectories(1, VehicleType.TAXI, start, points, city=name, source_id=source_id)
-            ]
-            [trajectory_id] = trajectory_repository.insert_cleaned_uniformed_trajectories(cleaned)
+            cleaned = [UniformedTrajectories(1, VehicleType.TAXI, start, points, city=name)]
+            [trajectory_id] = trajectory_repository.insert_uniformed_trajectories(dataset_id, cleaned)
             trajectory_repository.insert_trips([trajectory_id], cleaned)
 
             def subtrajectories(start_date, end_date):

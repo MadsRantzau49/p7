@@ -3,7 +3,6 @@ from typing import Annotated
 from database.connection import create_db_connection
 from database.database_actions import DatabaseActions
 from database.repositories.dataset_repository import DatasetRepository
-from database.repositories.import_repository import ImportRepository
 from database.repositories.trajectory_repository import TrajectoryRepository
 from fastapi import Depends
 from psycopg import Connection
@@ -34,11 +33,6 @@ def get_dataset_repository(connection: Annotated[Connection, Depends(get_db_conn
 def get_database_actions(connection: Annotated[Connection, Depends(get_db_connection)]):
     """Create a database actions using provided connection"""
     return DatabaseActions(connection)
-
-
-def get_import_repository(connection: Annotated[Connection, Depends(get_db_connection)]):
-    """Create a import repository using provided connection"""
-    return ImportRepository(connection)
 
 
 def get_trajectory_service(

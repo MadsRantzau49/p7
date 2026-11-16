@@ -1,7 +1,6 @@
-import uuid
+from collections.abc import Iterable
 from dataclasses import replace
-from datetime import datetime
-from typing import cast
+from itertools import batched
 
 from config.cleaning_config import get_config
 from database.database_actions import DatabaseActions
@@ -15,7 +14,7 @@ from helpers.cleaners import (
     drop_speed_outliers,
 )
 from models.cleaning_reports import DatasetReport, JourneyReport, RejectionReason
-from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint, VehicleType
+from models.uniformed_trajectories import UniformedTrajectories
 
 
 class CleanService:
@@ -23,36 +22,26 @@ class CleanService:
         self.trajectory_repository = trajectory_repository
         self.db_actions = db_actions
 
-    def clean_dataset(self, city: str, batch_size: int) -> DatasetReport:
+    def clean_dataset(
+        self, dataset_id: int, city: str, trajectories: Iterable[UniformedTrajectories], batch_size: int
+    ) -> DatasetReport:
         """Clean a city's uniformed trajectories in batches and return the aggregated report."""
         reports: list[JourneyReport] = []
 
         try:
-            last_id = None
-            while True:
-                batch = self.trajectory_repository.retrieve_uniformed_batch(city, batch_size, last_id)
-                if not batch:
-                    break
-
+            for batch in batched(trajectories, batch_size):
                 cleaned_batch: list[UniformedTrajectories] = []
-                for row in batch:
-                    cleaned, report = _clean_trajectory(_row_to_trajectory(row))
+                for trajectory in batch:
+                    cleaned, report = _clean_trajectory(trajectory)
                     cleaned_batch.extend(cleaned)
                     reports.append(report)
 
-                dataset_id = batch[0]["dataset_id"]
-                source_ids = []
-                for run in cleaned_batch:
-                    source_ids.append(cast(str, run.source_id))
-
-                self.trajectory_repository.create_source_trajectories(dataset_id, source_ids)
-                trajectory_ids = self.trajectory_repository.insert_cleaned_uniformed_trajectories(
-                    cleaned_batch
+                trajectory_ids = self.trajectory_repository.insert_uniformed_trajectories(
+                    dataset_id, cleaned_batch
                 )
                 self.trajectory_repository.insert_trips(trajectory_ids, cleaned_batch)
 
                 self.db_actions.commit()
-                last_id = batch[-1]["trajectory_id"]
 
         except Exception as error:
             self.db_actions.rollback()
@@ -69,7 +58,7 @@ def _clean_trajectory(trajectory: UniformedTrajectories) -> tuple[list[Uniformed
 
     config = get_config(trajectory.city)
     points = trajectory.points
-    report = JourneyReport(source_id=trajectory.source_id, points_in=len(points))
+    report = JourneyReport(points_in=len(points))
 
     points, report.removed[RejectionReason.OUT_OF_BOUNDS] = drop_out_of_bounds(points, config.bbox)
     points, report.removed[RejectionReason.BAD_TIMESTAMP] = drop_bad_timestamps(points)
@@ -93,7 +82,6 @@ def _clean_trajectory(trajectory: UniformedTrajectories) -> tuple[list[Uniformed
             replace(
                 trajectory,
                 trajectory_id=None,
-                source_id=str(uuid.uuid4()),
                 trajectory_date=segment[0].point_timestamp,
                 points=segment,
             )
@@ -118,23 +106,3 @@ def _aggregate_report(city: str, reports: list[JourneyReport]) -> DatasetReport:
         for reason, count in report.removed.items():
             dataset.removed[reason] = dataset.removed.get(reason, 0) + count
     return dataset
-
-
-def _row_to_trajectory(row: dict) -> UniformedTrajectories:
-    points = [
-        UniformedTrajectoryPoint(
-            longitude=point["longitude"],
-            latitude=point["latitude"],
-            point_timestamp=datetime.fromisoformat(point["point_timestamp"]),
-        )
-        for point in row["points"]
-    ]
-    return UniformedTrajectories(
-        vehicle_id=row["vehicle_id"],
-        vehicle_type=VehicleType(row["vehicle_type"]),
-        trajectory_date=row["trajectory_date"],
-        points=points,
-        trajectory_id=row["trajectory_id"],
-        city=row["city"],
-        source_id=row["source_id"],
-    )

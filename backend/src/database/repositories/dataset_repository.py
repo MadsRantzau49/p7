@@ -1,6 +1,6 @@
 from models.city import City
 from psycopg import Connection
-from psycopg.rows import class_row, dict_row
+from psycopg.rows import class_row
 
 
 class DatasetRepository:
@@ -27,6 +27,18 @@ class DatasetRepository:
         finally:
             cursor.close()
 
+    def delete_dataset(self, dataset_id: int) -> None:
+        """Delete a dataset. Its trajectories and trips are deleted with it."""
+        cursor = self.connection.cursor()
+
+        try:
+            cursor.execute("DELETE FROM datasets WHERE dataset_id = %s", (dataset_id,))
+        except Exception as error:
+            print(f"Failed to delete dataset: {error}")
+            raise
+        finally:
+            cursor.close()
+
     def get_or_create_city(self, name: str, time_zone: str) -> City:
         """Return the city with this name, creating it with the given time zone if it does not exist."""
         cursor = self.connection.cursor(row_factory=class_row(City))
@@ -44,23 +56,6 @@ class DatasetRepository:
             return city
         except Exception as error:
             print(f"Failed to get or create city: {error}")
-            raise
-        finally:
-            cursor.close()
-
-    def get_dataset_id(self, dataset_name: str) -> int:
-        """Get the ID of a dataset by its name."""
-        cursor = self.connection.cursor(row_factory=dict_row)
-
-        try:
-            cursor.execute("SELECT dataset_id FROM datasets WHERE name = %s", (dataset_name,))
-            result = cursor.fetchone()
-
-            if result is None:
-                raise ValueError(f"No dataset named {dataset_name}")
-            return result["dataset_id"]
-        except Exception as error:
-            print(f"Failed to get dataset id: {error}")
             raise
         finally:
             cursor.close()
