@@ -15,8 +15,7 @@ from helpers.cleaners import (
     drop_speed_outliers,
 )
 from models.cleaning_reports import DatasetReport, JourneyReport, RejectionReason
-from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint
-from models.uniformed_trajectories import VehicleType
+from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint, VehicleType
 
 
 class CleanService:
