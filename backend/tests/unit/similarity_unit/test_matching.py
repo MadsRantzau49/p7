@@ -29,7 +29,14 @@ def _grid_with(*representative_lines: Coordinates) -> tuple[RepresentativeGrid, 
     representatives = []
     for coordinates in representative_lines:
         polyline = _polyline(coordinates)
-        representative = Representative(polyline, TrajectorySection(1, 0.0, polyline.total_length))
+        section = TrajectorySection(
+            1,
+            0.0,
+            polyline.total_length,
+            source_start_index=0,
+            source_end_index=len(polyline.points) - 1,
+        )
+        representative = Representative(polyline, section)
         grid.add(representative)
         representatives.append(representative)
     return grid, representatives
