@@ -59,6 +59,11 @@ def test_identical_routes_return_one_pathlet_in_gps_coordinates():
     [interval] = pathlet.support
     assert interval.count == 2
     assert interval.end_m > interval.start_m
+    assert interval.trajectory_ids == [1, 2]
+    assert interval.support_interval_id == 1
+    assert interval.points == pathlet.points
+    assert pathlet.pathlet_id == 1
+    assert pathlet.length_m == interval.end_m
 
 
 def test_routes_far_apart_return_separate_pathlets():

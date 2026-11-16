@@ -260,11 +260,28 @@ body {
   border-radius: 8px;
   cursor: pointer;
   font-size: 14px;
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
 }
 
 .route-row:hover,
 .route-row.active {
   background: #f0f3f6;
+}
+
+.route-row.selected {
+  border-color: #2f6fd1;
+  background: #eaf1fb;
+}
+
+.route-row:focus-visible,
+.support-inspector button:focus-visible {
+  outline: 3px solid #2f6fd1;
+  outline-offset: 2px;
 }
 
 .swatch {
@@ -284,6 +301,14 @@ body {
 }
 
 /* The map fills the rest of the width, inside a rounded card like the sketch. */
+.map-workspace {
+  flex: 1;
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+}
+
 .map-card {
   flex: 1;
   min-width: 0;
@@ -309,6 +334,152 @@ body {
   color: #1f2933;
 }
 
+.support-inspector {
+  width: 340px;
+  flex-shrink: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+  border: 1px solid #e0e4e8;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.support-heading,
+.support-interval-heading,
+.support-scale {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.support-heading h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.support-summary {
+  font-size: 13px;
+  color: #52606d;
+}
+
+.support-close {
+  padding: 5px 8px;
+  border: 1px solid #c7ced6;
+  border-radius: 6px;
+  background: #fff;
+  color: #275fb3;
+  cursor: pointer;
+}
+
+.support-timeline {
+  position: relative;
+  height: 24px;
+  margin-top: 20px;
+  background: #eef2f6;
+  border-radius: 4px;
+}
+
+.support-timeline button {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  min-width: 1px;
+  padding: 0;
+  border: 1px solid #fff;
+  cursor: pointer;
+}
+
+.support-timeline button[aria-pressed='true'] {
+  outline: 2px solid #17212f;
+  z-index: 1;
+}
+
+.support-scale {
+  margin: 4px 0 16px;
+  font-size: 11px;
+  color: #52606d;
+}
+
+.support-selection {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #eaf1fb;
+  font-size: 12px;
+}
+
+.support-selection h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.support-ids {
+  max-height: 150px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.support-list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.support-interval {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #c7ced6;
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.support-interval:hover,
+.support-interval[aria-pressed='true'] {
+  border-color: #2f6fd1;
+  background: #eaf1fb;
+}
+
+.support-interval-heading strong {
+  flex: 1;
+}
+
+.support-distances {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+  color: #52606d;
+}
+
+.support-distances strong {
+  display: block;
+  margin-top: 3px;
+  color: #1f2933;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1200px) {
+  .map-workspace {
+    flex-direction: column;
+  }
+
+  .support-inspector {
+    width: 100%;
+    max-height: 300px;
+  }
+}
+
 /* phone width */
 @media (max-width: 800px) {
   .app-body {
@@ -321,5 +492,9 @@ body {
 
   .map-card {
     min-height: 400px;
+  }
+
+  .map-workspace {
+    flex: none;
   }
 }

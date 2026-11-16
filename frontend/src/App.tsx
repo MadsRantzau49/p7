@@ -4,6 +4,7 @@ import { findRoutes } from './api/subtrajectories'
 import SearchPanel from './components/SearchPanel'
 import RouteMap from './components/RouteMap'
 import RouteOverview from './components/RouteOverview'
+import RouteSupportInspector from './components/RouteSupportInspector'
 
 type PickMode = 'start' | 'end' | null
 
@@ -52,12 +53,21 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
   const [hoveredRoute, setHoveredRoute] = useState<number | null>(null)
+  const [selectedRoute, setSelectedRoute] = useState<number | null>(null)
+  const [selectedInterval, setSelectedInterval] = useState<number | null>(null)
 
 
   const epsilonMeters = useCustomEpsilon ? customEpsilon : EPSILON_BY_LEVEL[similarityLevel]
 
   // search guard, needs all 4 before we hit endpoint 
   const canSearch = Boolean(startPoint && endPoint && fromDate && toDate)
+
+  function selectRoute(index: number | null) {
+    setSelectedRoute(index)
+    setSelectedInterval(null)
+    setHoveredRoute(null)
+    setPickMode(null)
+  }
 
   // A map click lands here. We drop the point we are currently picking.
   function handlePickPoint(point: LatLng) {
@@ -82,6 +92,7 @@ export default function App() {
         epsilon: epsilonMeters,
       })
       setRoutes(result)
+      selectRoute(null)
       setHasSearched(true)
     } catch (err) {
       setError(readErrorMessage(err))
@@ -129,18 +140,34 @@ export default function App() {
             hasSearched={hasSearched}
             hoveredRoute={hoveredRoute}
             setHoveredRoute={setHoveredRoute}
+            selectedRoute={selectedRoute}
+            onSelectRoute={selectRoute}
           />
         </div>
 
-        <RouteMap
-          startPoint={startPoint}
-          endPoint={endPoint}
-          pickMode={pickMode}
-          onPickPoint={handlePickPoint}
-          routes={routes}
-          hoveredRoute={hoveredRoute}
-          setHoveredRoute={setHoveredRoute}
-        />
+        <div className="map-workspace">
+          <RouteMap
+            startPoint={startPoint}
+            endPoint={endPoint}
+            pickMode={pickMode}
+            onPickPoint={handlePickPoint}
+            routes={routes}
+            hoveredRoute={hoveredRoute}
+            setHoveredRoute={setHoveredRoute}
+            selectedRoute={selectedRoute}
+            onSelectRoute={selectRoute}
+            selectedInterval={selectedInterval}
+            onSelectInterval={setSelectedInterval}
+          />
+          {selectedRoute !== null && routes[selectedRoute] && (
+            <RouteSupportInspector
+              route={routes[selectedRoute]}
+              selectedInterval={selectedInterval}
+              onSelectInterval={setSelectedInterval}
+              onClose={() => selectRoute(null)}
+            />
+          )}
+        </div>
       </div>
     </div>
   )

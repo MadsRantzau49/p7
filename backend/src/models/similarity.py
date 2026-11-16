@@ -36,7 +36,7 @@ class ProjectedTrajectory:
 
 @dataclass
 class SupportInterval:
-    """A distance interval with a constant number of supporting trajectories.
+    """A distance interval with a constant set of supporting trajectories.
 
     start_m and end_m are measured along the representative from its start.
     count is the number of distinct source trajectory IDs covering the interval's
@@ -47,6 +47,10 @@ class SupportInterval:
     start_m: float
     end_m: float
     count: int
+    trajectory_ids: list[int] = field(default_factory=list)
+    # IDs are one-based within a pathlet in the search response.
+    support_interval_id: int = 0
+    points: list[GPSCoordinate] = field(default_factory=list)
 
 
 @dataclass
@@ -89,6 +93,9 @@ class Pathlet:
     points: list[GPSCoordinate]
     count: int
     support: list[SupportInterval] = field(default_factory=list)
+    # A pathlet ID is local to this search response, not a database record ID.
+    pathlet_id: int = 0
+    length_m: float = 0.0
 
 
 @dataclass

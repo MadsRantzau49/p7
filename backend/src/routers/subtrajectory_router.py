@@ -24,7 +24,7 @@ def get_subtrajectories(
     box_half_width_m: float = 50,
     start_time: time | None = None,
     end_time: time | None = None,
-):
+) -> list[Pathlet]:
     """Return the subtrajectories from location A to location B in the date range given.
 
     start_time and end_time optionally limit the local time of day the trip leaves A.
@@ -43,7 +43,7 @@ def get_subtrajectories(
             end_time,
         )
         pathlets = similarity_service.find_similar_trajectories(subtrajectory_list, epsilon)
-        return pathlets
+        return [] if pathlets is None else pathlets
 
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error

@@ -8,3 +8,7 @@ export const ROUTE_COLORS = [
   '#17a2b8', 
   '#c23b8a', 
 ]
+
+export function supportColor(intervalId: number): string {
+  return ROUTE_COLORS[(intervalId - 1) % ROUTE_COLORS.length]
+}

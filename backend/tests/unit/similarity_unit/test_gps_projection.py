@@ -6,9 +6,10 @@ from helpers.similarity_steps.gps_projection_convertion import (
     inverse_projection,
     projection,
 )
-from models.similarity import ProjectedPathlet, SupportInterval
+from models.similarity import ProjectedPathlet, ProjectedPoint, SupportInterval
 from models.subtrajectory import Subtrajectory
 from models.uniformed_trajectories import UniformedTrajectoryPoint
+from pyproj import Transformer
 
 MOMENT = datetime(2026, 1, 1, tzinfo=UTC)
 
@@ -101,14 +102,40 @@ def test_inverse_projection_returns_the_original_gps_coordinates():
 def test_inverse_projection_keeps_count_and_support_in_metres():
     """Only the points are converted, so count and support are unchanged."""
     [projected], transformer = projection([_subtrajectory(1, 232, [(10.2, 56.15), (10.201, 56.151)])])
-    support = [SupportInterval(0.0, 50.0, 3)]
+    support = [SupportInterval(0.0, 50.0, 3, [1, 2, 3])]
     pathlet = ProjectedPathlet(points=projected.projected_points, count=3, support=support)
 
     [gps_pathlet] = inverse_projection([pathlet], transformer)
 
     assert gps_pathlet.count == 3
-    assert gps_pathlet.support == [SupportInterval(0.0, 50.0, 3)]
-    assert pathlet.support == [SupportInterval(0.0, 50.0, 3)]
+    [interval] = gps_pathlet.support
+    assert (interval.start_m, interval.end_m, interval.count) == (0.0, 50.0, 3)
+    assert interval.trajectory_ids == [1, 2, 3]
+    assert interval.support_interval_id == 1
+    assert len(interval.points) == 2
+    assert pathlet.support == [SupportInterval(0.0, 50.0, 3, [1, 2, 3])]
+
+
+def test_support_geometry_interpolates_metre_offsets_and_keeps_corners():
+    """Highlight endpoints use projected offsets, with intervening vertices preserved."""
+    transformer = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
+    pathlet = ProjectedPathlet(
+        points=[ProjectedPoint(0, 0), ProjectedPoint(10, 0), ProjectedPoint(10, 20)],
+        count=2,
+        support=[SupportInterval(5, 20, 2, [4, 9]), SupportInterval(20, 30, 1, [4])],
+    )
+
+    [gps_pathlet] = inverse_projection([pathlet], transformer)
+
+    assert gps_pathlet.pathlet_id == 1
+    assert gps_pathlet.length_m == 30
+    assert [interval.support_interval_id for interval in gps_pathlet.support] == [1, 2]
+    first, second = gps_pathlet.support
+    projected = [transformer.transform(point.longitude, point.latitude) for point in first.points]
+    for actual, expected in zip(projected, [(5, 0), (10, 0), (10, 10)], strict=True):
+        assert actual == pytest.approx(expected)
+    assert first.points[-1] == second.points[0]
+    assert second.points[-1] == gps_pathlet.points[-1]
 
 
 def test_inverse_projection_of_nothing_is_empty():

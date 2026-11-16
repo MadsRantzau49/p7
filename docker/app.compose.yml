@@ -7,12 +7,12 @@ services:
       dockerfile: docker/backend/Dockerfile
       # Use the host resolver when bridge-network DNS is unavailable.
       network: host
+    # The SSH tunnel listens on the Linux host's loopback interface.
+    network_mode: host
     env_file:
       - ../.env
     environment:
-      DATABASE_HOST: host.docker.internal
-    ports:
-      - "8000:8000"
+      DATABASE_HOST: 127.0.0.1
 
   frontend:
     build:

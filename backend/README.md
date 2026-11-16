@@ -76,3 +76,25 @@ The upload does not check whether movement is realistic, e.g. a vehicle moving 2
 | 422 | The file breaks a rule | `{"detail": [{"line": 4, "message": "latitude: Input should be less than or equal to 90"}]}` |
 
 If anything is wrong, nothing is stored. A 422 lists up to 100 problems with their line numbers. Line 1 is the header.
+
+## Inspecting pathlet support
+
+`GET /api/subtrajectories/get` returns a list of pathlets (or `[]` when no routes match).
+Each pathlet includes `pathlet_id`, its representative `points`, `length_m`, the count of
+distinct supporting trajectories, and a `support` list.
+
+Each support interval contains:
+
+- `support_interval_id`: a one-based ID within its pathlet.
+- `start_m` and `end_m`: distances along the representative, measured from its start.
+- `count` and `trajectory_ids`: the distinct original trajectories supporting that stretch.
+- `points`: the representative clipped at these exact metre offsets and converted back to GPS.
+
+Intervals split whenever the set of supporters changes, even if the count stays the same.
+Multiple contributions from one trajectory count only once. Pathlet and interval IDs are
+local to a search response; `trajectory_ids` refer to source trajectories in the database.
+Interval geometry highlights coverage **on the representative**, not the supporters' own GPS tracks.
+
+In the Route Explorer, click a pathlet on the map or in the route list, then choose an
+interval in the support panel or on the map. The panel shows its supporters and distance
+range; filled/hollow map markers identify the interval's start/end.

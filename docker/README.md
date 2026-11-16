@@ -15,8 +15,10 @@ DATABASE_USER=postgres
 DATABASE_PASSWORD=<the password from the VM>
 ```
 
-`docker/app.compose.yml` changes `DATABASE_HOST` to `host.docker.internal` inside the
-backend container. So the same `.env` works both for Docker and for running uvicorn directly.
+On Linux, `docker/app.compose.yml` uses host networking for the backend and sets
+`DATABASE_HOST=127.0.0.1`. This lets the container reach the SSH tunnel bound to the
+host's loopback interface, using `DATABASE_PORT` from `.env`. The backend listens
+directly on the host's port `8000`, so it does not need a Docker port mapping.
 
 ### 2. Open the SSH tunnel
 
@@ -34,6 +36,12 @@ ssh -N -L 15432:localhost:5432 ucloud@ssh.cloud.sdu.dk -p <port>
 
 ```bash
 docker compose -f docker/app.compose.yml up --build -d
+```
+
+After changing the backend's network or environment settings, recreate it:
+
+```bash
+docker compose -f docker/app.compose.yml up -d --force-recreate backend
 ```
 
 ## Start trajectory builder

@@ -32,7 +32,8 @@ def test_get_subtrajectories(monkeypatch):
 
     def find_similar_trajectories(*arguments):
         received["similarity_arguments"] = arguments
-        return [Pathlet([GPSCoordinate(41.15, -8.61)], 2, [SupportInterval(0.0, 50.0, 2)])]
+        points = [GPSCoordinate(41.15, -8.61)]
+        return [Pathlet(points, 2, [SupportInterval(0.0, 50.0, 2, [7, 9], 1, points)], 1, 50.0)]
 
     monkeypatch.setitem(
         app.dependency_overrides,
@@ -51,6 +52,11 @@ def test_get_subtrajectories(monkeypatch):
     assert response.json()[0]["count"] == 2
     assert response.json()[0]["points"][0]["longitude"] == -8.61
     assert response.json()[0]["support"][0]["end_m"] == 50.0
+    assert response.json()[0]["pathlet_id"] == 1
+    assert response.json()[0]["length_m"] == 50.0
+    assert response.json()[0]["support"][0]["support_interval_id"] == 1
+    assert response.json()[0]["support"][0]["trajectory_ids"] == [7, 9]
+    assert response.json()[0]["support"][0]["points"][0]["longitude"] == -8.61
     assert received["arguments"] == (
         -8.614,
         41.15,
@@ -63,6 +69,25 @@ def test_get_subtrajectories(monkeypatch):
         None,
     )
     assert received["similarity_arguments"] == (subtrajectories, 100)
+
+
+def test_get_subtrajectories_no_matches_returns_empty_list_with_cors(monkeypatch):
+    """An empty search through the real similarity service stays a valid browser response."""
+    monkeypatch.setitem(
+        app.dependency_overrides,
+        subtrajectory_router.get_subtrajectory_service,
+        lambda: SimpleNamespace(find_subtrajectories=lambda *arguments: []),
+    )
+
+    response = client.get(
+        "/api/subtrajectories/get",
+        params={**QUERY, "start_date": "1111-11-11", "end_date": "1111-11-11"},
+        headers={"Origin": "http://localhost:5173"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
 
 
 def test_get_subtrajectories_passes_time_window(monkeypatch):

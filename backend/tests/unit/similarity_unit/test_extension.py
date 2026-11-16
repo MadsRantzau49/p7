@@ -28,7 +28,7 @@ def test_two_identical_trajectories_give_one_pathlet_with_count_two():
 
     assert _coordinates(pathlet) == line
     assert pathlet.count == 2
-    assert pathlet.support == [SupportInterval(0, 20, 2)]
+    assert pathlet.support == [SupportInterval(0, 20, 2, [1, 2])]
 
 
 def test_reversed_trajectory_gives_its_own_pathlet():
@@ -59,7 +59,7 @@ def test_longest_trajectory_becomes_the_representative():
 
     assert _coordinates(pathlet) == long_line
     assert pathlet.count == 2
-    assert pathlet.support == [SupportInterval(0, 10, 2), SupportInterval(10, 30, 1)]
+    assert pathlet.support == [SupportInterval(0, 10, 2, [1, 2]), SupportInterval(10, 30, 1, [2])]
 
 
 def test_trajectory_leaving_a_representative_continues_as_a_new_pathlet():
@@ -69,11 +69,11 @@ def test_trajectory_leaving_a_representative_continues_as_a_new_pathlet():
 
     first, second = _generate([_trajectory(1, road), _trajectory(2, turning_off)], 1)
 
-    assert first.support == [SupportInterval(0, 10, 2), SupportInterval(10, 30, 1)]
+    assert first.support == [SupportInterval(0, 10, 2, [1, 2]), SupportInterval(10, 30, 1, [1])]
     assert _coordinates(second) == [(10, 0), (10, 10), (10, 20)]
     assert second.count == 1
     assert first.count == 2
-    assert second.support == [SupportInterval(0, 20, 1)]
+    assert second.support == [SupportInterval(0, 20, 1, [2])]
 
 
 def test_trajectory_joining_a_representative_starts_as_a_new_pathlet():
@@ -83,11 +83,11 @@ def test_trajectory_joining_a_representative_starts_as_a_new_pathlet():
 
     first, second = _generate([_trajectory(1, road), _trajectory(2, joining)], 1)
 
-    assert first.support == [SupportInterval(0, 20, 2), SupportInterval(20, 30, 1)]
+    assert first.support == [SupportInterval(0, 20, 2, [1, 2]), SupportInterval(20, 30, 1, [1])]
     assert _coordinates(second) == [(0, 10), (0, 0)]
     assert first.count == 2
     assert second.count == 1
-    assert second.support == [SupportInterval(0, 10, 1)]
+    assert second.support == [SupportInterval(0, 10, 1, [2])]
 
 
 def test_matches_are_measured_against_the_representative_only():
@@ -111,7 +111,7 @@ def test_repeated_trajectory_id_counts_as_one_trajectory():
     [pathlet] = _generate([_trajectory(7, line), _trajectory(7, line)], 1)
 
     assert pathlet.count == 1
-    assert pathlet.support == [SupportInterval(0, 10, 1)]
+    assert pathlet.support == [SupportInterval(0, 10, 1, [7])]
 
 
 def test_trajectory_mapping_to_a_single_position_becomes_its_own_pathlet():
@@ -121,7 +121,7 @@ def test_trajectory_mapping_to_a_single_position_becomes_its_own_pathlet():
 
     first, second = _generate([_trajectory(1, road), _trajectory(2, tiny_crossing)], 1)
 
-    assert first.support == [SupportInterval(0, 10, 1)]
+    assert first.support == [SupportInterval(0, 10, 1, [1])]
     assert _coordinates(second) == tiny_crossing
     assert second.count == 1
 

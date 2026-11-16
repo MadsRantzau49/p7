@@ -26,14 +26,14 @@ def test_overlapping_sections_of_one_trajectory_count_once():
     """A trajectory covering the same stretch twice is still one supporter."""
     sections = [_section(1, 0, 10), _section(1, 5, 15)]
 
-    assert support_intervals(sections, 15) == [SupportInterval(0, 15, 1)]
+    assert support_intervals(sections, 15) == [SupportInterval(0, 15, 1, [1])]
 
 
 def test_two_trajectories_on_the_same_stretch_count_twice():
     """Two different trajectories give a count of 2."""
     sections = [_section(1, 0, 10), _section(2, 0, 10)]
 
-    assert support_intervals(sections, 10) == [SupportInterval(0, 10, 2)]
+    assert support_intervals(sections, 10) == [SupportInterval(0, 10, 2, [1, 2])]
 
 
 def test_count_changes_where_a_supporter_joins_or_leaves():
@@ -41,17 +41,20 @@ def test_count_changes_where_a_supporter_joins_or_leaves():
     sections = [_section(1, 0, 30), _section(2, 10, 20)]
 
     assert support_intervals(sections, 30) == [
-        SupportInterval(0, 10, 1),
-        SupportInterval(10, 20, 2),
-        SupportInterval(20, 30, 1),
+        SupportInterval(0, 10, 1, [1]),
+        SupportInterval(10, 20, 2, [1, 2]),
+        SupportInterval(20, 30, 1, [1]),
     ]
 
 
-def test_neighbouring_stretches_with_the_same_count_are_joined():
-    """One trajectory taking over from another does not split the interval."""
+def test_neighbouring_stretches_with_different_supporters_stay_separate():
+    """Keep the point where one trajectory takes over, even when the count stays constant."""
     sections = [_section(1, 0, 10), _section(2, 10, 20)]
 
-    assert support_intervals(sections, 20) == [SupportInterval(0, 20, 1)]
+    assert support_intervals(sections, 20) == [
+        SupportInterval(0, 10, 1, [1]),
+        SupportInterval(10, 20, 1, [2]),
+    ]
 
 
 def test_uncovered_gap_has_a_count_of_zero():
@@ -59,9 +62,9 @@ def test_uncovered_gap_has_a_count_of_zero():
     sections = [_section(1, 0, 2), _section(1, 8, 10)]
 
     assert support_intervals(sections, 10) == [
-        SupportInterval(0, 2, 1),
+        SupportInterval(0, 2, 1, [1]),
         SupportInterval(2, 8, 0),
-        SupportInterval(8, 10, 1),
+        SupportInterval(8, 10, 1, [1]),
     ]
 
 
@@ -69,11 +72,20 @@ def test_zero_length_section_adds_no_support_on_a_normal_representative():
     """A section that maps to a single position covers no distance."""
     sections = [_section(1, 0, 10), _section(2, 5, 5)]
 
-    assert support_intervals(sections, 10) == [SupportInterval(0, 10, 1)]
+    assert support_intervals(sections, 10) == [SupportInterval(0, 10, 1, [1])]
 
 
 def test_zero_length_representative_counts_all_distinct_trajectories():
     """A representative without length gets one [0, 0] interval counting each trajectory once."""
     sections = [_section(1, 0, 0), _section(1, 0, 0), _section(2, 0, 0)]
 
-    assert support_intervals(sections, 0) == [SupportInterval(0.0, 0.0, 2)]
+    assert support_intervals(sections, 0) == [SupportInterval(0.0, 0.0, 2, [1, 2])]
+
+
+def test_uncovered_start_and_end_keep_their_distance_ranges():
+    """Intervals span the whole representative, including uncovered ends."""
+    assert support_intervals([_section(3, 2, 8)], 10) == [
+        SupportInterval(0, 2, 0),
+        SupportInterval(2, 8, 1, [3]),
+        SupportInterval(8, 10, 0),
+    ]

@@ -23,14 +23,13 @@ def merge_intervals(intervals: list[tuple[float, float]]) -> list[tuple[float, f
 
 
 def support_intervals(sections: list[TrajectorySection], total_length: float) -> list[SupportInterval]:
-    """Build intervals with constant counts of distinct supporting trajectories.
+    """Build intervals with constant sets of distinct supporting trajectories.
 
     Group sections by trajectory ID and merge each trajectory's coverage,
     so overlapping contributions from the same trajectory count once.
 
-    Create +1 events at coverage starts and -1 events at coverage ends.
-    Sweep these events in distance order, emitting intervals between them
-    and joining adjacent intervals with equal counts.
+    Sweep coverage starts and ends in distance order. Keep a boundary when
+    supporters change, even if the number of supporters stays the same.
 
     All offsets and total_length use metres. For a zero-length representative,
     return one [0.0, 0.0] interval counting all distinct IDs in sections.
@@ -42,23 +41,30 @@ def support_intervals(sections: list[TrajectorySection], total_length: float) ->
             (section.representative_start_m, section.representative_end_m)
         )
     if total_length == 0:
-        return [SupportInterval(0.0, 0.0, len(intervals_by_trajectory))]
+        ids = sorted(intervals_by_trajectory)
+        return [SupportInterval(0.0, 0.0, len(ids), ids)]
 
-    count_changes: dict[float, int] = {}
-    for intervals in intervals_by_trajectory.values():
+    starts: dict[float, set[int]] = {}
+    ends: dict[float, set[int]] = {}
+    for trajectory_id, intervals in intervals_by_trajectory.items():
         for start, end in merge_intervals(intervals):
-            count_changes[start] = count_changes.get(start, 0) + 1
-            count_changes[end] = count_changes.get(end, 0) - 1
+            start, end = max(0.0, start), min(total_length, end)
+            if end <= start:
+                continue
+            starts.setdefault(start, set()).add(trajectory_id)
+            ends.setdefault(end, set()).add(trajectory_id)
 
     support: list[SupportInterval] = []
     previous = 0.0
-    count = 0
-    for position, change in sorted(count_changes.items()):
+    active: set[int] = set()
+    for position in sorted({0.0, total_length} | starts.keys() | ends.keys()):
         if position > previous:
-            if support and support[-1].count == count:
+            ids = sorted(active)
+            if support and support[-1].trajectory_ids == ids:
                 support[-1].end_m = position
             else:
-                support.append(SupportInterval(previous, position, count))
-        count += change
+                support.append(SupportInterval(previous, position, len(ids), ids))
+        active.difference_update(ends.get(position, ()))
+        active.update(starts.get(position, ()))
         previous = position
     return support
