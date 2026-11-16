@@ -150,3 +150,4 @@ runs/
 docs/rendered/*
 backend/tests/data/pathlets.json
 backend/tests/data/large_trajectories/*.csv*
+backend/tests/data/trajectories/beijing_data.csv
