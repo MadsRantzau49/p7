@@ -6,8 +6,7 @@ import pytest
 from database.repositories.dataset_repository import DatasetRepository
 from database.repositories.import_repository import ImportRepository
 from database.repositories.trajectory_repository import TrajectoryRepository
-from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint
-from models.upload_row import VehicleType
+from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint, VehicleType
 
 
 def _call_get_dataset_id(context):
@@ -40,20 +39,12 @@ def _call_get_trajectories_from_db(context):
     )
 
 
-def _call_dataset_name_taken(context):
-    return DatasetRepository(context).dataset_name_taken("x")
-
-
 def _call_create_dataset(context):
     return DatasetRepository(context).create_dataset("x", 1)
 
 
 def _call_get_or_create_city(context):
     return DatasetRepository(context).get_or_create_city("x", "Europe/Lisbon")
-
-
-def _call_get_time_zones(context):
-    return DatasetRepository(context).get_time_zones()
 
 
 def _call_get_trajectories_cities_from_db(context):
@@ -81,10 +72,8 @@ def _call_insert_trips(context):
         _call_retrieve_porto_dataset_batch,
         _call_retrieve_beijing_data_batch,
         _call_get_trajectories_from_db,
-        _call_dataset_name_taken,
         _call_create_dataset,
         _call_get_or_create_city,
-        _call_get_time_zones,
         _call_get_trajectories_cities_from_db,
         _call_get_vehicle_type_ids,
         _call_insert_trips,

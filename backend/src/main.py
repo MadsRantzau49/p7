@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers.dataset_router import router as dataset_router
 from routers.subtrajectory_router import router as subtrajectory_router
 from routers.trajectory_router import router as trajectory_router
 
@@ -22,7 +21,6 @@ app.add_middleware(
 )
 
 app.include_router(trajectory_router)
-app.include_router(dataset_router)
 app.include_router(subtrajectory_router)
 
 
