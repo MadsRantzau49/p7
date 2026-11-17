@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from datetime import date, time
 from typing import Annotated
 
+import psycopg
 from dependencies import get_similarity_service, get_subtrajectory_service
 from fastapi import APIRouter, Depends, HTTPException, Query
 from models.bounding_box import BoundingBox
@@ -63,3 +64,9 @@ def get_subtrajectories(
 
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
+    except psycopg.errors.QueryCanceled as error:
+        raise HTTPException(status_code=504, detail="The search took too long. Try smaller areas.") from error
+    except psycopg.OperationalError as error:
+        raise HTTPException(
+            status_code=503, detail="Lost the connection to the database. Please try again."
+        ) from error

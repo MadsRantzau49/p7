@@ -300,7 +300,26 @@ body {
 .usage-legend { max-width: 100%; }
 .usage-bands { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 6px; }
 .usage-band { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
-.usage-band i { width: 16px; height: 12px; border: 1px solid #292929; }
+/* A sample of the line as drawn on the map: colour and thickness both show usage. */
+.usage-band i { width: 22px; border-radius: 2px; }
+
+/* Grey, slightly faded basemap: OpenStreetMap's own coloured roads and water otherwise
+   compete with the route colours. */
+.basemap { filter: grayscale(1) contrast(.85) brightness(1.08); }
+
+/* Small "A" / "B" badges instead of large white tooltip boxes. */
+.leaflet-tooltip.area-label {
+  padding: 1px 7px;
+  border: none;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / .3);
+  color: white;
+  font-weight: 700;
+  font-size: 12px;
+}
+.leaflet-tooltip.area-label::before { display: none; }
+.leaflet-tooltip.area-label-start { background: #35754c; }
+.leaflet-tooltip.area-label-end { background: #79579c; }
 .journey-key { display: flex; flex-direction: column; gap: 5px; }
 .journey-key span { display: flex; align-items: center; gap: 7px; }
 .journey-key i { display: inline-block; width: 20px; height: 4px; }

@@ -19,8 +19,14 @@ database_pool = ConnectionPool(
         "dbname": os.getenv("DATABASE_NAME"),
         "user": os.getenv("DATABASE_USER"),
         "password": os.getenv("DATABASE_PASSWORD"),
-        "options": "-c TimeZone=UTC",
+        # statement_timeout: a runaway query fails with a clear error instead of hanging. It is
+        # generous on purpose: searching the whole dataset is allowed and takes seconds.
+        "options": "-c TimeZone=UTC -c statement_timeout=300s",
     },
+    # Test each connection before handing it out. Connections through the SSH tunnel can die
+    # while idle in the pool (tunnel restart, network drop); without this check the next request
+    # gets a dead connection and fails with "server closed the connection unexpectedly".
+    check=ConnectionPool.check_connection,
     min_size=1,
     max_size=5,
     open=True,
