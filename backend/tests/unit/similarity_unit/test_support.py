@@ -2,9 +2,15 @@ from helpers.similarity_steps.pathlet_extension.support import merge_intervals, 
 from models.similarity import SupportInterval, TrajectorySection
 
 
-def _section(trajectory_id: int, start_m: float, end_m: float) -> TrajectorySection:
-    """Build one trajectory's coverage of a representative."""
-    return TrajectorySection(trajectory_id, start_m, end_m)
+def _section(subtrajectory_id: int, start_m: float, end_m: float) -> TrajectorySection:
+    """Build one input subpath's coverage of a representative."""
+    return TrajectorySection(
+        subtrajectory_id,
+        start_m,
+        end_m,
+        source_start_index=0,
+        source_end_index=1,
+    )
 
 
 def test_merge_intervals_of_nothing_is_empty():

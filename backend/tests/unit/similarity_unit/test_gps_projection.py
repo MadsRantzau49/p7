@@ -23,7 +23,7 @@ def _subtrajectory(
 ) -> Subtrajectory:
     """Build a subtrajectory from (longitude, latitude) pairs."""
     points = [_point(longitude, latitude) for longitude, latitude in coordinates]
-    return Subtrajectory(trajectory_id, trajectory_id, MOMENT, MOMENT, points)
+    return Subtrajectory(subtrajectory_id, trajectory_id, MOMENT, MOMENT, points)
 
 
 def test_centre_longitude_handles_the_antimeridian():
@@ -65,8 +65,8 @@ def test_projection_gives_distances_in_metres():
     assert second.x - first.x == pytest.approx(0, abs=0.01)
 
 
-def test_projection_keeps_trajectory_ids_and_the_number_of_points():
-    """Every trajectory keeps its identity, in the same order as the input."""
+def test_projection_keeps_subtrajectory_ids_and_the_number_of_points():
+    """Projection uses input subpath IDs rather than original database IDs."""
     trajectories = [
         _subtrajectory(4, 194, [(10.2, 56.15), (10.201, 56.15)]),
         _subtrajectory(
@@ -76,12 +76,12 @@ def test_projection_keeps_trajectory_ids_and_the_number_of_points():
         ),
     ]
 
-    # Check whether the IDs are already wrong before projection.
+    # Original database IDs remain on the input records only.
     assert [t.trajectory_id for t in trajectories] == [4, 9]
 
     projected, _ = projection(trajectories)
 
-    assert [t.trajectory_id for t in projected] == [4, 9]
+    assert [t.subtrajectory_id for t in projected] == [194, 2432]
     assert [len(t.projected_points) for t in projected] == [2, 3]
 
 

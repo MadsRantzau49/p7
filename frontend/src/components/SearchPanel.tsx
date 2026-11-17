@@ -1,4 +1,4 @@
-import type { LatLng, SimilarityLevel } from '../types'
+import type { Area, PickMode, SimilarityLevel } from '../types'
 
 // The three similarity blocks, in order, with their labels.
 const SIMILARITY_LEVELS: { value: SimilarityLevel; label: string }[] = [
@@ -7,11 +7,9 @@ const SIMILARITY_LEVELS: { value: SimilarityLevel; label: string }[] = [
   { value: 'high', label: 'High' },
 ]
 
-type PickMode = 'start' | 'end' | null
-
 type Props = {
-  startPoint: LatLng | null
-  endPoint: LatLng | null
+  startArea: Area | null
+  endArea: Area | null
   pickMode: PickMode
   setPickMode: (mode: PickMode) => void
 
@@ -39,14 +37,9 @@ type Props = {
   onFindRoutes: () => void
 }
 
-// Show a picked point as short coordinates.
-function formatPoint(point: LatLng): string {
-  return `${point.lat.toFixed(4)}, ${point.lng.toFixed(4)}`
-}
-
 export default function SearchPanel({
-  startPoint,
-  endPoint,
+  startArea,
+  endArea,
   pickMode,
   setPickMode,
   fromDate,
@@ -78,25 +71,28 @@ export default function SearchPanel({
         <button
           type="button"
           className={pickMode === 'start' ? 'pick-button active' : 'pick-button'}
+          aria-pressed={pickMode === 'start'}
+          disabled={loading}
           onClick={() => setPickMode(pickMode === 'start' ? null : 'start')}
         >
-          {startPoint ? 'Starting area selected' : 'Select starting area on map'}
+          {startArea ? 'A · Starting area selected — change' : 'A · Select starting area on map'}
         </button>
-        {startPoint && <p className="coords">{formatPoint(startPoint)}</p>}
 
         <button
           type="button"
           className={pickMode === 'end' ? 'pick-button active' : 'pick-button'}
+          aria-pressed={pickMode === 'end'}
+          disabled={loading}
           onClick={() => setPickMode(pickMode === 'end' ? null : 'end')}
         >
-          {endPoint ? 'Destination selected' : 'Select destination area on map'}
+          {endArea ? 'B · Destination area selected — change' : 'B · Select destination area on map'}
         </button>
-        {endPoint && <p className="coords">{formatPoint(endPoint)}</p>}
       </section>
 
       {/* 2. When */}
       <section className="panel-section">
-        <h3>2. When?</h3>
+        <h3>2. When? (optional)</h3>
+        <p className="help-text">Leave blank to include all dates and hours.</p>
         <div className="field-row">
           <label>
             From date
@@ -171,7 +167,7 @@ export default function SearchPanel({
         {loading ? 'Finding...' : 'Find routes'}
       </button>
 
-      {error && <p className="error-text">{error}</p>}
+      {error && <p className="error-text" role="alert">{error}</p>}
     </aside>
   )
 }

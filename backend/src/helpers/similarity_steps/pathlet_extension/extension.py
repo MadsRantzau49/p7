@@ -22,13 +22,13 @@ def generate_pathlet(
     distance threshold in metres. Each input segment is assigned exactly once, either to an existing
     pathlet or to a newly created one. Pathlets may be supported by different trajectories along different
     sections. The overall count represents the number of distinct
-    original trajectory IDs contributing to a pathlet, while support
+    input subtrajectory IDs contributing to a pathlet, while support
     intervals describe local counts along its geometry.
     """
     lines = []
-    for _, trajectory in enumerate(trajectories):
+    for trajectory in trajectories:
         polyline = Polyline.from_points(trajectory.projected_points)
-        lines.append(TrajectoryLine(trajectory.trajectory_id, polyline))
+        lines.append(TrajectoryLine(trajectory.subtrajectory_id, polyline))
 
     lengths = []
     for line in lines:
@@ -75,9 +75,11 @@ def assign_trajectory(
         # Match found: assign the stretch to that representative.
         if match:
             section = TrajectorySection(
-                trajectory_id=line.trajectory_id,
+                subtrajectory_id=line.subtrajectory_id,
                 representative_start_m=match.start_m,
                 representative_end_m=match.end_m,
+                source_start_index=start,
+                source_end_index=match.end_index,
             )
 
             match.representative.assigned_sections.append(section)
@@ -95,9 +97,11 @@ def assign_trajectory(
         # Everything from start to end becomes a new representative.
         representative_line = Polyline.from_points(polyline.points[start : end + 1])
         own_section = TrajectorySection(
-            trajectory_id=line.trajectory_id,
+            subtrajectory_id=line.subtrajectory_id,
             representative_start_m=0.0,
             representative_end_m=representative_line.total_length,
+            source_start_index=start,
+            source_end_index=end,
         )
         representative = Representative(representative_line, own_section)
         representatives.append(representative)
@@ -108,8 +112,8 @@ def assign_trajectory(
 def to_projected_pathlet(representative: Representative) -> ProjectedPathlet:
     """Return representative points with trajectory counts and support intervals.
 
-    Count distinct source IDs with positive-length coverage. For a zero-length
-    representative, count all assigned source IDs. Support distances use metres.
+    Count distinct input subpath IDs with positive-length coverage. For a zero-length
+    representative, count all assigned subpath IDs. Support distances use metres.
     """
     sections = [representative.own_section]
     sections.extend(representative.assigned_sections)
@@ -120,12 +124,14 @@ def to_projected_pathlet(representative: Representative) -> ProjectedPathlet:
         if section.representative_end_m > section.representative_start_m:
             covering.append(section)
 
-    trajectory_ids = set()
+    subtrajectory_ids = set()
     for section in covering:
-        trajectory_ids.add(section.trajectory_id)
+        subtrajectory_ids.add(section.subtrajectory_id)
 
     return ProjectedPathlet(
         points=representative.polyline.points,
-        count=len(trajectory_ids),
+        count=len(subtrajectory_ids),
         support=support_intervals(sections, total_length_m),
+        sections=covering,
+        distances_m=list(representative.polyline.cumulative_lengths),
     )

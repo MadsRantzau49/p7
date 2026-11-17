@@ -1,11 +1,9 @@
 import { useState } from 'react'
-import type { LatLng, Pathlet, SimilarityLevel } from './types'
+import type { Area, Pathlet, PickMode, SimilarityLevel, Subtrajectory } from './types'
 import { findRoutes } from './api/subtrajectories'
 import SearchPanel from './components/SearchPanel'
 import RouteMap from './components/RouteMap'
-import RouteOverview from './components/RouteOverview'
-
-type PickMode = 'start' | 'end' | null
+import { areasOverlap } from './routeGeometry'
 
 
 const EPSILON_BY_LEVEL: Record<SimilarityLevel, number> = {
@@ -21,7 +19,7 @@ function readErrorMessage(err: unknown): string {
   if (typeof detail === 'string') return detail
   if (Array.isArray(detail)) {
     return detail
-      .map((item) => (item as { message?: string }).message ?? 'invalid input')
+      .map((item) => (item as { msg?: string }).msg ?? 'invalid input')
       .join('; ')
   }
   return 'Could not fetch routes.'
@@ -29,8 +27,8 @@ function readErrorMessage(err: unknown): string {
 
 export default function App() {
   // location
-  const [startPoint, setStartPoint] = useState<LatLng | null>(null)
-  const [endPoint, setEndPoint] = useState<LatLng | null>(null)
+  const [startArea, setStartArea] = useState<Area | null>(null)
+  const [endArea, setEndArea] = useState<Area | null>(null)
   const [pickMode, setPickMode] = useState<PickMode>(null)
 
   // date
@@ -48,40 +46,54 @@ export default function App() {
 
   // Results
   const [routes, setRoutes] = useState<Pathlet[]>([])
+  const [trajectories, setTrajectories] = useState<Subtrajectory[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
-  const [hoveredRoute, setHoveredRoute] = useState<number | null>(null)
 
 
   const epsilonMeters = useCustomEpsilon ? customEpsilon : EPSILON_BY_LEVEL[similarityLevel]
 
-  // search guard, needs all 4 before we hit endpoint 
-  const canSearch = Boolean(startPoint && endPoint && fromDate && toDate)
+  const canSearch = Boolean(startArea && endArea && Number.isFinite(epsilonMeters) && epsilonMeters > 0)
 
-  // A map click lands here. We drop the point we are currently picking.
-  function handlePickPoint(point: LatLng) {
-    if (pickMode === 'start') setStartPoint(point)
-    else if (pickMode === 'end') setEndPoint(point)
+  function handlePickArea(area: Area): boolean {
+    const other = pickMode === 'start' ? endArea : startArea
+    if (other && areasOverlap(area, other)) {
+      setError('Start and destination areas must not overlap. Choose another corner.')
+      return false
+    }
+    if (pickMode === 'start') setStartArea(area)
+    else if (pickMode === 'end') setEndArea(area)
+    setError(null)
     setPickMode(null)
+    return true
   }
 
   async function handleFindRoutes() {
-    if (!startPoint || !endPoint) return
+    if (!startArea || !endArea || !canSearch || loading) return
+    if (fromDate && toDate && fromDate > toDate) {
+      setError('From date must be on or before To date.')
+      return
+    }
 
     setLoading(true)
+    setPickMode(null)
+    setRoutes([])
+    setTrajectories([])
+    setHasSearched(false)
     setError(null)
     try {
       const result = await findRoutes({
-        start: startPoint,
-        end: endPoint,
+        start: startArea,
+        end: endArea,
         fromDate,
         toDate,
         fromHour,
         toHour,
         epsilon: epsilonMeters,
       })
-      setRoutes(result)
+      setRoutes(result.pathlets)
+      setTrajectories(result.trajectories)
       setHasSearched(true)
     } catch (err) {
       setError(readErrorMessage(err))
@@ -99,8 +111,8 @@ export default function App() {
       <div className="app-body">
         <div className="left-column">
           <SearchPanel
-            startPoint={startPoint}
-            endPoint={endPoint}
+            startArea={startArea}
+            endArea={endArea}
             pickMode={pickMode}
             setPickMode={setPickMode}
             fromDate={fromDate}
@@ -124,22 +136,21 @@ export default function App() {
             onFindRoutes={handleFindRoutes}
           />
 
-          <RouteOverview
-            routes={routes}
-            hasSearched={hasSearched}
-            hoveredRoute={hoveredRoute}
-            setHoveredRoute={setHoveredRoute}
-          />
+          <p className="help-text" role="status">
+            {loading ? 'Finding journeys…' : hasSearched
+              ? routes.length ? 'Click a path on the map to see its journeys.' : 'No journeys found for these areas and dates.'
+              : 'Select two areas and find routes.'}
+          </p>
         </div>
 
         <RouteMap
-          startPoint={startPoint}
-          endPoint={endPoint}
+          startArea={startArea}
+          endArea={endArea}
           pickMode={pickMode}
-          onPickPoint={handlePickPoint}
+          onPickArea={handlePickArea}
+          onCancelPick={() => setPickMode(null)}
           routes={routes}
-          hoveredRoute={hoveredRoute}
-          setHoveredRoute={setHoveredRoute}
+          trajectories={trajectories}
         />
       </div>
     </div>

@@ -24,24 +24,20 @@ class ProjectedPoint:
 
 @dataclass
 class ProjectedTrajectory:
-    """A source trajectory expressed as ordered projected points.
+    """One input A-to-B subpath expressed as ordered projected points."""
 
-    trajectory_id identifies the original trajectory for support counting.
-    Multiple input subtrajectories can therefore share the same trajectory_id.
-    """
-
-    trajectory_id: int
+    subtrajectory_id: int
     projected_points: list[ProjectedPoint]
 
 
 @dataclass
 class SupportInterval:
-    """A distance interval with a constant number of supporting trajectories.
+    """A distance interval with a constant number of supporting input subpaths.
 
     start_m and end_m are measured along the representative from its start.
-    count is the number of distinct source trajectory IDs covering the interval's
+    count is the number of distinct subtrajectory IDs covering the interval's
     interior. A zero-length representative uses the interval [0.0, 0.0] and
-    counts all source trajectory IDs assigned to it.
+    counts all subtrajectory IDs assigned to it.
     """
 
     start_m: float
@@ -51,31 +47,35 @@ class SupportInterval:
 
 @dataclass
 class TrajectorySection:
-    """One source trajectory's coverage interval along a representative.
+    """One A-to-B passage's contribution to a representative.
 
-    Both offsets are arc lengths in metres from the representative's start.
-    They are stored with start <= end, including for backward matches, and may
-    be equal when the matched source stretch maps to a single position.
+    subtrajectory_id identifies the passage whose points the source indices
+    select (both ends inclusive). Representative offsets are arc lengths in
+    metres from the representative's start, stored with start <= end.
     """
 
-    trajectory_id: int
+    subtrajectory_id: int
     representative_start_m: float
     representative_end_m: float
+    source_start_index: int
+    source_end_index: int
 
 
 @dataclass
 class ProjectedPathlet:
     """A completed pathlet with representative points in projected metres.
 
-    count is the number of distinct source trajectories with positive-length
+    count is the number of distinct input subpaths with positive-length
     coverage anywhere along it. For a zero-length pathlet, all assigned source
-    trajectory IDs count. support contains local counts over metre intervals;
+    subtrajectory IDs count. support contains local counts over metre intervals;
     these can be smaller than the overall count.
     """
 
     points: list[ProjectedPoint]
     count: int
     support: list[SupportInterval] = field(default_factory=list)
+    sections: list[TrajectorySection] = field(default_factory=list)
+    distances_m: list[float] = field(default_factory=list)
 
 
 @dataclass
@@ -84,22 +84,25 @@ class Pathlet:
 
     count and support retain the coverage semantics of ProjectedPathlet.
     Support interval offsets remain in metres after inverse projection.
+    distances_m contains the projected arc length of each representative point,
+    allowing the frontend to split the geometry at exact support boundaries.
     """
 
     points: list[GPSCoordinate]
     count: int
     support: list[SupportInterval] = field(default_factory=list)
+    sections: list[TrajectorySection] = field(default_factory=list)
+    distances_m: list[float] = field(default_factory=list)
 
 
 @dataclass
 class TrajectoryLine:
     """A projected input prepared for matching, with cached polyline lengths.
 
-    trajectory_id identifies the source trajectory. position is the zero-based
-    position in the original input list, before sorting inputs by length.
+    subtrajectory_id identifies the input subpath for counting and inspection.
     """
 
-    trajectory_id: int
+    subtrajectory_id: int
     polyline: Polyline
 
 
