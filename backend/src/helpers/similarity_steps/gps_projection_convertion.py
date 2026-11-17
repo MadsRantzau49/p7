@@ -54,8 +54,8 @@ def projection(
 
         projected_trajectories.append(
             ProjectedTrajectory(
+                trajectory_id=trajectory.trajectory_id,
                 projected_points=projected_points,
-                subtrajectory_id=trajectory.subtrajectory_id,
             )
         )
 
@@ -84,8 +84,6 @@ def inverse_projection(
                 count=pathlet.count,
                 points=gps_points,
                 support=pathlet.support,
-                sections=pathlet.sections,
-                distances_m=pathlet.distances_m,
             )
         )
 

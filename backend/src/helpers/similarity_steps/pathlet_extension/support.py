@@ -23,10 +23,10 @@ def merge_intervals(intervals: list[tuple[float, float]]) -> list[tuple[float, f
 
 
 def support_intervals(sections: list[TrajectorySection], total_length: float) -> list[SupportInterval]:
-    """Build intervals with constant counts of distinct supporting input subpaths.
+    """Build intervals with constant counts of distinct supporting trajectories.
 
-    Group sections by subtrajectory ID and merge each input subpath's coverage,
-    so overlapping contributions from the same subpath count once.
+    Group sections by trajectory ID and merge each trajectory's coverage,
+    so overlapping contributions from the same trajectory count once.
 
     Create +1 events at coverage starts and -1 events at coverage ends.
     Sweep these events in distance order, emitting intervals between them
@@ -35,17 +35,17 @@ def support_intervals(sections: list[TrajectorySection], total_length: float) ->
     All offsets and total_length use metres. For a zero-length representative,
     return one [0.0, 0.0] interval counting all distinct IDs in sections.
     """
-    intervals_by_subtrajectory: dict[int, list[tuple[float, float]]] = {}
+    intervals_by_trajectory: dict[int, list[tuple[float, float]]] = {}
 
     for section in sections:
-        intervals_by_subtrajectory.setdefault(section.subtrajectory_id, []).append(
+        intervals_by_trajectory.setdefault(section.trajectory_id, []).append(
             (section.representative_start_m, section.representative_end_m)
         )
     if total_length == 0:
-        return [SupportInterval(0.0, 0.0, len(intervals_by_subtrajectory))]
+        return [SupportInterval(0.0, 0.0, len(intervals_by_trajectory))]
 
     count_changes: dict[float, int] = {}
-    for intervals in intervals_by_subtrajectory.values():
+    for intervals in intervals_by_trajectory.values():
         for start, end in merge_intervals(intervals):
             count_changes[start] = count_changes.get(start, 0) + 1
             count_changes[end] = count_changes.get(end, 0) - 1

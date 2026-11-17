@@ -5,9 +5,9 @@ from helpers.similarity_steps.pathlet_extension.extension import generate_pathle
 from models.similarity import ProjectedPathlet, ProjectedPoint, ProjectedTrajectory, SupportInterval
 
 
-def _trajectory(subtrajectory_id: int, coordinates: Sequence[tuple[float, float]]) -> ProjectedTrajectory:
+def _trajectory(trajectory_id: int, coordinates: Sequence[tuple[float, float]]) -> ProjectedTrajectory:
     """Build a projected trajectory from (x, y) pairs in metres."""
-    return ProjectedTrajectory(subtrajectory_id, [ProjectedPoint(x, y) for x, y in coordinates])
+    return ProjectedTrajectory(trajectory_id, [ProjectedPoint(x, y) for x, y in coordinates])
 
 
 def _generate(trajectories: list[ProjectedTrajectory], epsilon: float) -> list[ProjectedPathlet]:
@@ -104,14 +104,14 @@ def test_matches_are_measured_against_the_representative_only():
     assert [pathlet.count for pathlet in pathlets] == [2, 1]
 
 
-def test_repeated_subtrajectory_id_is_counted_once():
-    """Multiple contributions from the same input subpath count as one supporter."""
+def test_repeated_trajectory_id_counts_as_one_trajectory():
+    """Two sections of the same source trajectory are one supporter."""
     line = [(0, 0), (10, 0)]
+
     [pathlet] = _generate([_trajectory(7, line), _trajectory(7, line)], 1)
 
     assert pathlet.count == 1
     assert pathlet.support == [SupportInterval(0, 10, 1)]
-    assert {section.subtrajectory_id for section in pathlet.sections} == {7}
 
 
 def test_trajectory_mapping_to_a_single_position_becomes_its_own_pathlet():
