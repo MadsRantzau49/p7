@@ -42,7 +42,7 @@ body {
   min-height: 0; /* lets the map area shrink correctly */
 }
 
-/* Existing search panel beside the map. */
+/* Left column holds the search panel and the route list. */
 .left-column {
   display: flex;
   flex-direction: column;
@@ -52,7 +52,8 @@ body {
   overflow-y: auto;
 }
 
-.search-panel {
+.search-panel,
+.overview {
   background: #fff;
   border: 1px solid #e0e4e8;
   border-radius: 12px;
@@ -116,7 +117,6 @@ body {
   gap: 4px;
   font-size: 12px;
   color: #52606d;
-  min-width: 0;
 }
 
 .field-row input {
@@ -124,8 +124,6 @@ body {
   border: 1px solid #c7ced6;
   border-radius: 8px;
   font-size: 14px;
-  min-width: 0;
-  width: 100%;
 }
 
 .field-group-title {
@@ -242,6 +240,49 @@ body {
   }
 }
 
+/* Route list (the overview). */
+.overview h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.route-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.route-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.route-row:hover,
+.route-row.active {
+  background: #f0f3f6;
+}
+
+.swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.route-name {
+  flex: 1;
+}
+
+.route-count {
+  color: #52606d;
+  font-size: 13px;
+}
+
 /* The map fills the rest of the width, inside a rounded card like the sketch. */
 .map-card {
   flex: 1;
@@ -250,14 +291,6 @@ body {
   border: 2px solid #2f6fd1;
   border-radius: 16px;
   padding: 6px;
-  display: flex;
-  flex-direction: column;
-}
-
-.map-frame {
-  flex: 1;
-  position: relative;
-  min-height: 280px;
 }
 
 .map {
@@ -266,46 +299,15 @@ body {
   border-radius: 12px;
 }
 
-.map-message {
-  position: absolute;
-  z-index: 1000;
-  top: 10px;
-  left: 55px;
-  right: 10px;
-  width: fit-content;
-  max-width: calc(100% - 65px);
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px 10px;
+.count-label {
   background: #fff;
   border: 1px solid #c7ced6;
   border-radius: 6px;
+  padding: 1px 6px;
+  font-weight: 700;
   font-size: 12px;
+  color: #1f2933;
 }
-
-.map-message button {
-  background: white;
-  border: 1px solid #c7ced6;
-  border-radius: 4px;
-  padding: 4px 7px;
-  cursor: pointer;
-}
-
-.picking-area .leaflet-container,
-.picking-area .leaflet-interactive { cursor: crosshair; }
-
-.map-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; padding: 10px; font-size: 12px; }
-.usage-legend { max-width: 100%; }
-.usage-bands { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 6px; }
-.usage-band { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
-.usage-band i { width: 16px; height: 12px; border: 1px solid #292929; }
-.journey-key { display: flex; flex-direction: column; gap: 5px; }
-.journey-key span { display: flex; align-items: center; gap: 7px; }
-.journey-key i { display: inline-block; width: 20px; height: 4px; }
-.journey-key .representative-key { height: 0; border-top: 3px dashed; }
-.leaflet-interactive:focus-visible { outline: 2px solid #315bce; }
 
 /* phone width */
 @media (max-width: 800px) {

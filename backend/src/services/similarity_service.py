@@ -17,8 +17,9 @@ class SimilarityService(Logging):
 
         Every original segment is assigned exactly once. Members may support
         only part of a pathlet, with local counts in its support intervals.
-        Count is distinct input subpaths contributing anywhere along it.
-        The engine indexes representatives with an incremental spatial grid.
+        Count is distinct original trajectories contributing anywhere along it.
+        r_tree_max_entries is retained for call compatibility; the extension
+        engine indexes only representatives with an incremental spatial grid.
         """
         if not subtrajectory_list or subtrajectory_list is None:
             return None

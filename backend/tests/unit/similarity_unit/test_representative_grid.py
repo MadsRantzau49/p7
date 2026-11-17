@@ -9,14 +9,7 @@ CELL_SIZE = 10.0
 def _representative(coordinates: list[tuple[float, float]]) -> Representative:
     """Build a representative from (x, y) pairs in metres."""
     polyline = Polyline.from_points([ProjectedPoint(x, y) for x, y in coordinates])
-    section = TrajectorySection(
-        1,
-        0.0,
-        polyline.total_length,
-        source_start_index=0,
-        source_end_index=len(polyline.points) - 1,
-    )
-    return Representative(polyline, section)
+    return Representative(polyline, TrajectorySection(1, 0.0, polyline.total_length))
 
 
 def _grid_with(coordinates: list[tuple[float, float]]) -> tuple[RepresentativeGrid, Representative]:
