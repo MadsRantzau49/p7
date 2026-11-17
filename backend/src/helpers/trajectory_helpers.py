@@ -1,7 +1,8 @@
-import json
 import sys
 from pathlib import Path
 
+from models.beijing_trajectory import BeijingTrajectory
+from models.porto_trajectory import PortoTrajectory
 from models.uniformed_trajectories import VehicleType
 
 sys.path.append(str(Path(__file__).parent.parent))
@@ -13,19 +14,14 @@ from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajec
 BEIJING_TIME_ZONE = ZoneInfo("Asia/Shanghai")
 
 
-def convert_porto_trajectory(porto_trajectory: dict) -> UniformedTrajectories:
+def convert_porto_trajectory(porto_trajectory: PortoTrajectory) -> UniformedTrajectories:
     """Convert a Porto trajectory to the uniform trajectory format."""
-    polyline = porto_trajectory["polyline"]
-
-    while isinstance(polyline, str):
-        polyline = json.loads(polyline)
-
-    start_time = datetime.fromtimestamp(int(porto_trajectory["timestamp"]), UTC)
+    start_time = datetime.fromtimestamp(porto_trajectory.timestamp, UTC)
 
     current_time = start_time
     points = []
 
-    for longitude, latitude in polyline:
+    for longitude, latitude in porto_trajectory.polyline:
         points.append(
             UniformedTrajectoryPoint(
                 longitude=float(longitude), latitude=float(latitude), point_timestamp=current_time
@@ -36,42 +32,35 @@ def convert_porto_trajectory(porto_trajectory: dict) -> UniformedTrajectories:
         current_time += timedelta(seconds=15)
 
     return UniformedTrajectories(
-        vehicle_id=porto_trajectory["taxi_id"],
+        vehicle_id=porto_trajectory.taxi_id,
         vehicle_type=VehicleType.TAXI,
         trajectory_date=start_time,
         points=points,
         city="Porto",
-        source_id=porto_trajectory["source_id"],
     )
 
 
-def convert_beijing_trajectory(beijing_trajectory: dict) -> UniformedTrajectories:
+def convert_beijing_trajectory(beijing_trajectory: BeijingTrajectory) -> UniformedTrajectories:
     """Convert a Beijing trajectory to the uniform trajectory format."""
-    beijing_points = beijing_trajectory["points"]
-
-    while isinstance(beijing_points, str):
-        beijing_points = json.loads(beijing_points)
-
     points = []
 
-    for point in beijing_points:
-        point_datetime = datetime.strptime(point["date_time"], "%Y-%m-%d %H:%M:%S").replace(
+    for point in beijing_trajectory.points:
+        point_datetime = datetime.strptime(point.date_time, "%Y-%m-%d %H:%M:%S").replace(
             tzinfo=BEIJING_TIME_ZONE
         )
 
         points.append(
             UniformedTrajectoryPoint(
-                longitude=float(point["longitude"]),
-                latitude=float(point["latitude"]),
+                longitude=float(point.longitude),
+                latitude=float(point.latitude),
                 point_timestamp=point_datetime,
             )
         )
 
     return UniformedTrajectories(
-        vehicle_id=int(beijing_trajectory["taxi_id"]),
+        vehicle_id=int(beijing_trajectory.taxi_id),
         vehicle_type=VehicleType.TAXI,
         trajectory_date=points[0].point_timestamp,
         city="Beijing",
-        source_id=beijing_trajectory["source_id"],
         points=points,
     )

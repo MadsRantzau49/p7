@@ -12,4 +12,3 @@ class TrajectoryPoint:
 class BeijingTrajectory:
     taxi_id: int
     points: list[TrajectoryPoint]
-    source_id: str | None = None

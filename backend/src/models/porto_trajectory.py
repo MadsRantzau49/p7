@@ -12,7 +12,3 @@ class PortoTrajectory:
     day_type: str | None
     missing_data: bool
     polyline: list[list[float]]
-
-    source_id: str | None = (
-        None  # source_id is used for bridge tabel, to determine where the data origins from
-    )

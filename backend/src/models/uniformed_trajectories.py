@@ -25,4 +25,3 @@ class UniformedTrajectories:
 
     trajectory_id: int | None = None
     city: str | None = None
-    source_id: str | None = None

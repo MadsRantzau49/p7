@@ -12,7 +12,6 @@ class RejectionReason(str, Enum):
 
 @dataclass
 class JourneyReport:
-    source_id: str | None
     points_in: int = 0
     points_out: int = 0
     removed: dict[RejectionReason, int] = field(default_factory=dict)

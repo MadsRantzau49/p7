@@ -87,11 +87,10 @@ class TrajectoryRepository:
                                        WHERE name = %(city)s)
                             SELECT t.trajectory_id,
                                    t.vehicle_id,
-                                   vt.name AS vehicle_type,
+                                   t.vehicle_type,
                                    t.trajectory_date,
                                    t.city,
                                    t.points,
-                                   t.source_id,
                                    z.time_zone
                             FROM uniformed_trajectories AS t
                                      CROSS JOIN z
@@ -100,8 +99,6 @@ class TrajectoryRepository:
                                     (t.points -> -1 ->> 'point_timestamp') ::timestamptz
                                     AT TIME ZONE z.time_zone AS local_end
                                 ) AS l
-                                     LEFT JOIN vehicle_types AS vt
-                                               ON t.vehicle_type_id = vt.vehicle_type_id
                             WHERE {conditions}
                             ORDER BY t.trajectory_date, t.trajectory_id
                             LIMIT %(limit)s
@@ -130,7 +127,6 @@ class TrajectoryRepository:
                         )
                         for point in trajectory["points"]
                     ],
-                    source_id=trajectory["source_id"],
                 )
                 for trajectory in rows
             ]
@@ -141,59 +137,10 @@ class TrajectoryRepository:
         finally:
             cursor.close()
 
-    def create_source_trajectories(self, dataset_id: int, source_ids: list[str]) -> None:
-        """Create source trajectory entries for a dataset."""
-        cursor = self.connection.cursor()
-
-        try:
-            values = []
-
-            for source_id in source_ids:
-                values.append((source_id, dataset_id))
-
-            cursor.executemany(
-                "INSERT INTO source_trajectories (source_id, dataset_id) VALUES (%s, %s)", values
-            )
-
-        except Exception as error:
-            print(f"Failed to create source trajectory: {error}")
-            raise
-
-        finally:
-            cursor.close()
-
-    def retrieve_uniformed_batch(
-        self, city: str, batch_size: int, last_trajectory_id: int | None
-    ) -> list[dict[str, Any]]:
-        """Fetch a batch of a city's uniformed trajectories ordered by trajectory_id."""
-        cursor = self.connection.cursor(row_factory=dict_row)
-        try:
-            base = """
-                SELECT u.trajectory_id, u.vehicle_id, vt.name AS vehicle_type,
-                    u.trajectory_date, u.city, u.points, u.source_id, s.dataset_id
-                FROM uniformed_trajectories u
-                JOIN source_trajectories s ON s.source_id = u.source_id
-                LEFT JOIN vehicle_types vt ON u.vehicle_type_id = vt.vehicle_type_id
-                WHERE u.city = %s
-            """
-            if last_trajectory_id is None:
-                cursor.execute(base + " ORDER BY u.trajectory_id LIMIT %s", (city, batch_size))
-            else:
-                cursor.execute(
-                    base + " AND u.trajectory_id > %s ORDER BY u.trajectory_id LIMIT %s",
-                    (city, last_trajectory_id, batch_size),
-                )
-            rows = cursor.fetchall()
-            return rows
-        except Exception as error:
-            print(f"Failed to retrieve uniformed batch: {error}")
-            raise
-        finally:
-            cursor.close()
-
-    def insert_cleaned_uniformed_trajectories(self, trajectories: list[UniformedTrajectories]) -> list[int]:
+    def insert_uniformed_trajectories(
+        self, dataset_id: int, trajectories: list[UniformedTrajectories]
+    ) -> list[int]:
         """Bulk-insert cleaned trajectory runs and return their new trajectory_ids, in the same order."""
-        vehicle_type_ids = self.get_vehicle_type_ids()
         cursor = self.connection.cursor()
         try:
             values = []
@@ -211,19 +158,19 @@ class TrajectoryRepository:
 
                 values.append(
                     (
+                        dataset_id,
                         trajectory.vehicle_id,
-                        vehicle_type_ids[trajectory.vehicle_type],
+                        trajectory.vehicle_type.value,
                         trajectory.trajectory_date,
                         trajectory.city,
                         Jsonb(points),
-                        trajectory.source_id,
                     )
                 )
 
             cursor.executemany(
                 (
-                    "INSERT INTO cleaned_uniformed_trajectories "
-                    "(vehicle_id, vehicle_type_id, trajectory_date, city, points, source_id) "
+                    "INSERT INTO uniformed_trajectories "
+                    "(dataset_id, vehicle_id, vehicle_type, trajectory_date, city, points) "
                     "VALUES (%s, %s, %s, %s, %s, %s) "
                     "RETURNING trajectory_id"
                 ),
@@ -264,100 +211,6 @@ class TrajectoryRepository:
 
         except Exception as error:
             print(f"Failed to insert trips: {error}")
-            raise
-        finally:
-            cursor.close()
-
-    def insert_data_uniformed_trajectories(self, trajectories: list[UniformedTrajectories]) -> None:
-        """Insert uniformed trajectories into the database."""
-        vehicle_type_ids = self.get_vehicle_type_ids()
-        cursor = self.connection.cursor()
-
-        try:
-            values = []
-            for trajectory in trajectories:
-                points = []
-
-                for point in trajectory.points:
-                    points.append(
-                        {
-                            "longitude": point.longitude,
-                            "latitude": point.latitude,
-                            "point_timestamp": to_utc_iso(point.point_timestamp),
-                        }
-                    )
-
-                values.append(
-                    (
-                        trajectory.vehicle_id,
-                        vehicle_type_ids[trajectory.vehicle_type],
-                        trajectory.trajectory_date,
-                        trajectory.city,
-                        Jsonb(points),
-                        trajectory.source_id,
-                    )
-                )
-
-            cursor.executemany(
-                (
-                    "INSERT INTO uniformed_trajectories "
-                    "(vehicle_id, vehicle_type_id, trajectory_date, city, points, source_id) "
-                    "VALUES (%s, %s, %s, %s, %s, %s)"
-                ),
-                values,
-            )
-
-        except Exception:
-            print("Failed to insert data to uniformed schema")
-            raise
-        finally:
-            cursor.close()
-
-    def get_vehicle_type_ids(self) -> dict[str, int]:
-        """Fetch vehicle type IDs from the database."""
-        cursor = self.connection.cursor()
-
-        try:
-            cursor.execute("SELECT name, vehicle_type_id FROM vehicle_types")
-            return dict(cursor.fetchall())
-        except Exception as error:
-            print(f"Failed to retrieve vehicle types from database: {error}")
-            raise
-        finally:
-            cursor.close()
-
-    async def retrieve_cleaned_uniformed_batch(
-        self, batch_size: int, last_trajectory_id: int | None
-    ) -> list[dict[str, Any]]:
-        """Fetch a batch of cleaned uniformed trajectories ordered by trajectory_id."""
-        cursor = self.connection.cursor(row_factory=dict_row)
-        try:
-            base = """
-                SELECT u.trajectory_id, u.points
-                FROM cleaned_uniformed_trajectories u
-            """
-
-            if last_trajectory_id is None:
-                query = base + " ORDER BY u.trajectory_id LIMIT %s"
-                params = (batch_size,)
-            else:
-                query = (
-                    base
-                    + """
-                    WHERE u.trajectory_id > %s
-                    ORDER BY u.trajectory_id
-                    LIMIT %s
-                """
-                )
-                params = (last_trajectory_id, batch_size)
-
-            cursor.execute(query, params)
-            rows = cursor.fetchall()
-
-            return rows
-
-        except Exception as error:
-            print(f"Failed to retrieve cleaned uniformed batch: {error}")
             raise
         finally:
             cursor.close()
@@ -407,12 +260,12 @@ class TrajectoryRepository:
             WITH pieces AS (
                 SELECT trips.trajectory_id,
                        trips.trip,
-                       cleaned.points,
+                       uniformed.points,
                        cities.time_zone,
                        unnest(sequences(minusGeometry(trips.trip, ST_Union({area_a}, {area_b})))) AS piece
                 FROM trips
-                         JOIN cleaned_uniformed_trajectories AS cleaned USING (trajectory_id)
-                         JOIN cities ON cities.name = cleaned.city
+                         JOIN uniformed_trajectories AS uniformed USING (trajectory_id)
+                         JOIN cities ON cities.name = uniformed.city
                 WHERE trips.trip && stbox({area_a}, {search_window})
                   AND trips.trip && stbox({area_b}, {search_window})
                   AND eIntersects(trips.trip, {area_a})
