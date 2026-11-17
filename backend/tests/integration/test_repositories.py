@@ -11,8 +11,7 @@ from database.repositories.trajectory_repository import TrajectoryRepository
 from models.beijing_trajectory import BeijingTrajectory, TrajectoryPoint
 from models.bounding_box import BoundingBox
 from models.porto_trajectory import PortoTrajectory
-from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint
-from models.upload_row import VehicleType
+from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint, VehicleType
 
 
 def test_queries_against_configured_database():
@@ -28,8 +27,6 @@ def test_queries_against_configured_database():
 
         try:
             assert {"CAR", "TAXI", "UNKNOWN"} <= trajectory_repository.get_vehicle_type_ids().keys()
-            assert "Europe/Lisbon" in dataset_repository.get_time_zones()
-            assert not dataset_repository.dataset_name_taken(name)
 
             city = dataset_repository.get_or_create_city(name, "Europe/Lisbon")
             assert dataset_repository.get_or_create_city(name, "Europe/Copenhagen") == city
@@ -37,7 +34,6 @@ def test_queries_against_configured_database():
 
             dataset_id = dataset_repository.create_dataset(name, city.city_id)
             assert dataset_repository.get_dataset_id(name) == dataset_id
-            assert dataset_repository.dataset_name_taken(name)
 
             trajectory_repository.create_source_trajectories(dataset_id, source_ids)
 

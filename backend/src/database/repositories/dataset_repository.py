@@ -7,23 +7,6 @@ class DatasetRepository:
     def __init__(self, connection: Connection):
         self.connection = connection
 
-    def dataset_name_taken(self, name: str) -> bool:
-        """Check if a dataset or city already uses the given name."""
-        cursor = self.connection.cursor()
-
-        try:
-            cursor.execute("SELECT EXISTS(SELECT 1 FROM datasets WHERE name = %s)", (name,))
-            row = cursor.fetchone()
-            if row is None:
-                raise RuntimeError("SELECT EXISTS returned no row")
-            (taken,) = row
-            return bool(taken)
-        except Exception as error:
-            print(f"Failed to check dataset name: {error}")
-            raise
-        finally:
-            cursor.close()
-
     def create_dataset(self, name: str, city_id: int) -> int:
         """Create a dataset and return its ID."""
         cursor = self.connection.cursor()
@@ -61,23 +44,6 @@ class DatasetRepository:
             return city
         except Exception as error:
             print(f"Failed to get or create city: {error}")
-            raise
-        finally:
-            cursor.close()
-
-    def get_time_zones(self) -> list[str]:
-        """Fetch the time zone names PostgreSQL accepts, without aliases."""
-        cursor = self.connection.cursor()
-
-        try:
-            cursor.execute(
-                "SELECT name FROM pg_timezone_names "
-                "WHERE (name LIKE '%/%' AND name NOT LIKE 'Etc/%') OR name = 'UTC' "
-                "ORDER BY name"
-            )
-            return [name for (name,) in cursor.fetchall()]
-        except Exception as error:
-            print(f"failed to retrieve time zones: {error}")
             raise
         finally:
             cursor.close()

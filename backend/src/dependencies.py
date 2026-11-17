@@ -8,7 +8,6 @@ from database.repositories.trajectory_repository import TrajectoryRepository
 from fastapi import Depends
 from psycopg import Connection
 from services.cleaning_service import CleanService
-from services.dataset_upload_service import UploadDataset
 from services.similarity_service import SimilarityService
 from services.subtrajectory_service import SubtrajectoryService
 from services.trajectory_service import TrajectoryService
@@ -52,19 +51,6 @@ def get_trajectory_service(
         trajectory_repository=trajectory_repository,
         dataset_repository=dataset_repository,
         db_actions=db_actions,
-    )
-
-
-def get_dataset_upload_service(
-    database_actions: Annotated[DatabaseActions, Depends(get_database_actions)],
-    trajectory_repository: Annotated[TrajectoryRepository, Depends(get_trajectory_repository)],
-    dataset_repository: Annotated[DatasetRepository, Depends(get_dataset_repository)],
-) -> UploadDataset:
-    """Provides a dataset upload service and closes the connection afterward"""
-    return UploadDataset(
-        database_actions=database_actions,
-        trajectory_repository=trajectory_repository,
-        dataset_repository=dataset_repository,
     )
 
 

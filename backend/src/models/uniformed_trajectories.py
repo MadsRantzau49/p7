@@ -1,7 +1,12 @@
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 
-from models.upload_row import VehicleType
+
+class VehicleType(StrEnum):
+    CAR = "CAR"
+    TAXI = "TAXI"
+    UNKNOWN = "UNKNOWN"
 
 
 @dataclass

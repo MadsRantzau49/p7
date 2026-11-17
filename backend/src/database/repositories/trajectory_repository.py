@@ -4,8 +4,7 @@ from zoneinfo import ZoneInfo
 
 from helpers.time_helper import to_utc_iso
 from models.bounding_box import BoundingBox
-from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint
-from models.upload_row import VehicleType
+from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajectoryPoint, VehicleType
 from psycopg import Connection, sql
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb

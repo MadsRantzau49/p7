@@ -2,7 +2,7 @@ import json
 import sys
 from pathlib import Path
 
-from models.upload_row import UploadRow, VehicleType
+from models.uniformed_trajectories import VehicleType
 
 sys.path.append(str(Path(__file__).parent.parent))
 from datetime import UTC, datetime, timedelta
@@ -74,36 +74,4 @@ def convert_beijing_trajectory(beijing_trajectory: dict) -> UniformedTrajectorie
         city="Beijing",
         source_id=beijing_trajectory["source_id"],
         points=points,
-    )
-
-
-def convert_upload_trajectory(rows: list[tuple[int, UploadRow]]) -> UniformedTrajectories:
-    """Convert one uploaded trajectory into the uniform model
-
-    Args:
-        rows: The trajectory's points as (line number, row) pairs.
-    Returns:
-        The trajectory with optional CSV metadata preserved as-is.
-    """
-    points = []
-
-    for _line, row in rows:
-        points.append(
-            UniformedTrajectoryPoint(
-                longitude=row.longitude,
-                latitude=row.latitude,
-                point_timestamp=row.timestamp,
-            )
-        )
-
-    first_line, first_row = rows[0]
-
-    return UniformedTrajectories(
-        vehicle_id=first_row.vehicle_id,
-        vehicle_type=first_row.vehicle_type,
-        trajectory_date=first_row.timestamp,
-        trajectory_id=first_row.database_trajectory_id,
-        city=first_row.city,
-        points=points,
-        source_id=first_row.source_id,
     )
