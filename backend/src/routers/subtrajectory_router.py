@@ -1,8 +1,9 @@
-from datetime import date, time
+from datetime import time
 from typing import Annotated
 
 from dependencies import get_similarity_service, get_subtrajectory_service
 from fastapi import APIRouter, Depends, HTTPException
+from models.date_range import DateRange
 from models.similarity import Pathlet
 from services.similarity_service import SimilarityService
 from services.subtrajectory_service import SubtrajectoryService
@@ -14,12 +15,11 @@ router = APIRouter(prefix="/api/subtrajectories")
 def get_subtrajectories(
     subtrajectory_service: Annotated[SubtrajectoryService, Depends(get_subtrajectory_service)],
     similarity_service: Annotated[SimilarityService, Depends(get_similarity_service)],
+    dates: Annotated[DateRange, Depends()],
     a_longitude: float,
     a_latitude: float,
     b_longitude: float,
     b_latitude: float,
-    start_date: date,
-    end_date: date,
     epsilon: float = 100,
     box_half_width_m: float = 50,
     start_time: time | None = None,
@@ -36,8 +36,7 @@ def get_subtrajectories(
             a_latitude,
             b_longitude,
             b_latitude,
-            start_date,
-            end_date,
+            dates,
             box_half_width_m,
             start_time,
             end_time,
