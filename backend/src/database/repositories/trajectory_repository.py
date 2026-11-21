@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -219,8 +219,8 @@ class TrajectoryRepository:
         self,
         box_a: BoundingBox,
         box_b: BoundingBox,
-        start_date: date,
-        end_date: date,
+        start_date: date | None,
+        end_date: date | None,
         start_time: time | None = None,
         end_time: time | None = None,
     ) -> list[dict[str, Any]]:
@@ -228,6 +228,7 @@ class TrajectoryRepository:
 
         The search window is one day wider on each side than the date range, because the dates
         are local to each city. The service keeps only the ones that leave A inside the date range.
+        Missing date bounds are unbounded.
 
         If start_time or end_time is given, only parts that leave A between them (in the city's
         local time) are returned. If start_time is after end_time, the window wraps around midnight.
@@ -241,7 +242,14 @@ class TrajectoryRepository:
             area_b = sql.SQL(
                 "ST_MakeEnvelope(%(b_min_lon)s, %(b_min_lat)s, %(b_max_lon)s, %(b_max_lat)s, 4326)"
             )
-            search_window = sql.SQL("span(%(search_start)s, %(search_end)s)")
+            search_window = sql.SQL("""
+                span(
+                    COALESCE((%(start_date)s::timestamp AT TIME ZONE 'UTC') - INTERVAL '1 day',
+                             '-infinity'::timestamptz),
+                    COALESCE((%(end_date)s::timestamp AT TIME ZONE 'UTC') + INTERVAL '2 days',
+                             'infinity'::timestamptz)
+                )
+            """)
 
             time_filter = sql.SQL("")
             if start_time is not None or end_time is not None:
@@ -297,8 +305,8 @@ class TrajectoryRepository:
                 "b_min_lat": box_b.min_latitude,
                 "b_max_lon": box_b.max_longitude,
                 "b_max_lat": box_b.max_latitude,
-                "search_start": datetime.combine(start_date - timedelta(days=1), time.min, UTC),
-                "search_end": datetime.combine(end_date + timedelta(days=2), time.min, UTC),
+                "start_date": start_date,
+                "end_date": end_date,
                 "start_time": start_time,
                 "end_time": end_time,
             }
