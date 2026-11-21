@@ -3,9 +3,13 @@ from unittest.mock import MagicMock
 from zoneinfo import ZoneInfo
 
 import pytest
+from models.bounding_box import BoundingBox
+from models.date_range import DateRange
 from services.subtrajectory_service import SubtrajectoryService
 
 LISBON = ZoneInfo("Europe/Lisbon")
+BOX_A = BoundingBox(-8.616, 41.14, -8.612, 41.16)
+BOX_B = BoundingBox(-8.598, 41.14, -8.594, 41.16)
 
 
 def make_row():
@@ -34,14 +38,11 @@ def test_find_subtrajectories():
     repository.get_subtrajectories.return_value = [make_row()]
 
     [found] = SubtrajectoryService(repository).find_subtrajectories(
-        -8.614, 41.15, -8.596, 41.15, date(2013, 7, 1), date(2013, 7, 2), 50
+        BOX_A, BOX_B, DateRange(date(2013, 7, 1), date(2013, 7, 2))
     )
 
     box_a, box_b, start_date, end_date, start_time, end_time = repository.get_subtrajectories.call_args.args
-    # Each box is centred on its location
-    assert (box_a.min_longitude + box_a.max_longitude) / 2 == pytest.approx(-8.614)
-    assert (box_a.min_latitude + box_a.max_latitude) / 2 == pytest.approx(41.15)
-    assert (box_b.min_longitude + box_b.max_longitude) / 2 == pytest.approx(-8.596)
+    assert (box_a, box_b) == (BOX_A, BOX_B)
     assert (start_date, end_date) == (date(2013, 7, 1), date(2013, 7, 2))
     assert (start_time, end_time) == (None, None)
 
@@ -54,21 +55,22 @@ def test_find_subtrajectories():
 
 
 @pytest.mark.parametrize(
-    ("b_longitude", "start_date", "end_date", "half_width_m", "message"),
+    ("box_b", "start_date", "end_date", "message"),
     [
-        (-8.596, date(2013, 7, 2), date(2013, 7, 1), 50, "start_date must be on or before end_date"),
-        (-8.596, date(2013, 7, 1), date(2013, 7, 1), 0, "box_half_width_m must be greater than 0"),
-        (-8.6141, date(2013, 7, 1), date(2013, 7, 1), 50, "box A and box B must not overlap"),
+        (BOX_B, date(2013, 7, 2), date(2013, 7, 1), "start_date must be on or before end_date"),
+        (BoundingBox(-8.598, 41.14, -8.598, 41.16), date(2013, 7, 1), date(2013, 7, 1), "minimum"),
+        (BoundingBox(-8.594, 41.14, -8.598, 41.16), date(2013, 7, 1), date(2013, 7, 1), "minimum"),
+        (BoundingBox(-8.598, 41.16, -8.594, 41.14), date(2013, 7, 1), date(2013, 7, 1), "minimum"),
+        (BOX_A, date(2013, 7, 1), date(2013, 7, 1), "box A and box B must not overlap"),
+        (BoundingBox(-8.612, 41.14, -8.608, 41.16), date(2013, 7, 1), date(2013, 7, 1), "must not overlap"),
     ],
 )
-def test_find_subtrajectories_rejects_invalid_input(b_longitude, start_date, end_date, half_width_m, message):
+def test_find_subtrajectories_rejects_invalid_input(box_b, start_date, end_date, message):
     """Reject reversed dates, empty boxes and overlapping boxes before querying."""
     repository = MagicMock()
 
     with pytest.raises(ValueError, match=message):
-        SubtrajectoryService(repository).find_subtrajectories(
-            -8.614, 41.15, b_longitude, 41.15, start_date, end_date, half_width_m
-        )
+        SubtrajectoryService(repository).find_subtrajectories(BOX_A, box_b, DateRange(start_date, end_date))
 
     repository.get_subtrajectories.assert_not_called()
 
@@ -79,7 +81,7 @@ def test_find_subtrajectories_skips_those_leaving_a_outside_the_date_range():
     repository.get_subtrajectories.return_value = [make_row()]
 
     found = SubtrajectoryService(repository).find_subtrajectories(
-        -8.614, 41.15, -8.596, 41.15, date(2013, 7, 2), date(2013, 7, 3), 50
+        BOX_A, BOX_B, DateRange(date(2013, 7, 2), date(2013, 7, 3))
     )
 
     assert found == []
@@ -91,7 +93,7 @@ def test_find_subtrajectories_passes_time_window_to_repository():
     repository.get_subtrajectories.return_value = []
 
     SubtrajectoryService(repository).find_subtrajectories(
-        -8.614, 41.15, -8.596, 41.15, date(2013, 7, 1), date(2013, 7, 1), 50, time(22, 0), time(2, 0)
+        BOX_A, BOX_B, DateRange(date(2013, 7, 1), date(2013, 7, 1)), time(22, 0), time(2, 0)
     )
 
     assert repository.get_subtrajectories.call_args.args[-2:] == (time(22, 0), time(2, 0))

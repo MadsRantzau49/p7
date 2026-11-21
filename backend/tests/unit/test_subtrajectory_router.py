@@ -4,6 +4,8 @@ from types import SimpleNamespace
 import routers.subtrajectory_router as subtrajectory_router
 from fastapi.testclient import TestClient
 from main import app
+from models.bounding_box import BoundingBox
+from models.date_range import DateRange
 from models.similarity import GPSCoordinate, Pathlet, SupportInterval
 from models.subtrajectory import Subtrajectory
 from models.uniformed_trajectories import UniformedTrajectoryPoint
@@ -13,8 +15,12 @@ client = TestClient(app)
 QUERY = {
     "a_longitude": -8.614,
     "a_latitude": 41.15,
+    "a_max_longitude": -8.612,
+    "a_max_latitude": 41.16,
     "b_longitude": -8.596,
     "b_latitude": 41.15,
+    "b_max_longitude": -8.594,
+    "b_max_latitude": 41.16,
     "start_date": "2013-07-01",
     "end_date": "2013-07-01",
 }
@@ -52,13 +58,9 @@ def test_get_subtrajectories(monkeypatch):
     assert response.json()[0]["points"][0]["longitude"] == -8.61
     assert response.json()[0]["support"][0]["end_m"] == 50.0
     assert received["arguments"] == (
-        -8.614,
-        41.15,
-        -8.596,
-        41.15,
-        date(2013, 7, 1),
-        date(2013, 7, 1),
-        50,
+        BoundingBox(-8.614, 41.15, -8.612, 41.16),
+        BoundingBox(-8.596, 41.15, -8.594, 41.16),
+        DateRange(date(2013, 7, 1), date(2013, 7, 1)),
         None,
         None,
     )
