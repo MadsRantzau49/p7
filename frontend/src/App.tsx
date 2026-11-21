@@ -1,12 +1,11 @@
 import { useState } from 'react'
-import type { LatLng, Pathlet, SimilarityLevel } from './types'
+import type { Area, Pathlet, PickMode, SimilarityLevel } from './types'
 import { findRoutes } from './api/subtrajectories'
 import SearchPanel from './components/SearchPanel'
 import RouteMap from './components/RouteMap'
 import RouteOverview from './components/RouteOverview'
 import { datesAllowSearch } from './dateRange'
-
-type PickMode = 'start' | 'end' | null
+import { areasOverlap } from './areaGeometry'
 
 
 const EPSILON_BY_LEVEL: Record<SimilarityLevel, number> = {
@@ -30,8 +29,8 @@ function readErrorMessage(err: unknown): string {
 
 export default function App() {
   // location
-  const [startPoint, setStartPoint] = useState<LatLng | null>(null)
-  const [endPoint, setEndPoint] = useState<LatLng | null>(null)
+  const [startArea, setStartArea] = useState<Area | null>(null)
+  const [endArea, setEndArea] = useState<Area | null>(null)
   const [pickMode, setPickMode] = useState<PickMode>(null)
 
   // date
@@ -58,24 +57,29 @@ export default function App() {
   const epsilonMeters = useCustomEpsilon ? customEpsilon : EPSILON_BY_LEVEL[similarityLevel]
 
   // Location and date requirements are checked separately.
-  const canSearch = Boolean(startPoint && endPoint) && datesAllowSearch(fromDate, toDate)
+  const canSearch = Boolean(startArea && endArea) && datesAllowSearch(fromDate, toDate)
 
-  // A map click lands here. We drop the point we are currently picking.
-  function handlePickPoint(point: LatLng) {
-    if (pickMode === 'start') setStartPoint(point)
-    else if (pickMode === 'end') setEndPoint(point)
+  function handlePickArea(area: Area) {
+    const other = pickMode === 'start' ? endArea : startArea
+    if (other && areasOverlap(area, other)) {
+      setError('Start and destination areas must not overlap. Choose another corner.')
+      return
+    }
+    if (pickMode === 'start') setStartArea(area)
+    else if (pickMode === 'end') setEndArea(area)
+    setError(null)
     setPickMode(null)
   }
 
   async function handleFindRoutes() {
-    if (!startPoint || !endPoint) return
+    if (!startArea || !endArea) return
 
     setLoading(true)
     setError(null)
     try {
       const result = await findRoutes({
-        start: startPoint,
-        end: endPoint,
+        start: startArea,
+        end: endArea,
         fromDate,
         toDate,
         fromHour,
@@ -100,8 +104,8 @@ export default function App() {
       <div className="app-body">
         <div className="left-column">
           <SearchPanel
-            startPoint={startPoint}
-            endPoint={endPoint}
+            startArea={startArea}
+            endArea={endArea}
             pickMode={pickMode}
             setPickMode={setPickMode}
             fromDate={fromDate}
@@ -134,10 +138,11 @@ export default function App() {
         </div>
 
         <RouteMap
-          startPoint={startPoint}
-          endPoint={endPoint}
+          startArea={startArea}
+          endArea={endArea}
           pickMode={pickMode}
-          onPickPoint={handlePickPoint}
+          onPickArea={handlePickArea}
+          onCancelPick={() => setPickMode(null)}
           routes={routes}
           hoveredRoute={hoveredRoute}
           setHoveredRoute={setHoveredRoute}

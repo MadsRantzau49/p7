@@ -3,6 +3,15 @@ export type LatLng = {
   lng: number
 }
 
+export type Area = {
+  min_longitude: number
+  min_latitude: number
+  max_longitude: number
+  max_latitude: number
+}
+
+export type PickMode = 'start' | 'end' | null
+
 // Sim level discrete values. 
 export type SimilarityLevel = 'low' | 'mid' | 'high'
 
