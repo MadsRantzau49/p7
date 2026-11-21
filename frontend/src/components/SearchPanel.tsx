@@ -165,9 +165,10 @@ export default function SearchPanel({
         type="button"
         className="find-button"
         disabled={!canSearch || loading}
+        aria-busy={loading}
         onClick={onFindRoutes}
       >
-        {loading && <span className="spinner" />}
+        {loading && <span className="spinner" aria-hidden="true" />}
         {loading ? 'Finding...' : 'Find routes'}
       </button>
 

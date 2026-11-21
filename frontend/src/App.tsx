@@ -67,7 +67,7 @@ export default function App() {
   }
 
   async function handleFindRoutes() {
-    if (!startPoint || !endPoint) return
+    if (loading || !startPoint || !endPoint) return
 
     setLoading(true)
     setError(null)
