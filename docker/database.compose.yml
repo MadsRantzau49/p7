@@ -2,7 +2,7 @@ name: trajectory-database
 
 services:
   postgres:
-    image: mobilitydb/mobilitydb@sha256:8409e3897e2b88561bef4374110c3da5f7ff56838a7745315f1c2f111305dd24
+    image: mobilitydb/mobilitydb:18-3.6-1.3
     restart: "no"
     env_file:
       - ../.env
