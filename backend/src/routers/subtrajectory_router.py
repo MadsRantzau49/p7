@@ -29,7 +29,6 @@ def get_subtrajectories(
 
     start_time and end_time optionally limit the local time of day the trip leaves A.
     If start_time is after end_time, the window wraps around midnight (e.g. 22:00 to 02:00).
-    Omitted dates impose no limit on that side of the local departure date range.
     """
     try:
         subtrajectory_list = subtrajectory_service.find_subtrajectories(
