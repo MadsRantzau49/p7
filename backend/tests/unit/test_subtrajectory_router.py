@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import routers.subtrajectory_router as subtrajectory_router
 from fastapi.testclient import TestClient
 from main import app
+from models.date_range import DateRange
 from models.similarity import GPSCoordinate, Pathlet, SupportInterval
 from models.subtrajectory import Subtrajectory
 from models.uniformed_trajectories import UniformedTrajectoryPoint
@@ -56,8 +57,7 @@ def test_get_subtrajectories(monkeypatch):
         41.15,
         -8.596,
         41.15,
-        date(2013, 7, 1),
-        date(2013, 7, 1),
+        DateRange(date(2013, 7, 1), date(2013, 7, 1)),
         50,
         None,
         None,

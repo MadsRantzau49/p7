@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 from zoneinfo import ZoneInfo
 
 import pytest
+from models.date_range import DateRange
 from services.subtrajectory_service import SubtrajectoryService
 
 LISBON = ZoneInfo("Europe/Lisbon")
@@ -34,7 +35,7 @@ def test_find_subtrajectories():
     repository.get_subtrajectories.return_value = [make_row()]
 
     [found] = SubtrajectoryService(repository).find_subtrajectories(
-        -8.614, 41.15, -8.596, 41.15, date(2013, 7, 1), date(2013, 7, 2), 50
+        -8.614, 41.15, -8.596, 41.15, DateRange(date(2013, 7, 1), date(2013, 7, 2)), 50
     )
 
     box_a, box_b, start_date, end_date, start_time, end_time = repository.get_subtrajectories.call_args.args
@@ -67,7 +68,7 @@ def test_find_subtrajectories_rejects_invalid_input(b_longitude, start_date, end
 
     with pytest.raises(ValueError, match=message):
         SubtrajectoryService(repository).find_subtrajectories(
-            -8.614, 41.15, b_longitude, 41.15, start_date, end_date, half_width_m
+            -8.614, 41.15, b_longitude, 41.15, DateRange(start_date, end_date), half_width_m
         )
 
     repository.get_subtrajectories.assert_not_called()
@@ -79,7 +80,7 @@ def test_find_subtrajectories_skips_those_leaving_a_outside_the_date_range():
     repository.get_subtrajectories.return_value = [make_row()]
 
     found = SubtrajectoryService(repository).find_subtrajectories(
-        -8.614, 41.15, -8.596, 41.15, date(2013, 7, 2), date(2013, 7, 3), 50
+        -8.614, 41.15, -8.596, 41.15, DateRange(date(2013, 7, 2), date(2013, 7, 3)), 50
     )
 
     assert found == []
@@ -91,7 +92,14 @@ def test_find_subtrajectories_passes_time_window_to_repository():
     repository.get_subtrajectories.return_value = []
 
     SubtrajectoryService(repository).find_subtrajectories(
-        -8.614, 41.15, -8.596, 41.15, date(2013, 7, 1), date(2013, 7, 1), 50, time(22, 0), time(2, 0)
+        -8.614,
+        41.15,
+        -8.596,
+        41.15,
+        DateRange(date(2013, 7, 1), date(2013, 7, 1)),
+        50,
+        time(22, 0),
+        time(2, 0),
     )
 
     assert repository.get_subtrajectories.call_args.args[-2:] == (time(22, 0), time(2, 0))
