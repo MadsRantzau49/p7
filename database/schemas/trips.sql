@@ -6,4 +6,4 @@ CREATE TABLE trips (
     trip tgeompoint NOT NULL
 );
 
-CREATE INDEX idx_trips_trip ON trips USING SPGIST (trip);
+CREATE INDEX idx_trips_trip ON trips USING GIST (trip);
