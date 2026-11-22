@@ -1,9 +1,10 @@
-from datetime import date, datetime, time
+from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
 from database.repositories.trajectory_repository import TrajectoryRepository
 from helpers.boxes import make_box
 from models.bounding_box import BoundingBox
+from models.date_range import DateRange
 from models.subtrajectory import Subtrajectory
 from models.uniformed_trajectories import UniformedTrajectoryPoint
 
@@ -18,8 +19,7 @@ class SubtrajectoryService:
         a_latitude: float,
         b_longitude: float,
         b_latitude: float,
-        start_date: date,
-        end_date: date,
+        dates: DateRange,
         box_half_width_m: float,
         start_time: time | None = None,
         end_time: time | None = None,
@@ -28,8 +28,7 @@ class SubtrajectoryService:
         start_time and end_time is optional, since users might not need to look at specific time periods.
         the start_time indicates when a trajectory has left the start area and wise versa for end_time.
         """
-        if start_date > end_date:
-            raise ValueError("start_date must be on or before end_date")
+        dates.validate()
         if box_half_width_m <= 0:
             raise ValueError("box_half_width_m must be greater than 0")
 
@@ -40,7 +39,12 @@ class SubtrajectoryService:
             raise ValueError("box A and box B must not overlap")
 
         rows = self.trajectory_repository.get_subtrajectories(
-            BoundingBox(*box_a.bounds), BoundingBox(*box_b.bounds), start_date, end_date, start_time, end_time
+            BoundingBox(*box_a.bounds),
+            BoundingBox(*box_b.bounds),
+            dates.start_date,
+            dates.end_date,
+            start_time,
+            end_time,
         )
 
         subtrajectories = []
@@ -50,7 +54,7 @@ class SubtrajectoryService:
             exit_a_time = row["exit_a_time"].astimezone(zone)
             entry_b_time = row["entry_b_time"].astimezone(zone)
 
-            if exit_a_time.date() < start_date or exit_a_time.date() > end_date:
+            if not dates.contains(exit_a_time.date()):
                 continue
 
             points = [UniformedTrajectoryPoint(row["exit_a_longitude"], exit_a_time, row["exit_a_latitude"])]

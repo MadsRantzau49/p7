@@ -4,6 +4,7 @@ import { findRoutes } from './api/subtrajectories'
 import SearchPanel from './components/SearchPanel'
 import RouteMap from './components/RouteMap'
 import RouteOverview from './components/RouteOverview'
+import { datesAllowSearch } from './dateRange'
 
 type PickMode = 'start' | 'end' | null
 
@@ -56,8 +57,8 @@ export default function App() {
 
   const epsilonMeters = useCustomEpsilon ? customEpsilon : EPSILON_BY_LEVEL[similarityLevel]
 
-  // search guard, needs all 4 before we hit endpoint 
-  const canSearch = Boolean(startPoint && endPoint && fromDate && toDate)
+  // Location and date requirements are checked separately.
+  const canSearch = Boolean(startPoint && endPoint) && datesAllowSearch(fromDate, toDate)
 
   // A map click lands here. We drop the point we are currently picking.
   function handlePickPoint(point: LatLng) {
@@ -68,6 +69,11 @@ export default function App() {
 
   async function handleFindRoutes() {
     if (loading || !startPoint || !endPoint) return
+
+    if (fromDate && toDate && fromDate > toDate) {
+      setError('From date must be on or before To date.')
+      return
+    }
 
     setLoading(true)
     setError(null)
