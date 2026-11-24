@@ -16,6 +16,9 @@ type Props = {
   setHoveredRoute: (index: number | null) => void
   selectedRoute: number | null
   memberPaths: ClusterSubtrajectory[]
+  memberLoading: boolean
+  hoveredMember: number | null
+  setHoveredMember: (index: number | null) => void
   onSelectRoute: (index: number) => void
 }
 
@@ -23,6 +26,11 @@ type Props = {
 // TODO : Handle this depending on the dataset of the depolyment.
 const DEFAULT_CENTER: [number, number] = [39.9, 116.4]
 const DEFAULT_ZOOM = 11
+
+// The individual subtrajectories of an opened cluster, drawn in one neutral colour so they
+// stand apart from the coloured cluster representatives. A hovered one turns bright.
+const MEMBER_COLOR = '#212529'
+const MEMBER_HOVER_COLOR = '#1971c2'
 
 function AreaPicker({ mode, onPick, onCancel }: {
   mode: Exclude<PickMode, null>
@@ -81,12 +89,25 @@ function lineWeight(count: number, maxCount: number): number {
   return minWeight + (count / maxCount) * (maxWeight - minWeight)
 }
 
-export default function RouteMap({ startArea, endArea, pickMode, onPickArea, onCancelPick, routes, hoveredRoute, setHoveredRoute, selectedRoute, memberPaths, onSelectRoute }: Props) {
+export default function RouteMap({ startArea, endArea, pickMode, onPickArea, onCancelPick, routes, hoveredRoute, setHoveredRoute, selectedRoute, memberPaths, memberLoading, hoveredMember, setHoveredMember, onSelectRoute }: Props) {
   // Largest journey count - used to scale line thickness relative to biggest one.
   const maxCount = routes.reduce((max, route) => Math.max(max, route.count), 0)
+  const anyMemberHovered = hoveredMember !== null
 
   return (
     <div className={`map-card${pickMode ? ' picking-area' : ''}`}>
+      {selectedRoute !== null && !pickMode && (
+        <div className="map-message cluster-open" role="status">
+          <span>Showing one cluster. Hover a trip to highlight it.</span>
+          <button type="button" onClick={() => onSelectRoute(selectedRoute)}>Show all clusters</button>
+        </div>
+      )}
+      {memberLoading && (
+        <div className="map-loading" role="status">
+          <span className="spinner spinner-dark" aria-hidden="true" />
+          <span>Loading subtrajectories...</span>
+        </div>
+      )}
       <MapContainer center={DEFAULT_CENTER} zoom={DEFAULT_ZOOM} className="map">
         <TileLayer
           attribution="&copy; OpenStreetMap contributors"
@@ -120,6 +141,9 @@ export default function RouteMap({ startArea, endArea, pickMode, onPickArea, onC
         )}
 
         {routes.map((route, index) => {
+          // With a cluster open, hide every other cluster so only its routes show.
+          if (selectedRoute !== null && index !== selectedRoute) return null
+
           const positions = route.points.map(
             (point) => [point.latitude, point.longitude] as [number, number],
           )
@@ -156,7 +180,7 @@ export default function RouteMap({ startArea, endArea, pickMode, onPickArea, onC
           )
         })}
 
-        {/* Subtrajectories of the opened cluster, drawn thin underneath. */}
+        {/* The opened cluster's subtrajectories, drawn clearly over its representative. */}
         {selectedRoute !== null &&
           memberPaths.map((member, memberIndex) => {
             const positions = member.points.map(
@@ -165,14 +189,24 @@ export default function RouteMap({ startArea, endArea, pickMode, onPickArea, onC
 
             if (positions.length < 2) return null
 
-            const color = ROUTE_COLORS[selectedRoute % ROUTE_COLORS.length]
+            const isMemberHovered = hoveredMember === memberIndex
+            // Fade the other trips when one is hovered so the hovered one stands out.
+            const opacity = !anyMemberHovered ? 0.75 : isMemberHovered ? 1 : 0.2
 
             return (
               <Polyline
                 key={`member-${memberIndex}`}
-                interactive={false}
+                interactive={!pickMode}
                 positions={positions}
-                pathOptions={{ color, weight: 1.5, opacity: 0.5, dashArray: '4 4' }}
+                pathOptions={{
+                  color: isMemberHovered ? MEMBER_HOVER_COLOR : MEMBER_COLOR,
+                  weight: isMemberHovered ? 6 : 3,
+                  opacity,
+                }}
+                eventHandlers={{
+                  mouseover: () => setHoveredMember(memberIndex),
+                  mouseout: () => setHoveredMember(null),
+                }}
               />
             )
           })}

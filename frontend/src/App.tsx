@@ -57,6 +57,9 @@ export default function App() {
   const [lastQuery, setLastQuery] = useState<FindRoutesParams | null>(null)
   const [selectedRoute, setSelectedRoute] = useState<number | null>(null)
   const [memberPaths, setMemberPaths] = useState<ClusterSubtrajectory[]>([])
+  const [memberLoading, setMemberLoading] = useState(false)
+  // Which subtrajectory of the open cluster is highlighted, shared by the list and the map.
+  const [hoveredMember, setHoveredMember] = useState<number | null>(null)
 
 
   const epsilonMeters = useCustomEpsilon ? customEpsilon : EPSILON_BY_LEVEL[similarityLevel]
@@ -113,6 +116,7 @@ export default function App() {
 
   // Open a cluster to see its subtrajectories, or close it when clicked again.
   async function handleSelectRoute(index: number) {
+    setHoveredMember(null)
     if (selectedRoute === index) {
       setSelectedRoute(null)
       setMemberPaths([])
@@ -122,11 +126,14 @@ export default function App() {
     setMemberPaths([])
     const route = routes[index]
     if (!lastQuery || !route) return
+    setMemberLoading(true)
     try {
       const paths = await fetchClusterSubtrajectories(lastQuery, route.members)
       setMemberPaths(paths)
     } catch (err) {
       setError(readErrorMessage(err))
+    } finally {
+      setMemberLoading(false)
     }
   }
 
@@ -171,6 +178,10 @@ export default function App() {
             setHoveredRoute={setHoveredRoute}
             selectedRoute={selectedRoute}
             onSelectRoute={handleSelectRoute}
+            memberPaths={memberPaths}
+            memberLoading={memberLoading}
+            hoveredMember={hoveredMember}
+            setHoveredMember={setHoveredMember}
           />
         </div>
 
@@ -185,6 +196,9 @@ export default function App() {
           setHoveredRoute={setHoveredRoute}
           selectedRoute={selectedRoute}
           memberPaths={memberPaths}
+          memberLoading={memberLoading}
+          hoveredMember={hoveredMember}
+          setHoveredMember={setHoveredMember}
           onSelectRoute={handleSelectRoute}
         />
       </div>
