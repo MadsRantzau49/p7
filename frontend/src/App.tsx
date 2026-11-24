@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { LatLng, Route, SimilarityLevel } from './types'
-import { findRoutes } from './api/subtrajectories'
+import type { ClusterSubtrajectory, LatLng, Route, SimilarityLevel } from './types'
+import { fetchClusterSubtrajectories, findRoutes, type FindRoutesParams } from './api/subtrajectories'
 import SearchPanel from './components/SearchPanel'
 import RouteMap from './components/RouteMap'
 import RouteOverview from './components/RouteOverview'
@@ -53,6 +53,11 @@ export default function App() {
   const [hasSearched, setHasSearched] = useState(false)
   const [hoveredRoute, setHoveredRoute] = useState<number | null>(null)
 
+  // The opened cluster and the subtrajectories fetched for it.
+  const [lastQuery, setLastQuery] = useState<FindRoutesParams | null>(null)
+  const [selectedRoute, setSelectedRoute] = useState<number | null>(null)
+  const [memberPaths, setMemberPaths] = useState<ClusterSubtrajectory[]>([])
+
 
   const epsilonMeters = useCustomEpsilon ? customEpsilon : EPSILON_BY_LEVEL[similarityLevel]
 
@@ -69,24 +74,49 @@ export default function App() {
   async function handleFindRoutes() {
     if (!startPoint || !endPoint) return
 
+    const query: FindRoutesParams = {
+      start: startPoint,
+      end: endPoint,
+      fromDate,
+      toDate,
+      fromHour,
+      toHour,
+      epsilon: epsilonMeters,
+    }
+
     setLoading(true)
     setError(null)
+    // A new search clears any opened cluster.
+    setSelectedRoute(null)
+    setMemberPaths([])
     try {
-      const result = await findRoutes({
-        start: startPoint,
-        end: endPoint,
-        fromDate,
-        toDate,
-        fromHour,
-        toHour,
-        epsilon: epsilonMeters,
-      })
+      const result = await findRoutes(query)
       setRoutes(result)
+      setLastQuery(query)
       setHasSearched(true)
     } catch (err) {
       setError(readErrorMessage(err))
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Open a cluster to see its subtrajectories, or close it when clicked again.
+  async function handleSelectRoute(index: number) {
+    if (selectedRoute === index) {
+      setSelectedRoute(null)
+      setMemberPaths([])
+      return
+    }
+    setSelectedRoute(index)
+    setMemberPaths([])
+    const route = routes[index]
+    if (!lastQuery || !route) return
+    try {
+      const paths = await fetchClusterSubtrajectories(lastQuery, route.members)
+      setMemberPaths(paths)
+    } catch (err) {
+      setError(readErrorMessage(err))
     }
   }
 
@@ -129,6 +159,8 @@ export default function App() {
             hasSearched={hasSearched}
             hoveredRoute={hoveredRoute}
             setHoveredRoute={setHoveredRoute}
+            selectedRoute={selectedRoute}
+            onSelectRoute={handleSelectRoute}
           />
         </div>
 
@@ -140,6 +172,9 @@ export default function App() {
           routes={routes}
           hoveredRoute={hoveredRoute}
           setHoveredRoute={setHoveredRoute}
+          selectedRoute={selectedRoute}
+          memberPaths={memberPaths}
+          onSelectRoute={handleSelectRoute}
         />
       </div>
     </div>

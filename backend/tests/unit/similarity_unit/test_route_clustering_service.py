@@ -4,7 +4,7 @@ import pytest
 from models.similarity import GPSCoordinate, Route
 from models.subtrajectory import Subtrajectory
 from models.uniformed_trajectories import UniformedTrajectoryPoint
-from services.route_clustering_service import RouteClusteringService
+from services.clustering_service import RouteClusteringService
 
 MOMENT = datetime(2026, 1, 1, tzinfo=UTC)
 ROUTE = [(10.2, 56.15), (10.201, 56.151), (10.202, 56.152)]

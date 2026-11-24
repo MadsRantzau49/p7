@@ -1,7 +1,7 @@
 from datetime import UTC, date, datetime, time
 from types import SimpleNamespace
 
-import routers.subtrajectory_router as subtrajectory_router
+import routers.router as router
 from fastapi.testclient import TestClient
 from main import app
 from models.similarity import GPSCoordinate, Route
@@ -36,12 +36,12 @@ def test_get_subtrajectories(monkeypatch):
 
     monkeypatch.setitem(
         app.dependency_overrides,
-        subtrajectory_router.get_subtrajectory_service,
+        router.get_subtrajectory_service,
         lambda: SimpleNamespace(find_subtrajectories=find_subtrajectories),
     )
     monkeypatch.setitem(
         app.dependency_overrides,
-        subtrajectory_router.get_route_clustering_service,
+        router.get_route_clustering_service,
         lambda: SimpleNamespace(find_routes=find_routes),
     )
 
@@ -75,12 +75,12 @@ def test_get_subtrajectories_passes_time_window(monkeypatch):
 
     monkeypatch.setitem(
         app.dependency_overrides,
-        subtrajectory_router.get_subtrajectory_service,
+        router.get_subtrajectory_service,
         lambda: SimpleNamespace(find_subtrajectories=find_subtrajectories),
     )
     monkeypatch.setitem(
         app.dependency_overrides,
-        subtrajectory_router.get_route_clustering_service,
+        router.get_route_clustering_service,
         lambda: SimpleNamespace(find_routes=lambda *arguments: []),
     )
 
@@ -92,6 +92,42 @@ def test_get_subtrajectories_passes_time_window(monkeypatch):
     assert received["arguments"][-2:] == (time(22, 0), time(2, 30))
 
 
+def test_get_cluster_subtrajectories(monkeypatch):
+    """Clicking a cluster re-extracts the subtrajectories and returns only its members."""
+    moment = datetime(2013, 7, 1, 8, 10, tzinfo=UTC)
+    other = datetime(2013, 7, 1, 9, 0, tzinfo=UTC)
+    subtrajectories = [
+        Subtrajectory(1, 7, moment, moment, [UniformedTrajectoryPoint(-8.61, moment, 41.15)]),
+        Subtrajectory(2, 9, other, other, [UniformedTrajectoryPoint(-8.62, other, 41.16)]),
+    ]
+
+    monkeypatch.setitem(
+        app.dependency_overrides,
+        router.get_subtrajectory_service,
+        lambda: SimpleNamespace(find_subtrajectories=lambda *arguments: subtrajectories),
+    )
+
+    body = {
+        **QUERY,
+        "members": [
+            {
+                "trajectory_id": 7,
+                "exit_a_time": moment.isoformat(),
+                "entry_b_time": moment.isoformat(),
+            }
+        ],
+    }
+
+    response = client.post("/api/subtrajectories/cluster", json=body)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["trajectory_id"] == 7
+    assert data[0]["points"][0]["longitude"] == -8.61
+    assert data[0]["points"][0]["latitude"] == 41.15
+
+
 def test_get_subtrajectories_invalid_input(monkeypatch):
     """Check a ValueError from the service returns 400."""
 
@@ -100,7 +136,7 @@ def test_get_subtrajectories_invalid_input(monkeypatch):
 
     monkeypatch.setitem(
         app.dependency_overrides,
-        subtrajectory_router.get_subtrajectory_service,
+        router.get_subtrajectory_service,
         lambda: SimpleNamespace(find_subtrajectories=find_subtrajectories),
     )
 

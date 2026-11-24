@@ -1,68 +1,163 @@
 import math
 
-from helpers.similarity_steps.route_clustering.geometry import (
-    point_at_fraction,
-    project_onto_segment,
-    squared_distance,
-)
 from models.similarity import Polyline, ProjectedPoint
+
+# A free interval is the sub-range [lo, hi] of a segment that lies within epsilon of a point,
+# or None when no part of the segment is close enough.
+Interval = tuple[float, float] | None
 
 
 def routes_match(first: Polyline, second: Polyline, epsilon: float) -> bool:
-    """Return whether two routes stay within epsilon metres of each other end to end.
+    """Return whether the continuous Fréchet distance between two routes is within epsilon.
 
-    The check is symmetric and keeps order: every point of each route must lie within
-    epsilon of the other route while moving forward along it. The per-point maximum is used,
-    so a single stretch further than epsilon apart keeps the routes separate. A shared opening
-    that later diverges therefore does not count as the same route.
+    The Fréchet distance is the shortest leash that lets two walkers follow the routes from
+    start to end without ever walking backwards. It keeps the order of travel and pins start to
+    start and end to end, and it is the largest separation along the way, so a single stretch
+    further than epsilon apart keeps the routes separate. Reversing a route, or ending somewhere
+    else, therefore does not match.
     """
-    return _covers(first, second, epsilon) and _covers(second, first, epsilon)
+    return _frechet_within(first.points, second.points, epsilon)
 
 
-def _covers(source: Polyline, target: Polyline, epsilon: float) -> bool:
-    """Return whether every point of source lies within epsilon of target, moving forward."""
-    epsilon_squared = epsilon * epsilon
-    cursor = 0.0
-    for point in source.points:
-        cursor, distance_squared = _nearest_forward(target, point, cursor)
-        if distance_squared > epsilon_squared:
-            return False
-    return True
+def _distance(first: ProjectedPoint, second: ProjectedPoint) -> float:
+    """Euclidean distance between two projected points, in metres."""
+    return math.hypot(first.x - second.x, first.y - second.y)
 
 
-def _nearest_forward(target: Polyline, point: ProjectedPoint, cursor: float) -> tuple[float, float]:
-    """Return the closest position on target at or beyond cursor metres.
+def _free_interval(
+    point: ProjectedPoint, start: ProjectedPoint, end: ProjectedPoint, epsilon: float
+) -> Interval:
+    """Return the part [lo, hi] of segment start->end within epsilon of point, or None.
 
-    The result is the position's arc length from target's start and its squared distance from
-    point. The cursor never moves backward, which keeps the correspondence ordered.
+    Solving ||point - (start + h·(end - start))|| <= epsilon for h gives a quadratic; its roots,
+    clamped to [0, 1], bound the free interval. A zero-length segment is in or out as a whole.
     """
-    best_distance = cursor
-    best_squared = math.inf
-    for index in range(target.segment_count):
-        segment_start = target.cumulative_lengths[index]
-        segment_end = target.cumulative_lengths[index + 1]
-        if segment_end < cursor:
-            continue
+    dx = end.x - start.x
+    dy = end.y - start.y
+    offset_x = start.x - point.x
+    offset_y = start.y - point.y
 
-        start = target.points[index]
-        end = target.points[index + 1]
-        dx = end.x - start.x
-        dy = end.y - start.y
-        length_squared = dx * dx + dy * dy
-        fraction = project_onto_segment(point, start, dx, dy, length_squared)
+    a = dx * dx + dy * dy
+    b = 2 * (offset_x * dx + offset_y * dy)
+    c = offset_x * offset_x + offset_y * offset_y - epsilon * epsilon
 
-        # Do not step back before the cursor inside a segment that straddles it.
-        along = segment_start + fraction * (segment_end - segment_start)
-        if along < cursor:
-            along = cursor
-            span = segment_end - segment_start
-            fraction = (cursor - segment_start) / span if span > 0 else 0.0
+    if a == 0:
+        return (0.0, 1.0) if c <= 0 else None
 
-        projected_x, projected_y = point_at_fraction(start, end, dx, dy, fraction)
-        distance_squared = squared_distance(point.x, point.y, projected_x, projected_y)
+    discriminant = b * b - 4 * a * c
+    if discriminant < 0:
+        return None
 
-        if distance_squared < best_squared:
-            best_squared = distance_squared
-            best_distance = along
+    root = math.sqrt(discriminant)
+    low = max(0.0, (-b - root) / (2 * a))
+    high = min(1.0, (-b + root) / (2 * a))
+    if low > high:
+        return None
+    return (low, high)
 
-    return best_distance, best_squared
+
+def _clip_from(interval: Interval, lowest: float) -> Interval:
+    """Keep only the part of interval at or above lowest, preserving the upper bound."""
+    if interval is None or interval[1] < lowest:
+        return None
+    return (max(interval[0], lowest), interval[1])
+
+
+def _frechet_within(first: list[ProjectedPoint], second: list[ProjectedPoint], epsilon: float) -> bool:
+    """Decide whether a monotone matching of first and second stays within epsilon throughout.
+
+    This fills the Alt-Godau free-space diagram: each cell holds the part of a segment reachable
+    by a forward-only path from the start. The routes match when such a path reaches the end.
+    """
+    n = len(first)
+    m = len(second)
+    if n == 0 or m == 0:
+        return False
+
+    # The endpoints are pinned together, so they must already be within epsilon.
+    if _distance(first[0], second[0]) > epsilon or _distance(first[-1], second[-1]) > epsilon:
+        return False
+
+    # A single-point route only matches if every point of the other stays within epsilon.
+    if n == 1:
+        return all(_distance(first[0], point) <= epsilon for point in second)
+    if m == 1:
+        return all(_distance(point, second[0]) <= epsilon for point in first)
+
+    # left[i][j]:   reachable range on the vertical line at first-vertex i, over second-segment j.
+    # bottom[i][j]: reachable range on the horizontal line at second-vertex j, over first-segment i.
+    left: list[list[Interval]] = [[None] * (m - 1) for _ in range(n)]
+    bottom: list[list[Interval]] = [[None] * m for _ in range(n - 1)]
+
+    for i in range(n):
+        for j in range(m):
+            if j < m - 1:
+                left[i][j] = _reachable_left(first, second, left, bottom, i, j, epsilon)
+            if i < n - 1:
+                bottom[i][j] = _reachable_bottom(first, second, left, bottom, i, j, epsilon)
+
+    reached_top = left[n - 1][m - 2] is not None and left[n - 1][m - 2][1] == 1.0
+    reached_right = bottom[n - 2][m - 1] is not None and bottom[n - 2][m - 1][1] == 1.0
+    return reached_top or reached_right
+
+
+def _reachable_left(
+    first: list[ProjectedPoint],
+    second: list[ProjectedPoint],
+    left: list[list[Interval]],
+    bottom: list[list[Interval]],
+    i: int,
+    j: int,
+    epsilon: float,
+) -> Interval:
+    """Reachable range on the vertical edge at first-vertex i over second-segment j."""
+    free = _free_interval(first[i], second[j], second[j + 1], epsilon)
+    if free is None:
+        return None
+
+    if i == 0:
+        if j == 0:
+            return free if free[0] == 0.0 else None
+        # On the left wall, movement is only upward, so the column must be free without a gap.
+        previous = left[0][j - 1]
+        if previous is not None and previous[1] == 1.0 and free[0] == 0.0:
+            return free
+        return None
+
+    # The edge is entered from the cell to the left, through its bottom or its left edge.
+    if bottom[i - 1][j] is not None:
+        return free
+    if left[i - 1][j] is not None:
+        return _clip_from(free, left[i - 1][j][0])
+    return None
+
+
+def _reachable_bottom(
+    first: list[ProjectedPoint],
+    second: list[ProjectedPoint],
+    left: list[list[Interval]],
+    bottom: list[list[Interval]],
+    i: int,
+    j: int,
+    epsilon: float,
+) -> Interval:
+    """Reachable range on the horizontal edge at second-vertex j over first-segment i."""
+    free = _free_interval(second[j], first[i], first[i + 1], epsilon)
+    if free is None:
+        return None
+
+    if j == 0:
+        if i == 0:
+            return free if free[0] == 0.0 else None
+        # On the bottom wall, movement is only rightward, so the row must be free without a gap.
+        previous = bottom[i - 1][0]
+        if previous is not None and previous[1] == 1.0 and free[0] == 0.0:
+            return free
+        return None
+
+    # The edge is entered from the cell below, through its left or its bottom edge.
+    if left[i][j - 1] is not None:
+        return free
+    if bottom[i][j - 1] is not None:
+        return _clip_from(free, bottom[i][j - 1][0])
+    return None

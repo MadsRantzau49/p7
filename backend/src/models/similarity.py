@@ -3,7 +3,10 @@ from __future__ import annotations
 import math
 from array import array
 from dataclasses import dataclass, field
+from datetime import date, datetime, time
 from itertools import pairwise
+
+from pydantic import BaseModel
 
 
 @dataclass
@@ -23,37 +26,62 @@ class ProjectedPoint:
 
 
 @dataclass
-class ProjectedSubtrajectory:
-    """A source subtrajectory expressed as ordered projected points.
+class ClusterMember:
+    """Identity of one extracted subtrajectory grouped into a cluster.
 
-    trajectory_id identifies the original trajectory. Several extracted
-    subtrajectories can share the same trajectory_id.
+    The exit and entry times make the reference unique, since one trajectory can produce
+    several subtrajectories from A to B. The frontend sends these back to fetch a cluster's
+    subtrajectories on demand.
     """
 
     trajectory_id: int
+    exit_a_time: datetime
+    entry_b_time: datetime
+
+
+@dataclass
+class ProjectedSubtrajectory:
+    """A source subtrajectory expressed as ordered projected points.
+
+    trajectory_id identifies the original trajectory, while exit_a_time and entry_b_time make
+    the subtrajectory itself unique. Several extracted subtrajectories can share a trajectory_id.
+    """
+
+    trajectory_id: int
+    exit_a_time: datetime
+    entry_b_time: datetime
     projected_points: list[ProjectedPoint]
+
+    @property
+    def member(self) -> ClusterMember:
+        """Return the identity of this subtrajectory for cluster membership."""
+        return ClusterMember(self.trajectory_id, self.exit_a_time, self.entry_b_time)
 
 
 @dataclass
 class ProjectedRoute:
     """A clustered route with representative points in projected metres.
 
-    count is the number of distinct original trajectories grouped into the route.
+    count is the number of distinct original trajectories grouped into the route, and members
+    lists every subtrajectory grouped into it.
     """
 
     points: list[ProjectedPoint]
     count: int
+    members: list[ClusterMember] = field(default_factory=list)
 
 
 @dataclass
 class Route:
     """A clustered route with representative points in GPS degrees.
 
-    count is the number of distinct original trajectories grouped into the route.
+    count is the number of distinct original trajectories grouped into the route, and members
+    lists every subtrajectory grouped into it.
     """
 
     points: list[GPSCoordinate]
     count: int
+    members: list[ClusterMember] = field(default_factory=list)
 
 
 @dataclass
@@ -93,12 +121,51 @@ class Polyline:
 
 
 @dataclass
-class Representative:
-    """A representative route polyline and the trajectories grouped into it.
+class ClusteredSubtrajectory:
+    """One member of a cluster: its identity and its projected polyline."""
 
-    members holds the distinct original trajectory IDs assigned to this route,
-    including the one it was created from.
+    member: ClusterMember
+    polyline: Polyline
+
+
+@dataclass
+class Cluster:
+    """A cluster being built from the subtrajectories matched into it.
+
+    anchor is the first subtrajectory that founded the cluster; later subtrajectories are
+    matched against it. members holds every subtrajectory grouped in, the anchor included.
     """
 
-    polyline: Polyline
-    members: set[int] = field(default_factory=set)
+    anchor: Polyline
+    members: list[ClusteredSubtrajectory] = field(default_factory=list)
+
+
+class ClusterMemberRequest(BaseModel):
+    """One cluster member, as returned in a route and sent back to fetch its subtrajectory."""
+
+    trajectory_id: int
+    exit_a_time: datetime
+    entry_b_time: datetime
+
+
+class ClusterSubtrajectoriesRequest(BaseModel):
+    """The original query plus the members of one cluster to fetch the subtrajectories for."""
+
+    a_longitude: float
+    a_latitude: float
+    b_longitude: float
+    b_latitude: float
+    start_date: date
+    end_date: date
+    members: list[ClusterMemberRequest]
+    box_half_width_m: float = 50
+    start_time: time | None = None
+    end_time: time | None = None
+
+
+@dataclass
+class ClusterSubtrajectory:
+    """One subtrajectory of a cluster, returned when the cluster is opened on the map."""
+
+    trajectory_id: int
+    points: list[GPSCoordinate]

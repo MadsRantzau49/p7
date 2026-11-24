@@ -4,6 +4,7 @@ from helpers.similarity_steps.route_clustering.geometry import (
     dot,
     interpolate,
     point_at_fraction,
+    polyline_cells,
     project_onto_segment,
     squared_distance,
 )
@@ -64,3 +65,12 @@ def test_distance_along_adds_earlier_segments_and_part_of_the_current_one():
     polyline = Polyline.from_points([ORIGIN, ProjectedPoint(10, 0), ProjectedPoint(10, 20)])
 
     assert distance_along(polyline, 1, 0.5) == pytest.approx(20)
+
+
+def test_polyline_cells_cover_a_segment_without_gaps():
+    """A 25 m segment over 10 m cells touches columns 0, 1 and 2 with no cell skipped."""
+    polyline = Polyline.from_points([ORIGIN, ProjectedPoint(25, 0)])
+
+    cells = polyline_cells(polyline, 10)
+
+    assert cells == {(0, 0), (1, 0), (2, 0)}

@@ -7,7 +7,7 @@ from database.repositories.trajectory_repository import TrajectoryRepository
 from fastapi import Depends
 from psycopg import Connection
 from services.cleaning_service import CleanService
-from services.route_clustering_service import RouteClusteringService
+from services.clustering_service import RouteClusteringService
 from services.subtrajectory_service import SubtrajectoryService
 from services.trajectory_service import TrajectoryService
 

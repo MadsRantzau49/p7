@@ -6,9 +6,11 @@ type Props = {
   hasSearched: boolean
   hoveredRoute: number | null
   setHoveredRoute: (index: number | null) => void
+  selectedRoute: number | null
+  onSelectRoute: (index: number) => void
 }
 
-export default function RouteOverview({ routes, hasSearched, hoveredRoute, setHoveredRoute }: Props) {
+export default function RouteOverview({ routes, hasSearched, hoveredRoute, setHoveredRoute, selectedRoute, onSelectRoute }: Props) {
   if (!hasSearched) {
     return (
       <div className="overview">
@@ -36,9 +38,10 @@ export default function RouteOverview({ routes, hasSearched, hoveredRoute, setHo
         {rows.map(({ route, index }) => (
           <li
             key={index}
-            className={hoveredRoute === index ? 'route-row active' : 'route-row'}
+            className={hoveredRoute === index || selectedRoute === index ? 'route-row active' : 'route-row'}
             onMouseEnter={() => setHoveredRoute(index)}
             onMouseLeave={() => setHoveredRoute(null)}
+            onClick={() => onSelectRoute(index)}
           >
             <span
               className="swatch"

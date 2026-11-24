@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers.subtrajectory_router import router as subtrajectory_router
+from routers.router import router as subtrajectory_router
 from routers.trajectory_router import router as trajectory_router
 
 app = FastAPI(title="Trajectory API", version="0.0.1")

@@ -1,5 +1,5 @@
 import { MapContainer, TileLayer, CircleMarker, Polyline, Tooltip, useMapEvents, } from 'react-leaflet'
-import type { LatLng, Route } from '../types'
+import type { ClusterSubtrajectory, LatLng, Route } from '../types'
 import { ROUTE_COLORS } from '../colors'
 
 type PickMode = 'start' | 'end' | null
@@ -12,6 +12,9 @@ type Props = {
   routes: Route[]
   hoveredRoute: number | null
   setHoveredRoute: (index: number | null) => void
+  selectedRoute: number | null
+  memberPaths: ClusterSubtrajectory[]
+  onSelectRoute: (index: number) => void
 }
 
 // Start at Beijing. 
@@ -37,7 +40,7 @@ function lineWeight(count: number, maxCount: number): number {
   return minWeight + (count / maxCount) * (maxWeight - minWeight)
 }
 
-export default function RouteMap({ startPoint, endPoint, pickMode, onPickPoint, routes, hoveredRoute, setHoveredRoute }: Props) {
+export default function RouteMap({ startPoint, endPoint, pickMode, onPickPoint, routes, hoveredRoute, setHoveredRoute, selectedRoute, memberPaths, onSelectRoute }: Props) {
   // Largest journey count - used to scale line thickness relative to biggest one. 
   const maxCount = routes.reduce((max, route) => Math.max(max, route.count), 0)
 
@@ -89,18 +92,21 @@ export default function RouteMap({ startPoint, endPoint, pickMode, onPickPoint, 
           // fade the others routes when one is hovered.
           const opacity = hoveredRoute === null || isHovered ? 1 : 0.35
 
+          const isSelected = selectedRoute === index
+
           return (
             <Polyline
               key={index}
               positions={positions}
               pathOptions={{
                 color,
-                weight: lineWeight(route.count, maxCount) + (isHovered ? 3 : 0),
+                weight: lineWeight(route.count, maxCount) + (isHovered || isSelected ? 3 : 0),
                 opacity,
               }}
               eventHandlers={{
                 mouseover: () => setHoveredRoute(index),
                 mouseout: () => setHoveredRoute(null),
+                click: () => onSelectRoute(index),
               }}
             >
               <Tooltip permanent direction="center" className="count-label">
@@ -109,6 +115,26 @@ export default function RouteMap({ startPoint, endPoint, pickMode, onPickPoint, 
             </Polyline>
           )
         })}
+
+        {/* Subtrajectories of the opened cluster, drawn thin underneath. */}
+        {selectedRoute !== null &&
+          memberPaths.map((member, memberIndex) => {
+            const positions = member.points.map(
+              (point) => [point.latitude, point.longitude] as [number, number],
+            )
+
+            if (positions.length < 2) return null
+
+            const color = ROUTE_COLORS[selectedRoute % ROUTE_COLORS.length]
+
+            return (
+              <Polyline
+                key={`member-${memberIndex}`}
+                positions={positions}
+                pathOptions={{ color, weight: 1.5, opacity: 0.5, dashArray: '4 4' }}
+              />
+            )
+          })}
       </MapContainer>
     </div>
   )
