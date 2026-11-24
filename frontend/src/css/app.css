@@ -285,6 +285,7 @@ body {
 
 /* The map fills the rest of the width, inside a rounded card like the sketch. */
 .map-card {
+  position: relative;
   flex: 1;
   min-width: 0;
   background: #fff;
@@ -297,6 +298,26 @@ body {
   height: 100%;
   width: 100%;
   border-radius: 12px;
+}
+
+.picking-area .map {
+  cursor: crosshair;
+}
+
+.map-message {
+  position: absolute;
+  top: 12px;
+  left: 50px;
+  right: 12px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #c7ced6;
+  border-radius: 8px;
 }
 
 .count-label {
