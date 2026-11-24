@@ -12,15 +12,8 @@ export type GpsPoint = {
   longitude: number
 }
 
-// How many journeys support one stretch of a route.
-export type SupportInterval = {
-  start_m: number
-  end_m: number
-  count: number
-}
-
-export type Pathlet = {
+// One grouped route and how many journeys took it.
+export type Route = {
   points: GpsPoint[]
   count: number
-  support: SupportInterval[]
 }

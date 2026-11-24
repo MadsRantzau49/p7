@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { LatLng, Pathlet } from '../types'
+import type { LatLng, Route } from '../types'
 
 // width of search node 
 const BOX_HALF_WIDTH_M = 50
@@ -14,9 +14,9 @@ export type FindRoutesParams = {
   epsilon: number
 }
 
-// pathlets between the two picked areas.
-export async function findRoutes(params: FindRoutesParams): Promise<Pathlet[]> {
-  const response = await apiClient.get<Pathlet[]>('/api/subtrajectories/get', {
+// routes between the two picked areas.
+export async function findRoutes(params: FindRoutesParams): Promise<Route[]> {
+  const response = await apiClient.get<Route[]>('/api/subtrajectories/get', {
     params: {
       a_longitude: params.start.lng,
       a_latitude: params.start.lat,

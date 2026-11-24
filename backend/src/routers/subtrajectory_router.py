@@ -1,19 +1,19 @@
 from datetime import date, time
 from typing import Annotated
 
-from dependencies import get_similarity_service, get_subtrajectory_service
+from dependencies import get_route_clustering_service, get_subtrajectory_service
 from fastapi import APIRouter, Depends, HTTPException
-from models.similarity import Pathlet
-from services.similarity_service import SimilarityService
+from models.similarity import Route
+from services.route_clustering_service import RouteClusteringService
 from services.subtrajectory_service import SubtrajectoryService
 
 router = APIRouter(prefix="/api/subtrajectories")
 
 
-@router.get("/get", response_model=list[Pathlet])
+@router.get("/get", response_model=list[Route])
 def get_subtrajectories(
     subtrajectory_service: Annotated[SubtrajectoryService, Depends(get_subtrajectory_service)],
-    similarity_service: Annotated[SimilarityService, Depends(get_similarity_service)],
+    route_clustering_service: Annotated[RouteClusteringService, Depends(get_route_clustering_service)],
     a_longitude: float,
     a_latitude: float,
     b_longitude: float,
@@ -42,8 +42,8 @@ def get_subtrajectories(
             start_time,
             end_time,
         )
-        pathlets = similarity_service.find_similar_trajectories(subtrajectory_list, epsilon)
-        return pathlets
+        routes = route_clustering_service.find_routes(subtrajectory_list, epsilon)
+        return routes
 
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error

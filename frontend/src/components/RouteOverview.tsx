@@ -1,8 +1,8 @@
-import type { Pathlet } from '../types'
+import type { Route } from '../types'
 import { ROUTE_COLORS } from '../colors'
 
 type Props = {
-  routes: Pathlet[]
+  routes: Route[]
   hasSearched: boolean
   hoveredRoute: number | null
   setHoveredRoute: (index: number | null) => void

@@ -1,5 +1,5 @@
 import pytest
-from helpers.similarity_steps.pathlet_extension.geometry import (
+from helpers.similarity_steps.route_clustering.geometry import (
     distance_along,
     dot,
     interpolate,

@@ -1,5 +1,5 @@
 import { MapContainer, TileLayer, CircleMarker, Polyline, Tooltip, useMapEvents, } from 'react-leaflet'
-import type { LatLng, Pathlet } from '../types'
+import type { LatLng, Route } from '../types'
 import { ROUTE_COLORS } from '../colors'
 
 type PickMode = 'start' | 'end' | null
@@ -9,7 +9,7 @@ type Props = {
   endPoint: LatLng | null
   pickMode: PickMode
   onPickPoint: (point: LatLng) => void
-  routes: Pathlet[]
+  routes: Route[]
   hoveredRoute: number | null
   setHoveredRoute: (index: number | null) => void
 }

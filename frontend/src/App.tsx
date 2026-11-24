@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { LatLng, Pathlet, SimilarityLevel } from './types'
+import type { LatLng, Route, SimilarityLevel } from './types'
 import { findRoutes } from './api/subtrajectories'
 import SearchPanel from './components/SearchPanel'
 import RouteMap from './components/RouteMap'
@@ -47,7 +47,7 @@ export default function App() {
   const [customEpsilon, setCustomEpsilon] = useState(100)
 
   // Results
-  const [routes, setRoutes] = useState<Pathlet[]>([])
+  const [routes, setRoutes] = useState<Route[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)

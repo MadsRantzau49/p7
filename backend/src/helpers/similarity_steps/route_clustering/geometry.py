@@ -1,4 +1,4 @@
-from models.similarity import IndexedSegment, Polyline, ProjectedPoint
+from models.similarity import Polyline, ProjectedPoint
 
 
 def dot(ax: float, ay: float, bx: float, by: float) -> float:
@@ -62,16 +62,6 @@ def point_at_fraction(
 def interpolate(start: ProjectedPoint, end: ProjectedPoint, fraction: float) -> tuple[float, float]:
     """The point a fraction of the way from `start` to `end` (linear interpolation)."""
     return point_at_fraction(start, end, end.x - start.x, end.y - start.y, fraction)
-
-
-def box_contains(segment: IndexedSegment, point: ProjectedPoint) -> bool:
-    """Return whether the point lies inside or on the expanded bounding box."""
-    return not (
-        point.x < segment.min_x
-        or point.x > segment.max_x
-        or point.y < segment.min_y
-        or point.y > segment.max_y
-    )
 
 
 def distance_along(

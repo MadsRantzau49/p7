@@ -1,6 +1,6 @@
 import math
 
-from models.similarity import GPSCoordinate, Pathlet, ProjectedPathlet, ProjectedPoint, ProjectedTrajectory
+from models.similarity import GPSCoordinate, ProjectedPoint, ProjectedRoute, ProjectedSubtrajectory, Route
 from models.subtrajectory import Subtrajectory
 from pyproj import Transformer
 from pyproj.enums import TransformDirection
@@ -16,20 +16,20 @@ def centre_longitude(points) -> float:
 
 
 def projection(
-    trajectories: list[Subtrajectory],
-) -> tuple[list[ProjectedTrajectory], Transformer]:
-    """Project GPS trajectories into a shared local coordinate system in metres."""
-    if not trajectories:
-        raise ValueError("Projection requires at least one trajectory.")
+    subtrajectories: list[Subtrajectory],
+) -> tuple[list[ProjectedSubtrajectory], Transformer]:
+    """Project GPS subtrajectories into a shared local coordinate system in metres."""
+    if not subtrajectories:
+        raise ValueError("Projection requires at least one subtrajectory.")
 
-    # Collect all points so one projection can be used for every trajectory.
+    # Collect all points so one projection can be used for every subtrajectory.
     points = []
 
-    for trajectory in trajectories:
-        if not trajectory.points:
-            raise ValueError("Each trajectory must contain at least one point.")
+    for subtrajectory in subtrajectories:
+        if not subtrajectory.points:
+            raise ValueError("Each subtrajectory must contain at least one point.")
 
-        for point in trajectory.points:
+        for point in subtrajectory.points:
             points.append(point)
 
     # Centre a custom Transverse Mercator projection on the input data.
@@ -42,49 +42,48 @@ def projection(
         always_xy=True,
     )
 
-    projected_trajectories = []
+    projected_subtrajectories = []
 
-    for trajectory in trajectories:
-        # Transform a complete section
+    for subtrajectory in subtrajectories:
+        # Transform a complete subtrajectory
         xs, ys = transformer.transform(
-            [point.longitude for point in trajectory.points],
-            [point.latitude for point in trajectory.points],
+            [point.longitude for point in subtrajectory.points],
+            [point.latitude for point in subtrajectory.points],
         )
         projected_points = [ProjectedPoint(x=x, y=y) for x, y in zip(xs, ys, strict=True)]
 
-        projected_trajectories.append(
-            ProjectedTrajectory(
-                trajectory_id=trajectory.trajectory_id,
+        projected_subtrajectories.append(
+            ProjectedSubtrajectory(
+                trajectory_id=subtrajectory.trajectory_id,
                 projected_points=projected_points,
             )
         )
 
-    return projected_trajectories, transformer
+    return projected_subtrajectories, transformer
 
 
 def inverse_projection(
-    pathlets: list[ProjectedPathlet],
+    routes: list[ProjectedRoute],
     transformer: Transformer,
-) -> list[Pathlet]:
-    """Convert projected pathlet points back to GPS coordinates in degrees."""
-    if not pathlets:
+) -> list[Route]:
+    """Convert projected route points back to GPS coordinates in degrees."""
+    if not routes:
         return []
 
-    gps_pathlets = []
-    for pathlet in pathlets:
+    gps_routes = []
+    for route in routes:
         gps_points = []
-        for point in pathlet.points:
+        for point in route.points:
             longitude, latitude = transformer.transform(
                 point.x, point.y, direction=TransformDirection.INVERSE
             )
             gps_points.append(GPSCoordinate(latitude=latitude, longitude=longitude))
 
-        gps_pathlets.append(
-            Pathlet(
-                count=pathlet.count,
+        gps_routes.append(
+            Route(
+                count=route.count,
                 points=gps_points,
-                support=pathlet.support,
             )
         )
 
-    return gps_pathlets
+    return gps_routes
