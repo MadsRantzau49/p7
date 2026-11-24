@@ -119,5 +119,24 @@ def test_get_subtrajectories_against_configured_database():
             assert found["time_zone"] == "Europe/Lisbon"
 
             assert subtrajectories(date(2013, 6, 20), date(2013, 6, 20)) == []
+
+            for start_date, end_date in [
+                (None, None),
+                (date(2013, 7, 1), None),
+                (None, date(2013, 7, 1)),
+            ]:
+                [unbounded] = subtrajectories(start_date, end_date)
+                assert unbounded["trajectory_id"] == trajectory_id
+                assert unbounded["exit_a_time"] == found["exit_a_time"]
+
+            assert subtrajectories(date(2013, 7, 3), None) == []
+            assert subtrajectories(None, date(2013, 6, 28)) == []
+
+            overnight = trajectory_repository.get_subtrajectories(
+                box_a, box_b, None, None, time(22), time(10)
+            )
+            assert trajectory_id in [row["trajectory_id"] for row in overnight]
+            excluded = trajectory_repository.get_subtrajectories(box_a, box_b, None, None, time(22), time(2))
+            assert trajectory_id not in [row["trajectory_id"] for row in excluded]
         finally:
             connection.rollback()

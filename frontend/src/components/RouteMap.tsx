@@ -1,14 +1,16 @@
-import { MapContainer, TileLayer, CircleMarker, Polyline, Tooltip, useMapEvents, } from 'react-leaflet'
-import type { ClusterSubtrajectory, LatLng, Route } from '../types'
+import { useEffect, useState } from 'react'
+import { DomEvent } from 'leaflet'
+import { MapContainer, TileLayer, CircleMarker, Polyline, Rectangle, Tooltip, useMapEvents, } from 'react-leaflet'
+import type { Area, ClusterSubtrajectory, LatLng, PickMode, Route } from '../types'
 import { ROUTE_COLORS } from '../colors'
-
-type PickMode = 'start' | 'end' | null
+import { areaBounds, areaFromCorners } from '../areaGeometry'
 
 type Props = {
-  startPoint: LatLng | null
-  endPoint: LatLng | null
+  startArea: Area | null
+  endArea: Area | null
   pickMode: PickMode
-  onPickPoint: (point: LatLng) => void
+  onPickArea: (area: Area) => void
+  onCancelPick: () => void
   routes: Route[]
   hoveredRoute: number | null
   setHoveredRoute: (index: number | null) => void
@@ -17,22 +19,61 @@ type Props = {
   onSelectRoute: (index: number) => void
 }
 
-// Start at Beijing. 
-// TODO : Handle this depending on the dataset of the depolyment. 
+// Start at Beijing.
+// TODO : Handle this depending on the dataset of the depolyment.
 const DEFAULT_CENTER: [number, number] = [39.9, 116.4]
 const DEFAULT_ZOOM = 11
 
-// listens for clicks on the map.
-function MapClickHandler({ onClick }: { onClick: (point: LatLng) => void }) {
+function AreaPicker({ mode, onPick, onCancel }: {
+  mode: Exclude<PickMode, null>
+  onPick: (area: Area) => void
+  onCancel: () => void
+}) {
+  const [first, setFirst] = useState<LatLng | null>(null)
+  const [pointer, setPointer] = useState<LatLng | null>(null)
+  const [tooSmall, setTooSmall] = useState(false)
   useMapEvents({
     click: (event) => {
-      onClick({ lat: event.latlng.lat, lng: event.latlng.lng })
+      const point = { lat: event.latlng.lat, lng: event.latlng.lng }
+      if (!first) {
+        setFirst(point)
+        setPointer(point)
+        return
+      }
+      const area = areaFromCorners(first, point)
+      if (area.min_latitude === area.max_latitude || area.min_longitude === area.max_longitude) {
+        setTooSmall(true)
+        return
+      }
+      setTooSmall(false)
+      onPick(area)
+    },
+    mousemove: (event) => {
+      if (first) setPointer({ lat: event.latlng.lat, lng: event.latlng.lng })
     },
   })
-  return null
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') onCancel()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onCancel])
+
+  return <>
+    <div className="map-message" role="status" ref={element => { if (element) DomEvent.disableClickPropagation(element) }}>
+      <span>{tooSmall ? 'Choose a larger rectangle.' : first ? 'Click the opposite corner.'
+        : `Click the first corner of the ${mode === 'start' ? 'starting' : 'destination'} area.`}</span>
+      <button type="button" onClick={onCancel}>Cancel</button>
+    </div>
+    {first && <CircleMarker center={[first.lat, first.lng]} radius={4} interactive={false} />}
+    {first && pointer && <Rectangle bounds={areaBounds(areaFromCorners(first, pointer))} interactive={false}
+      pathOptions={{ color: mode === 'start' ? '#1e7e34' : '#b21f2d', dashArray: '5 5', fillOpacity: 0.12 }} />}
+  </>
 }
 
-// Line size depending on # of trajectories counted and grouped together 
+// Line size depending on # of trajectories counted and grouped together
 function lineWeight(count: number, maxCount: number): number {
   const minWeight = 3
   const maxWeight = 10
@@ -40,43 +81,42 @@ function lineWeight(count: number, maxCount: number): number {
   return minWeight + (count / maxCount) * (maxWeight - minWeight)
 }
 
-export default function RouteMap({ startPoint, endPoint, pickMode, onPickPoint, routes, hoveredRoute, setHoveredRoute, selectedRoute, memberPaths, onSelectRoute }: Props) {
-  // Largest journey count - used to scale line thickness relative to biggest one. 
+export default function RouteMap({ startArea, endArea, pickMode, onPickArea, onCancelPick, routes, hoveredRoute, setHoveredRoute, selectedRoute, memberPaths, onSelectRoute }: Props) {
+  // Largest journey count - used to scale line thickness relative to biggest one.
   const maxCount = routes.reduce((max, route) => Math.max(max, route.count), 0)
 
   return (
-    <div className="map-card">
+    <div className={`map-card${pickMode ? ' picking-area' : ''}`}>
       <MapContainer center={DEFAULT_CENTER} zoom={DEFAULT_ZOOM} className="map">
         <TileLayer
           attribution="&copy; OpenStreetMap contributors"
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        {/* Check that we are choosing point */}
-        {pickMode && <MapClickHandler onClick={onPickPoint} />}
+        {pickMode && <AreaPicker key={pickMode} mode={pickMode} onPick={onPickArea} onCancel={onCancelPick} />}
 
-        {startPoint && (
-          <CircleMarker
-            center={[startPoint.lat, startPoint.lng]}
-            radius={9}
-            pathOptions={{ color: '#1e7e34', fillColor: '#28a745', fillOpacity: 1 }}
+        {startArea && (
+          <Rectangle
+            bounds={areaBounds(startArea)}
+            interactive={false}
+            pathOptions={{ color: '#1e7e34', fillColor: '#28a745', fillOpacity: 0.12 }}
           >
             <Tooltip permanent direction="top">
               START
             </Tooltip>
-          </CircleMarker>
+          </Rectangle>
         )}
 
-        {endPoint && (
-          <CircleMarker
-            center={[endPoint.lat, endPoint.lng]}
-            radius={9}
-            pathOptions={{ color: '#b21f2d', fillColor: '#dc3545', fillOpacity: 1 }}
+        {endArea && (
+          <Rectangle
+            bounds={areaBounds(endArea)}
+            interactive={false}
+            pathOptions={{ color: '#b21f2d', fillColor: '#dc3545', fillOpacity: 0.12 }}
           >
             <Tooltip permanent direction="top">
               END
             </Tooltip>
-          </CircleMarker>
+          </Rectangle>
         )}
 
         {routes.map((route, index) => {
@@ -88,15 +128,15 @@ export default function RouteMap({ startPoint, endPoint, pickMode, onPickPoint, 
 
           const color = ROUTE_COLORS[index % ROUTE_COLORS.length]
           const isHovered = hoveredRoute === index
+          const isSelected = selectedRoute === index
 
           // fade the others routes when one is hovered.
           const opacity = hoveredRoute === null || isHovered ? 1 : 0.35
 
-          const isSelected = selectedRoute === index
-
           return (
             <Polyline
-              key={index}
+              key={`${index}-${Boolean(pickMode)}`}
+              interactive={!pickMode}
               positions={positions}
               pathOptions={{
                 color,
@@ -130,6 +170,7 @@ export default function RouteMap({ startPoint, endPoint, pickMode, onPickPoint, 
             return (
               <Polyline
                 key={`member-${memberIndex}`}
+                interactive={false}
                 positions={positions}
                 pathOptions={{ color, weight: 1.5, opacity: 0.5, dashArray: '4 4' }}
               />

@@ -149,16 +149,23 @@ class ClusterMemberRequest(BaseModel):
 
 
 class ClusterSubtrajectoriesRequest(BaseModel):
-    """The original query plus the members of one cluster to fetch the subtrajectories for."""
+    """The original query plus the members of one cluster to fetch the subtrajectories for.
+
+    A and B are given as bounding boxes (minimum and maximum corners), matching the query that
+    produced the routes.
+    """
 
     a_longitude: float
     a_latitude: float
+    a_max_longitude: float
+    a_max_latitude: float
     b_longitude: float
     b_latitude: float
-    start_date: date
-    end_date: date
+    b_max_longitude: float
+    b_max_latitude: float
     members: list[ClusterMemberRequest]
-    box_half_width_m: float = 50
+    start_date: date | None = None
+    end_date: date | None = None
     start_time: time | None = None
     end_time: time | None = None
 

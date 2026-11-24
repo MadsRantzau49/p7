@@ -1,4 +1,4 @@
-import type { LatLng, SimilarityLevel } from '../types'
+import type { Area, PickMode, SimilarityLevel } from '../types'
 
 // The three similarity blocks, in order, with their labels.
 const SIMILARITY_LEVELS: { value: SimilarityLevel; label: string }[] = [
@@ -7,11 +7,9 @@ const SIMILARITY_LEVELS: { value: SimilarityLevel; label: string }[] = [
   { value: 'high', label: 'High' },
 ]
 
-type PickMode = 'start' | 'end' | null
-
 type Props = {
-  startPoint: LatLng | null
-  endPoint: LatLng | null
+  startArea: Area | null
+  endArea: Area | null
   pickMode: PickMode
   setPickMode: (mode: PickMode) => void
 
@@ -39,14 +37,14 @@ type Props = {
   onFindRoutes: () => void
 }
 
-// Show a picked point as short coordinates.
-function formatPoint(point: LatLng): string {
-  return `${point.lat.toFixed(4)}, ${point.lng.toFixed(4)}`
+// Show the two corners of a selected area.
+function formatArea(area: Area): string {
+  return `${area.min_latitude.toFixed(4)}, ${area.min_longitude.toFixed(4)} — ${area.max_latitude.toFixed(4)}, ${area.max_longitude.toFixed(4)}`
 }
 
 export default function SearchPanel({
-  startPoint,
-  endPoint,
+  startArea,
+  endArea,
   pickMode,
   setPickMode,
   fromDate,
@@ -78,25 +76,31 @@ export default function SearchPanel({
         <button
           type="button"
           className={pickMode === 'start' ? 'pick-button active' : 'pick-button'}
+          aria-pressed={pickMode === 'start'}
           onClick={() => setPickMode(pickMode === 'start' ? null : 'start')}
         >
-          {startPoint ? 'Starting area selected' : 'Select starting area on map'}
+          {startArea ? 'Starting area selected — change' : 'Select starting area on map'}
         </button>
-        {startPoint && <p className="coords">{formatPoint(startPoint)}</p>}
+        {startArea && <p className="coords">{formatArea(startArea)}</p>}
 
         <button
           type="button"
           className={pickMode === 'end' ? 'pick-button active' : 'pick-button'}
+          aria-pressed={pickMode === 'end'}
           onClick={() => setPickMode(pickMode === 'end' ? null : 'end')}
         >
-          {endPoint ? 'Destination selected' : 'Select destination area on map'}
+          {endArea ? 'Destination selected — change' : 'Select destination area on map'}
         </button>
-        {endPoint && <p className="coords">{formatPoint(endPoint)}</p>}
+        {endArea && <p className="coords">{formatArea(endArea)}</p>}
       </section>
 
       {/* 2. When */}
       <section className="panel-section">
-        <h3>2. When?</h3>
+        <h3>2. When? (optional)</h3>
+        <p className="help-text">Leave either date blank for no limit on that side, or both for all dates.</p>
+        {fromDate && toDate && fromDate > toDate && (
+          <p className="error-text" role="alert">From date must be on or before To date.</p>
+        )}
         <div className="field-row">
           <label>
             From date
@@ -165,9 +169,10 @@ export default function SearchPanel({
         type="button"
         className="find-button"
         disabled={!canSearch || loading}
+        aria-busy={loading}
         onClick={onFindRoutes}
       >
-        {loading && <span className="spinner" />}
+        {loading && <span className="spinner" aria-hidden="true" />}
         {loading ? 'Finding...' : 'Find routes'}
       </button>
 

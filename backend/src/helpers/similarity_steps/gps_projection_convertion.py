@@ -36,7 +36,7 @@ def projection(
     centre_lat = sum(point.latitude for point in points) / len(points)
     centre_lon = centre_longitude(points)
 
-    # ah hell nah 
+    # ah hell nah
     transformer = Transformer.from_crs(
         "EPSG:4326",
         f"+proj=tmerc +lat_0={centre_lat} +lon_0={centre_lon} +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m",
