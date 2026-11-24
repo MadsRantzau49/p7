@@ -72,7 +72,12 @@ export default function App() {
   }
 
   async function handleFindRoutes() {
-    if (!startArea || !endArea) return
+    if (loading || !startArea || !endArea) return
+
+    if (fromDate && toDate && fromDate > toDate) {
+      setError('From date must be on or before To date.')
+      return
+    }
 
     setLoading(true)
     setError(null)

@@ -96,7 +96,11 @@ export default function SearchPanel({
 
       {/* 2. When */}
       <section className="panel-section">
-        <h3>2. When?</h3>
+        <h3>2. When? (optional)</h3>
+        <p className="help-text">Leave either date blank for no limit on that side, or both for all dates.</p>
+        {fromDate && toDate && fromDate > toDate && (
+          <p className="error-text" role="alert">From date must be on or before To date.</p>
+        )}
         <div className="field-row">
           <label>
             From date
@@ -165,9 +169,10 @@ export default function SearchPanel({
         type="button"
         className="find-button"
         disabled={!canSearch || loading}
+        aria-busy={loading}
         onClick={onFindRoutes}
       >
-        {loading && <span className="spinner" />}
+        {loading && <span className="spinner" aria-hidden="true" />}
         {loading ? 'Finding...' : 'Find routes'}
       </button>
 
