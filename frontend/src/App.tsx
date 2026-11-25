@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { Area, Pathlet, PickMode, SimilarityLevel } from './types'
-import { findRoutes } from './api/subtrajectories'
+import type { Area, ClusterSubtrajectory, PickMode, Route, SimilarityLevel } from './types'
+import { fetchClusterSubtrajectories, findRoutes, type FindRoutesParams } from './api/subtrajectories'
 import SearchPanel from './components/SearchPanel'
 import RouteMap from './components/RouteMap'
 import RouteOverview from './components/RouteOverview'
@@ -47,11 +47,19 @@ export default function App() {
   const [customEpsilon, setCustomEpsilon] = useState(100)
 
   // Results
-  const [routes, setRoutes] = useState<Pathlet[]>([])
+  const [routes, setRoutes] = useState<Route[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
   const [hoveredRoute, setHoveredRoute] = useState<number | null>(null)
+
+  // The opened cluster and the subtrajectories fetched for it.
+  const [lastQuery, setLastQuery] = useState<FindRoutesParams | null>(null)
+  const [selectedRoute, setSelectedRoute] = useState<number | null>(null)
+  const [memberPaths, setMemberPaths] = useState<ClusterSubtrajectory[]>([])
+  const [memberLoading, setMemberLoading] = useState(false)
+  // Which subtrajectory of the open cluster is highlighted, shared by the list and the map.
+  const [hoveredMember, setHoveredMember] = useState<number | null>(null)
 
 
   const epsilonMeters = useCustomEpsilon ? customEpsilon : EPSILON_BY_LEVEL[similarityLevel]
@@ -79,24 +87,53 @@ export default function App() {
       return
     }
 
+    const query: FindRoutesParams = {
+      start: startArea,
+      end: endArea,
+      fromDate,
+      toDate,
+      fromHour,
+      toHour,
+      epsilon: epsilonMeters,
+    }
+
     setLoading(true)
     setError(null)
+    // A new search clears any opened cluster.
+    setSelectedRoute(null)
+    setMemberPaths([])
     try {
-      const result = await findRoutes({
-        start: startArea,
-        end: endArea,
-        fromDate,
-        toDate,
-        fromHour,
-        toHour,
-        epsilon: epsilonMeters,
-      })
+      const result = await findRoutes(query)
       setRoutes(result)
+      setLastQuery(query)
       setHasSearched(true)
     } catch (err) {
       setError(readErrorMessage(err))
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Open a cluster to see its subtrajectories, or close it when clicked again.
+  async function handleSelectRoute(index: number) {
+    setHoveredMember(null)
+    if (selectedRoute === index) {
+      setSelectedRoute(null)
+      setMemberPaths([])
+      return
+    }
+    setSelectedRoute(index)
+    setMemberPaths([])
+    const route = routes[index]
+    if (!lastQuery || !route) return
+    setMemberLoading(true)
+    try {
+      const paths = await fetchClusterSubtrajectories(lastQuery, route.members)
+      setMemberPaths(paths)
+    } catch (err) {
+      setError(readErrorMessage(err))
+    } finally {
+      setMemberLoading(false)
     }
   }
 
@@ -139,6 +176,12 @@ export default function App() {
             hasSearched={hasSearched}
             hoveredRoute={hoveredRoute}
             setHoveredRoute={setHoveredRoute}
+            selectedRoute={selectedRoute}
+            onSelectRoute={handleSelectRoute}
+            memberPaths={memberPaths}
+            memberLoading={memberLoading}
+            hoveredMember={hoveredMember}
+            setHoveredMember={setHoveredMember}
           />
         </div>
 
@@ -151,6 +194,12 @@ export default function App() {
           routes={routes}
           hoveredRoute={hoveredRoute}
           setHoveredRoute={setHoveredRoute}
+          selectedRoute={selectedRoute}
+          memberPaths={memberPaths}
+          memberLoading={memberLoading}
+          hoveredMember={hoveredMember}
+          setHoveredMember={setHoveredMember}
+          onSelectRoute={handleSelectRoute}
         />
       </div>
     </div>

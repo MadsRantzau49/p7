@@ -6,7 +6,7 @@ from helpers.similarity_steps.gps_projection_convertion import (
     inverse_projection,
     projection,
 )
-from models.similarity import ProjectedPathlet, SupportInterval
+from models.similarity import ProjectedRoute
 from models.subtrajectory import Subtrajectory
 from models.uniformed_trajectories import UniformedTrajectoryPoint
 
@@ -31,14 +31,14 @@ def test_centre_longitude_handles_the_antimeridian():
     assert abs(centre_longitude([_point(179, 0), _point(-179, 0)])) == pytest.approx(180)
 
 
-def test_projection_requires_at_least_one_trajectory():
+def test_projection_requires_at_least_one_subtrajectory():
     """An empty list has no centre to project around."""
-    with pytest.raises(ValueError, match="at least one trajectory"):
+    with pytest.raises(ValueError, match="at least one subtrajectory"):
         projection([])
 
 
-def test_projection_requires_every_trajectory_to_have_points():
-    """A trajectory without points is rejected."""
+def test_projection_requires_every_subtrajectory_to_have_points():
+    """A subtrajectory without points is rejected."""
     with pytest.raises(ValueError, match="at least one point"):
         projection(
             [
@@ -66,53 +66,45 @@ def test_projection_gives_distances_in_metres():
 
 
 def test_projection_keeps_trajectory_ids_and_the_number_of_points():
-    """Every trajectory keeps its identity, in the same order as the input."""
-    trajectories = [
+    """Every subtrajectory keeps its identity, in the same order as the input."""
+    subtrajectories = [
         _subtrajectory(4, 194, [(10.2, 56.15), (10.201, 56.15)]),
-        _subtrajectory(
-            9,
-            2432,
-            [(10.2, 56.16), (10.201, 56.16), (10.202, 56.16)],
-        ),
+        _subtrajectory(9, 2432, [(10.2, 56.16), (10.201, 56.16), (10.202, 56.16)]),
     ]
 
-    # Check whether the IDs are already wrong before projection.
-    assert [t.trajectory_id for t in trajectories] == [4, 9]
+    assert [s.trajectory_id for s in subtrajectories] == [4, 9]
 
-    projected, _ = projection(trajectories)
+    projected, _ = projection(subtrajectories)
 
-    assert [t.trajectory_id for t in projected] == [4, 9]
-    assert [len(t.projected_points) for t in projected] == [2, 3]
+    assert [p.trajectory_id for p in projected] == [4, 9]
+    assert [len(p.projected_points) for p in projected] == [2, 3]
 
 
 def test_inverse_projection_returns_the_original_gps_coordinates():
     """Projecting and converting back ends where it started."""
     coordinates = [(10.2, 56.15), (10.201, 56.151)]
     [projected], transformer = projection([_subtrajectory(1, 232, coordinates)])
-    pathlet = ProjectedPathlet(points=projected.projected_points, count=1)
+    route = ProjectedRoute(points=projected.projected_points, count=1)
 
-    [gps_pathlet] = inverse_projection([pathlet], transformer)
+    [gps_route] = inverse_projection([route], transformer)
 
-    for point, (longitude, latitude) in zip(gps_pathlet.points, coordinates, strict=True):
+    for point, (longitude, latitude) in zip(gps_route.points, coordinates, strict=True):
         assert point.longitude == pytest.approx(longitude, abs=1e-9)
         assert point.latitude == pytest.approx(latitude, abs=1e-9)
 
 
-def test_inverse_projection_keeps_count_and_support_in_metres():
-    """Only the points are converted, so count and support are unchanged."""
+def test_inverse_projection_keeps_the_count():
+    """Only the points are converted, so the count is unchanged."""
     [projected], transformer = projection([_subtrajectory(1, 232, [(10.2, 56.15), (10.201, 56.151)])])
-    support = [SupportInterval(0.0, 50.0, 3)]
-    pathlet = ProjectedPathlet(points=projected.projected_points, count=3, support=support)
+    route = ProjectedRoute(points=projected.projected_points, count=3)
 
-    [gps_pathlet] = inverse_projection([pathlet], transformer)
+    [gps_route] = inverse_projection([route], transformer)
 
-    assert gps_pathlet.count == 3
-    assert gps_pathlet.support == [SupportInterval(0.0, 50.0, 3)]
-    assert pathlet.support == [SupportInterval(0.0, 50.0, 3)]
+    assert gps_route.count == 3
 
 
 def test_inverse_projection_of_nothing_is_empty():
-    """No pathlets means nothing to convert."""
+    """No routes means nothing to convert."""
     _, transformer = projection([_subtrajectory(1, 2323, [(10.2, 56.15)])])
 
     assert inverse_projection([], transformer) == []

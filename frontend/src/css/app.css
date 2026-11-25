@@ -240,6 +240,30 @@ body {
   }
 }
 
+/* Dark spinner variant for light backgrounds (e.g. over the map). */
+.spinner-dark {
+  border-color: rgba(31, 41, 51, 0.25);
+  border-top-color: #1f2933;
+}
+
+/* Centered loading badge shown over the map while a cluster's subtrajectories load. */
+.map-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #fff;
+  border: 1px solid #c7ced6;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #1f2933;
+}
+
 /* Route list (the overview). */
 .overview h3 {
   margin: 0 0 10px;
@@ -283,6 +307,50 @@ body {
   font-size: 13px;
 }
 
+/* The trips of the opened cluster, listed under its row. */
+.member-list-item {
+  list-style: none;
+}
+
+.member-list {
+  list-style: none;
+  margin: 2px 0 6px;
+  padding: 0;
+  border-left: 2px solid #d7dde3;
+  margin-left: 15px;
+}
+
+.member-loading {
+  margin: 4px 0 8px 17px;
+  font-size: 13px;
+  color: #52606d;
+}
+
+.member-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px 5px 15px;
+  border-radius: 6px;
+  cursor: default;
+  font-size: 13px;
+}
+
+.member-row:hover,
+.member-row.active {
+  background: #e7eef9;
+}
+
+.member-name {
+  flex: 1;
+  color: #1f2933;
+}
+
+.member-id {
+  color: #7b8794;
+  font-variant-numeric: tabular-nums;
+}
+
 /* The map fills the rest of the width, inside a rounded card like the sketch. */
 .map-card {
   position: relative;
@@ -318,6 +386,22 @@ body {
   background: #fff;
   border: 1px solid #c7ced6;
   border-radius: 8px;
+}
+
+.map-message button {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border: 1px solid #2f6fd1;
+  border-radius: 6px;
+  background: #2f6fd1;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.map-message button:hover {
+  background: #2558a8;
 }
 
 .count-label {
