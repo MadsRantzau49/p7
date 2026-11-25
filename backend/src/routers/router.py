@@ -89,10 +89,7 @@ def get_cluster_subtrajectories(
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
-    wanted = {
-        (member.trajectory_id, member.exit_a_time, member.entry_b_time)
-        for member in request.members
-    }
+    wanted = {(member.trajectory_id, member.exit_a_time, member.entry_b_time) for member in request.members}
 
     return [
         ClusterSubtrajectory(
@@ -103,6 +100,5 @@ def get_cluster_subtrajectories(
             ],
         )
         for subtrajectory in subtrajectories
-        if (subtrajectory.trajectory_id, subtrajectory.exit_a_time, subtrajectory.entry_b_time)
-        in wanted
+        if (subtrajectory.trajectory_id, subtrajectory.exit_a_time, subtrajectory.entry_b_time) in wanted
     ]

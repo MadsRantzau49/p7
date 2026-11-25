@@ -11,9 +11,7 @@ from models.similarity import (
 )
 
 
-def cluster_routes(
-    subtrajectories: list[ProjectedSubtrajectory], epsilon: float
-) -> list[ProjectedRoute]:
+def cluster_routes(subtrajectories: list[ProjectedSubtrajectory], epsilon: float) -> list[ProjectedRoute]:
     """Group whole subtrajectories into routes within epsilon metres of each other.
 
     This runs the clustering stages in order: prepare the polylines, assign them to clusters,
@@ -32,9 +30,7 @@ def build_polylines(
 ) -> list[ClusteredSubtrajectory]:
     """Pair each subtrajectory with its projected polyline, rejecting stationary-only input."""
     entries = [
-        ClusteredSubtrajectory(
-            subtrajectory.member, Polyline.from_points(subtrajectory.projected_points)
-        )
+        ClusteredSubtrajectory(subtrajectory.member, Polyline.from_points(subtrajectory.projected_points))
         for subtrajectory in subtrajectories
     ]
 
@@ -46,9 +42,7 @@ def build_polylines(
     return entries
 
 
-def assign_clusters(
-    entries: list[ClusteredSubtrajectory], epsilon: float
-) -> list[Cluster]:
+def assign_clusters(entries: list[ClusteredSubtrajectory], epsilon: float) -> list[Cluster]:
     """Place each entry in the first cluster whose anchor it matches, else start a new one."""
     clusters: list[Cluster] = []
     for entry in entries:
@@ -66,9 +60,7 @@ def choose_representatives(clusters: list[Cluster], epsilon: float) -> list[Poly
     return [_representative(cluster, epsilon) for cluster in clusters]
 
 
-def build_routes(
-    clusters: list[Cluster], representatives: list[Polyline]
-) -> list[ProjectedRoute]:
+def build_routes(clusters: list[Cluster], representatives: list[Polyline]) -> list[ProjectedRoute]:
     """Assemble each cluster into a route with its representative, distinct count and members."""
     routes: list[ProjectedRoute] = []
     for cluster, representative in zip(clusters, representatives, strict=True):
@@ -79,9 +71,7 @@ def build_routes(
     return routes
 
 
-def _matching_cluster(
-    polyline: Polyline, clusters: list[Cluster], epsilon: float
-) -> Cluster | None:
+def _matching_cluster(polyline: Polyline, clusters: list[Cluster], epsilon: float) -> Cluster | None:
     """Return the first cluster whose anchor matches the polyline, or None."""
     for cluster in clusters:
         if routes_match(polyline, cluster.anchor, epsilon):
