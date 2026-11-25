@@ -31,7 +31,7 @@ def test_queries_against_configured_database():
             later = now + timedelta(seconds=15)
             cleaned = [
                 UniformedTrajectories(
-                    1,
+                    "1",
                     VehicleType.CAR,
                     now,
                     [UniformedTrajectoryPoint(1, now, 2), UniformedTrajectoryPoint(1.5, later, 2.5)],
@@ -101,7 +101,7 @@ def test_get_subtrajectories_against_configured_database():
         try:
             city = dataset_repository.get_or_create_city(name, "Europe/Lisbon")
             dataset_id = dataset_repository.create_dataset(name, city.city_id)
-            cleaned = [UniformedTrajectories(1, VehicleType.TAXI, start, points, city=name)]
+            cleaned = [UniformedTrajectories("1", VehicleType.TAXI, start, points, city=name)]
             [trajectory_id] = trajectory_repository.insert_uniformed_trajectories(dataset_id, cleaned)
             trajectory_repository.insert_trips([trajectory_id], cleaned)
 
