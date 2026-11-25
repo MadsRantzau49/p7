@@ -18,7 +18,7 @@ class UniformedTrajectoryPoint:
 
 @dataclass
 class UniformedTrajectories:
-    vehicle_id: int
+    vehicle_id: str
     vehicle_type: VehicleType
     trajectory_date: datetime
     points: list[UniformedTrajectoryPoint]

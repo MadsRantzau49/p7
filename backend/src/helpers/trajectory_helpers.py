@@ -32,7 +32,7 @@ def convert_porto_trajectory(porto_trajectory: PortoTrajectory) -> UniformedTraj
         current_time += timedelta(seconds=15)
 
     return UniformedTrajectories(
-        vehicle_id=porto_trajectory.taxi_id,
+        vehicle_id=str(porto_trajectory.taxi_id),
         vehicle_type=VehicleType.TAXI,
         trajectory_date=start_time,
         points=points,
@@ -58,7 +58,7 @@ def convert_beijing_trajectory(beijing_trajectory: BeijingTrajectory) -> Uniform
         )
 
     return UniformedTrajectories(
-        vehicle_id=int(beijing_trajectory.taxi_id),
+        vehicle_id=str(beijing_trajectory.taxi_id),
         vehicle_type=VehicleType.TAXI,
         trajectory_date=points[0].point_timestamp,
         city="Beijing",

@@ -10,7 +10,7 @@ from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajec
 
 def _trajectory():
     now = datetime.now(UTC)
-    return UniformedTrajectories(1, VehicleType.CAR, now, [UniformedTrajectoryPoint(1, now, 2)])
+    return UniformedTrajectories("1", VehicleType.CAR, now, [UniformedTrajectoryPoint(1, now, 2)])
 
 
 def _call_get_trajectories_from_db(context):
