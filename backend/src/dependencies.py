@@ -9,7 +9,6 @@ from psycopg import Connection
 from services.cleaning_service import CleanService
 from services.similarity_service import SimilarityService
 from services.subtrajectory_service import SubtrajectoryService
-from services.trajectory_service import TrajectoryService
 
 
 def get_db_connection():
@@ -33,19 +32,6 @@ def get_dataset_repository(connection: Annotated[Connection, Depends(get_db_conn
 def get_database_actions(connection: Annotated[Connection, Depends(get_db_connection)]):
     """Create a database actions using provided connection"""
     return DatabaseActions(connection)
-
-
-def get_trajectory_service(
-    trajectory_repository: Annotated[TrajectoryRepository, Depends(get_trajectory_repository)],
-    dataset_repository: Annotated[DatasetRepository, Depends(get_dataset_repository)],
-    db_actions: Annotated[DatabaseActions, Depends(get_database_actions)],
-) -> TrajectoryService:
-    """Provides a trajectory service and closes the connection afterward"""
-    return TrajectoryService(
-        trajectory_repository=trajectory_repository,
-        dataset_repository=dataset_repository,
-        db_actions=db_actions,
-    )
 
 
 def get_cleaning_service(

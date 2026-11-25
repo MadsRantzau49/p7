@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers.subtrajectory_router import router as subtrajectory_router
-from routers.trajectory_router import router as trajectory_router
 
 app = FastAPI(title="Trajectory API", version="0.0.1")
 # It seems we run on different ports for frontend, so we need this for now.
@@ -20,7 +19,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(trajectory_router)
 app.include_router(subtrajectory_router)
 
 
