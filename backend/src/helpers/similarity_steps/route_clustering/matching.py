@@ -96,8 +96,10 @@ def _frechet_within(first: list[ProjectedPoint], second: list[ProjectedPoint], e
             if i < n - 1:
                 bottom[i][j] = _reachable_bottom(first, second, left, bottom, i, j, epsilon)
 
-    reached_top = left[n - 1][m - 2] is not None and left[n - 1][m - 2][1] == 1.0
-    reached_right = bottom[n - 2][m - 1] is not None and bottom[n - 2][m - 1][1] == 1.0
+    top = left[n - 1][m - 2]
+    right = bottom[n - 2][m - 1]
+    reached_top = top is not None and top[1] == 1.0
+    reached_right = right is not None and right[1] == 1.0
     return reached_top or reached_right
 
 
@@ -127,8 +129,9 @@ def _reachable_left(
     # The edge is entered from the cell to the left, through its bottom or its left edge.
     if bottom[i - 1][j] is not None:
         return free
-    if left[i - 1][j] is not None:
-        return _clip_from(free, left[i - 1][j][0])
+    left_below = left[i - 1][j]
+    if left_below is not None:
+        return _clip_from(free, left_below[0])
     return None
 
 
@@ -158,6 +161,7 @@ def _reachable_bottom(
     # The edge is entered from the cell below, through its left or its bottom edge.
     if left[i][j - 1] is not None:
         return free
-    if bottom[i][j - 1] is not None:
-        return _clip_from(free, bottom[i][j - 1][0])
+    bottom_prev = bottom[i][j - 1]
+    if bottom_prev is not None:
+        return _clip_from(free, bottom_prev[0])
     return None
