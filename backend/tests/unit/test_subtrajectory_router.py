@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import dependencies
 import routers.router as router
 from fastapi.testclient import TestClient
+from helpers.similarity_steps.route_clustering import clustering
 from main import app
 from models.bounding_box import BoundingBox
 from models.date_range import DateRange
@@ -102,33 +103,43 @@ def test_get_subtrajectories_passes_time_window(monkeypatch):
 def test_find_routes_logs_pipeline_timings(monkeypatch, caplog):
     """Log timings and workload counts from the real services with a fake database."""
     connection = MagicMock()
-    connection.cursor.return_value.fetchall.return_value = [
-        {
-            "trajectory_id": 7,
-            "time_zone": "Europe/Lisbon",
-            "exit_a_time": datetime(2013, 7, 1, 8, 10, tzinfo=UTC),
-            "entry_b_time": datetime(2013, 7, 1, 8, 12, tzinfo=UTC),
-            "exit_a_longitude": -8.612,
-            "exit_a_latitude": 41.15,
-            "entry_b_longitude": -8.596,
-            "entry_b_latitude": 41.15,
-            "points": [],
-        }
-    ]
-    row = connection.cursor.return_value.fetchall.return_value[0]
-    connection.cursor.return_value.fetchall.return_value = [row, row.copy()]
+    row = {
+        "trajectory_id": 7,
+        "time_zone": "Europe/Lisbon",
+        "exit_a_time": datetime(2013, 7, 1, 8, 10, tzinfo=UTC),
+        "entry_b_time": datetime(2013, 7, 1, 8, 12, tzinfo=UTC),
+        "exit_a_longitude": -8.612,
+        "exit_a_latitude": 41.15,
+        "entry_b_longitude": -8.596,
+        "entry_b_latitude": 41.15,
+        "points": [],
+    }
+    cursor = connection.cursor.return_value.__enter__.return_value
+
+    def stream():
+        yield row
+        yield row.copy()
+
+    cursor.stream.return_value = stream()
     monkeypatch.setattr(dependencies, "create_db_connection", lambda: nullcontext(connection))
 
     with caplog.at_level(logging.INFO):
         response = client.get("/api/subtrajectories/get", params=QUERY)
 
     assert response.status_code == 200
+    cursor.stream.assert_called_once()
+    cursor.execute.assert_not_called()
+    cursor.fetchall.assert_not_called()
+    assert "Received first A-to-B query row" in caplog.messages
     assert any("rows=2, distinct trajectories=1" in message for message in caplog.messages)
     assert any(
         "points per subtrajectory (including boundaries): total=4" in message for message in caplog.messages
     )
-    assert any("full Fréchet evaluations=1, free-space cells=1" in message for message in caplog.messages)
-    assert any("Representative grid: cell size=100 m" in message for message in caplog.messages)
+    assert any(
+        "full Fréchet evaluations=1, potential free-space cells=1, visited=1" in message
+        for message in caplog.messages
+    )
+    assert any("Global spatial grid: cell size=100 m" in message for message in caplog.messages)
     assert any("Clustering output: routes=1" in message for message in caplog.messages)
     assert f"Response: status=200, bytes={len(response.content)}" in caplog.messages
     loggers = {
@@ -155,16 +166,15 @@ def test_find_routes_logs_pipeline_timings(monkeypatch, caplog):
         "=== SubtrajectoryService ===",
         "Validate query",
         "=== TrajectoryRepository ===",
-        "Execute SQL and receive results",
-        "Fetch and decode rows",
-        "Build subtrajectories",
+        "Stream SQL rows and build subtrajectories",
         "=== ClusteringService ===",
         "Step 1: Projection",
         "Step 2: Build polylines",
-        "Step 3: Assign clusters",
-        "Step 4: Choose representatives",
-        "Step 5: Build routes",
-        "Step 6: Inverse projection",
+        "Step 3: Build global spatial grid",
+        "Step 4: Score and sort by popularity",
+        "Step 5: Assign clusters",
+        "Step 6: Build routes",
+        "Step 7: Inverse projection",
         "Clustering total",
         "Find routes request",
     ]
@@ -222,3 +232,31 @@ def test_get_subtrajectories_invalid_input(monkeypatch):
 
     assert response.status_code == 400
     assert response.json()["detail"] == "box A and box B must not overlap"
+
+
+def test_small_tolerance_search_still_returns_all_pieces(monkeypatch, caplog):
+    """Exercise the HTTP clustering path when a 1 m popularity grid does not fit."""
+    moment = datetime(2013, 7, 1, 8, tzinfo=UTC)
+    trip = Subtrajectory(
+        1,
+        7,
+        moment,
+        moment,
+        [UniformedTrajectoryPoint(-8.612, moment, 41.15), UniformedTrajectoryPoint(-8.596, moment, 41.15)],
+    )
+    monkeypatch.setattr(clustering, "MAX_GRID_CELL_VISITS", 20)
+    monkeypatch.setitem(
+        app.dependency_overrides,
+        router.get_subtrajectory_service,
+        lambda: SimpleNamespace(find_subtrajectories=lambda *arguments: [trip]),
+    )
+
+    with caplog.at_level(logging.INFO):
+        response = client.get("/api/subtrajectories/get", params={**QUERY, "epsilon": 1})
+    assert response.status_code == 200
+    [route] = response.json()
+    assert [member["trajectory_id"] for member in route["members"]] == [7]
+    [message] = [msg for msg in caplog.messages if msg.startswith("Global spatial grid:")]
+    assert "matching epsilon=1 m" in message
+    cell_size = float(message.split("cell size=")[1].split()[0])
+    assert cell_size > 1

@@ -4,6 +4,7 @@ import math
 from array import array
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
+from functools import cached_property
 from itertools import pairwise
 
 from pydantic import BaseModel
@@ -119,6 +120,15 @@ class Polyline:
         """Length of the whole polyline, in metres."""
         return self.cumulative_lengths[-1]
 
+    @cached_property
+    def segment_vectors(self) -> list[tuple[float, float, float]]:
+        """Cache each segment's direction and squared norm for repeated matching."""
+        vectors = []
+        for start, end in pairwise(self.points):
+            dx, dy = end.x - start.x, end.y - start.y
+            vectors.append((dx, dy, dx * dx + dy * dy))
+        return vectors
+
 
 @dataclass
 class ClusteredSubtrajectory:
@@ -128,16 +138,16 @@ class ClusteredSubtrajectory:
     polyline: Polyline
 
 
-@dataclass
+@dataclass(frozen=True)
 class Cluster:
     """A cluster being built from the subtrajectories matched into it.
 
-    anchor is the first subtrajectory that founded the cluster; later subtrajectories are
-    matched against it. members holds every subtrajectory grouped in, the anchor included.
+    The founder is both the fixed matching anchor and the displayed representative.
+    Members stores only identities, including that of the founder.
     """
 
-    anchor: Polyline
-    members: list[ClusteredSubtrajectory] = field(default_factory=list)
+    representative: Polyline
+    members: list[ClusterMember] = field(default_factory=list)
 
 
 class ClusterMemberRequest(BaseModel):

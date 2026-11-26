@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, time
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from database.repositories.trajectory_repository import TrajectoryRepository
@@ -9,6 +10,29 @@ from models.subtrajectory import Subtrajectory
 from models.uniformed_trajectories import UniformedTrajectoryPoint
 
 from services.logging import Logging, describe_sizes
+
+
+def build_subtrajectory(row: dict[str, Any], dates: DateRange, subtrajectory_id: int) -> Subtrajectory | None:
+    """Convert one query row to an A→B piece, keeping only its interior points."""
+    zone = ZoneInfo(row["time_zone"])
+    exit_a_time = row["exit_a_time"].astimezone(zone)
+    entry_b_time = row["entry_b_time"].astimezone(zone)
+    if not dates.contains(exit_a_time.date()):
+        return None
+
+    points = [UniformedTrajectoryPoint(row["exit_a_longitude"], exit_a_time, row["exit_a_latitude"])]
+    for point in row["points"]:
+        point_timestamp = datetime.fromisoformat(point["point_timestamp"]).astimezone(zone)
+        if exit_a_time < point_timestamp < entry_b_time:
+            points.append(
+                UniformedTrajectoryPoint(
+                    longitude=point["longitude"],
+                    latitude=point["latitude"],
+                    point_timestamp=point_timestamp,
+                )
+            )
+    points.append(UniformedTrajectoryPoint(row["entry_b_longitude"], entry_b_time, row["entry_b_latitude"]))
+    return Subtrajectory(subtrajectory_id, row["trajectory_id"], exit_a_time, entry_b_time, points)
 
 
 class SubtrajectoryService(Logging):
@@ -44,68 +68,43 @@ class SubtrajectoryService(Logging):
             ):
                 raise ValueError("box A and box B must not overlap")
 
-        rows = self.trajectory_repository.get_subtrajectories(
-            box_a, box_b, dates.start_date, dates.end_date, start_time, end_time
-        )
         logger = self.logger
-        if logger.isEnabledFor(logging.INFO):
+        log_stats = logger.isEnabledFor(logging.INFO)
+        subtrajectories = []
+        row_count = points_examined = source_points = 0
+        source_ids: set[int] = set()
+
+        with self.trajectory_repository.stream_subtrajectories(
+            box_a, box_b, dates.start_date, dates.end_date, start_time, end_time
+        ) as rows:
+            logger.info("Waiting for A-to-B query results")
+            with self.log_step("Stream SQL rows and build subtrajectories"):
+                for row_count, row in enumerate(rows, start=1):
+                    if log_stats:
+                        source_ids.add(row["trajectory_id"])
+                        source_points += len(row["points"])
+                    piece = build_subtrajectory(row, dates, len(subtrajectories) + 1)
+                    if piece is not None:
+                        subtrajectories.append(piece)
+                        points_examined += len(row["points"])
+                    if row_count == 1:
+                        logger.info("Received first A-to-B query row")
+                    elif row_count % 10_000 == 0:
+                        logger.info("Processed %d A-to-B query rows", row_count)
+
+        if log_stats:
             logger.info(
                 "SQL results: rows=%d, distinct trajectories=%d, source point entries=%d (including repeats)",
-                len(rows),
-                len({row["trajectory_id"] for row in rows}),
-                sum(len(row["points"]) for row in rows),
+                row_count,
+                len(source_ids),
+                source_points,
             )
-
-        with self.log_step("Build subtrajectories"):
-            subtrajectories = []
-            points_examined = 0
-
-            for row in rows:
-                zone = ZoneInfo(row["time_zone"])
-                exit_a_time = row["exit_a_time"].astimezone(zone)
-                entry_b_time = row["entry_b_time"].astimezone(zone)
-
-                if not dates.contains(exit_a_time.date()):
-                    continue
-
-                points_examined += len(row["points"])
-                points = [
-                    UniformedTrajectoryPoint(row["exit_a_longitude"], exit_a_time, row["exit_a_latitude"])
-                ]
-
-                for point in row["points"]:
-                    point_timestamp = datetime.fromisoformat(point["point_timestamp"]).astimezone(zone)
-
-                    if exit_a_time < point_timestamp < entry_b_time:
-                        points.append(
-                            UniformedTrajectoryPoint(
-                                longitude=point["longitude"],
-                                latitude=point["latitude"],
-                                point_timestamp=point_timestamp,
-                            )
-                        )
-
-                points.append(
-                    UniformedTrajectoryPoint(row["entry_b_longitude"], entry_b_time, row["entry_b_latitude"])
-                )
-
-                subtrajectories.append(
-                    Subtrajectory(
-                        subtrajectory_id=len(subtrajectories) + 1,
-                        trajectory_id=row["trajectory_id"],
-                        exit_a_time=exit_a_time,
-                        entry_b_time=entry_b_time,
-                        points=points,
-                    )
-                )
-
-        if logger.isEnabledFor(logging.INFO):
             logger.info(
                 "Extraction: subtrajectories=%d, distinct trajectories=%d, rows excluded by local date=%d, "
                 "source points examined=%d; points per subtrajectory (including boundaries): %s",
                 len(subtrajectories),
                 len({item.trajectory_id for item in subtrajectories}),
-                len(rows) - len(subtrajectories),
+                row_count - len(subtrajectories),
                 points_examined,
                 describe_sizes([len(item.points) for item in subtrajectories]),
             )

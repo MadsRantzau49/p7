@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 from datetime import UTC, date, datetime, time
 from unittest.mock import MagicMock
 from zoneinfo import ZoneInfo
@@ -13,7 +14,7 @@ BOX_B = BoundingBox(-8.598, 41.14, -8.594, 41.16)
 
 
 def make_row():
-    """One row as get_subtrajectories returns it, with times in UTC."""
+    """One database row, with times in UTC."""
     return {
         "trajectory_id": 7,
         "exit_a_time": datetime(2013, 7, 1, 8, 10, 48, tzinfo=UTC),
@@ -35,13 +36,15 @@ def make_row():
 def test_find_subtrajectories():
     """Build each subtrajectory from the exit, the points in between and the entry, in local time."""
     repository = MagicMock()
-    repository.get_subtrajectories.return_value = [make_row()]
+    repository.stream_subtrajectories.return_value = nullcontext(iter([make_row()]))
 
     [found] = SubtrajectoryService(repository).find_subtrajectories(
         BOX_A, BOX_B, DateRange(date(2013, 7, 1), date(2013, 7, 2))
     )
 
-    box_a, box_b, start_date, end_date, start_time, end_time = repository.get_subtrajectories.call_args.args
+    box_a, box_b, start_date, end_date, start_time, end_time = (
+        repository.stream_subtrajectories.call_args.args
+    )
     assert (box_a, box_b) == (BOX_A, BOX_B)
     assert (start_date, end_date) == (date(2013, 7, 1), date(2013, 7, 2))
     assert (start_time, end_time) == (None, None)
@@ -72,13 +75,13 @@ def test_find_subtrajectories_rejects_invalid_input(box_b, start_date, end_date,
     with pytest.raises(ValueError, match=message):
         SubtrajectoryService(repository).find_subtrajectories(BOX_A, box_b, DateRange(start_date, end_date))
 
-    repository.get_subtrajectories.assert_not_called()
+    repository.stream_subtrajectories.assert_not_called()
 
 
 def test_find_subtrajectories_skips_those_leaving_a_outside_the_date_range():
     """Skip a subtrajectory that leaves A on a local date outside the range."""
     repository = MagicMock()
-    repository.get_subtrajectories.return_value = [make_row()]
+    repository.stream_subtrajectories.return_value = nullcontext(iter([make_row()]))
 
     found = SubtrajectoryService(repository).find_subtrajectories(
         BOX_A, BOX_B, DateRange(date(2013, 7, 2), date(2013, 7, 3))
@@ -90,10 +93,10 @@ def test_find_subtrajectories_skips_those_leaving_a_outside_the_date_range():
 def test_find_subtrajectories_passes_time_window_to_repository():
     """Pass start_time and end_time on to the repository, which filters on them."""
     repository = MagicMock()
-    repository.get_subtrajectories.return_value = []
+    repository.stream_subtrajectories.return_value = nullcontext(iter([]))
 
     SubtrajectoryService(repository).find_subtrajectories(
         BOX_A, BOX_B, DateRange(date(2013, 7, 1), date(2013, 7, 1)), time(22, 0), time(2, 0)
     )
 
-    assert repository.get_subtrajectories.call_args.args[-2:] == (time(22, 0), time(2, 0))
+    assert repository.stream_subtrajectories.call_args.args[-2:] == (time(22, 0), time(2, 0))

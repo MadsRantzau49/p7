@@ -1,11 +1,13 @@
 import math
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 from models.similarity import Polyline, ProjectedPoint
 
 # A free interval is the sub-range [lo, hi] of a segment that lies within epsilon of a point,
 # or None when no part of the segment is close enough.
-Interval = tuple[float, float] | None
+Range = tuple[float, float]
+Interval = Range | None
 
 
 @dataclass
@@ -13,10 +15,13 @@ class MatchingCounts:
     """Count the workload of anchor comparisons without profiling the inner loop."""
 
     comparisons: int = 0
+    endpoint_bucket_skips: int = 0
+    bounds_rejections: int = 0
     endpoint_rejections: int = 0
     successful_matches: int = 0
     free_space_runs: int = 0
     free_space_cells: int = 0
+    visited_free_space_cells: int = 0
     largest_free_space_cells: int = 0
 
 
@@ -31,7 +36,7 @@ def routes_match(
     further than epsilon apart keeps the routes separate. Reversing a route, or ending somewhere
     else, therefore does not match.
     """
-    matches = _frechet_within(first.points, second.points, epsilon, counts)
+    matches = _frechet_within(first, second, epsilon, counts)
     if counts is not None:
         counts.comparisons += 1
         counts.successful_matches += matches
@@ -44,21 +49,19 @@ def _distance(first: ProjectedPoint, second: ProjectedPoint) -> float:
 
 
 def _free_interval(
-    point: ProjectedPoint, start: ProjectedPoint, end: ProjectedPoint, epsilon: float
+    point: ProjectedPoint, start: ProjectedPoint, vector: tuple[float, float, float], epsilon_squared: float
 ) -> Interval:
     """Return the part [lo, hi] of segment start->end within epsilon of point, or None.
 
     Solving ||point - (start + h·(end - start))|| <= epsilon for h gives a quadratic; its roots,
     clamped to [0, 1], bound the free interval. A zero-length segment is in or out as a whole.
     """
-    dx = end.x - start.x
-    dy = end.y - start.y
+    dx, dy, a = vector
     offset_x = start.x - point.x
     offset_y = start.y - point.y
 
-    a = dx * dx + dy * dy
     b = 2 * (offset_x * dx + offset_y * dy)
-    c = offset_x * offset_x + offset_y * offset_y - epsilon * epsilon
+    c = offset_x * offset_x + offset_y * offset_y - epsilon_squared
 
     if a == 0:
         return (0.0, 1.0) if c <= 0 else None
@@ -68,8 +71,11 @@ def _free_interval(
         return None
 
     root = math.sqrt(discriminant)
-    low = max(0.0, (-b - root) / (2 * a))
-    high = min(1.0, (-b + root) / (2 * a))
+    denominator = 2 * a
+    low = (-b - root) / denominator
+    high = (-b + root) / denominator
+    low = low if low > 0 else 0.0
+    high = high if high < 1 else 1.0
     if low > high:
         return None
     return (low, high)
@@ -83,13 +89,14 @@ def _clip_from(interval: Interval, lowest: float) -> Interval:
 
 
 def _frechet_within(
-    first: list[ProjectedPoint], second: list[ProjectedPoint], epsilon: float, counts: MatchingCounts | None
+    first_line: Polyline, second_line: Polyline, epsilon: float, counts: MatchingCounts | None
 ) -> bool:
     """Decide whether a monotone matching of first and second stays within epsilon throughout.
 
-    This fills the Alt-Godau free-space diagram: each cell holds the part of a segment reachable
-    by a forward-only path from the start. The routes match when such a path reaches the end.
+    Propagate reachable intervals through the Alt-Godau diagram. A cell with no reachable
+    left or bottom edge cannot contribute to a match, so skip it without solving any quadratics.
     """
+    first, second = first_line.points, second_line.points
     n = len(first)
     m = len(second)
     if n == 0 or m == 0:
@@ -113,84 +120,64 @@ def _frechet_within(
         counts.free_space_cells += cells
         counts.largest_free_space_cells = max(counts.largest_free_space_cells, cells)
 
-    # left[i][j]:   reachable range on the vertical line at first-vertex i, over second-segment j.
-    # bottom[i][j]: reachable range on the horizontal line at second-vertex j, over first-segment i.
-    left: list[list[Interval]] = [[None] * (m - 1) for _ in range(n)]
-    bottom: list[list[Interval]] = [[None] * m for _ in range(n - 1)]
-
-    for i in range(n):
-        for j in range(m):
-            if j < m - 1:
-                left[i][j] = _reachable_left(first, second, left, bottom, i, j, epsilon)
-            if i < n - 1:
-                bottom[i][j] = _reachable_bottom(first, second, left, bottom, i, j, epsilon)
-
-    top = left[n - 1][m - 2]
-    right = bottom[n - 2][m - 1]
-    reached_top = top is not None and top[1] == 1.0
-    reached_right = right is not None and right[1] == 1.0
-    return reached_top or reached_right
+    matches, visited = _reachable_end(first_line, second_line, epsilon)
+    if counts is not None:
+        counts.visited_free_space_cells += visited
+    return matches
 
 
-def _reachable_left(
-    first: list[ProjectedPoint],
-    second: list[ProjectedPoint],
-    left: list[list[Interval]],
-    bottom: list[list[Interval]],
-    i: int,
-    j: int,
-    epsilon: float,
-) -> Interval:
-    """Reachable range on the vertical edge at first-vertex i over second-segment j."""
-    free = _free_interval(first[i], second[j], second[j + 1], epsilon)
-    if free is None:
-        return None
-
-    if i == 0:
-        if j == 0:
-            return free if free[0] == 0.0 else None
-        # On the left wall, movement is only upward, so the column must be free without a gap.
-        previous = left[0][j - 1]
-        if previous is not None and previous[1] == 1.0 and free[0] == 0.0:
-            return free
-        return None
-
-    # The edge is entered from the cell to the left, through its bottom or its left edge.
-    if bottom[i - 1][j] is not None:
-        return free
-    left_below = left[i - 1][j]
-    if left_below is not None:
-        return _clip_from(free, left_below[0])
-    return None
+def _boundary(fixed_point: ProjectedPoint, moving: Polyline, epsilon_squared: float) -> Iterator[Range]:
+    """Yield the consecutive reachable ranges along a starting wall of the diagram."""
+    for i, vector in enumerate(moving.segment_vectors):
+        free = _free_interval(fixed_point, moving.points[i], vector, epsilon_squared)
+        if free is None or free[0] != 0.0:
+            break
+        yield free
+        if free[1] != 1.0:
+            break
 
 
-def _reachable_bottom(
-    first: list[ProjectedPoint],
-    second: list[ProjectedPoint],
-    left: list[list[Interval]],
-    bottom: list[list[Interval]],
-    i: int,
-    j: int,
-    epsilon: float,
-) -> Interval:
-    """Reachable range on the horizontal edge at second-vertex j over first-segment i."""
-    free = _free_interval(second[j], first[i], first[i + 1], epsilon)
-    if free is None:
-        return None
+def _reachable_end(first_line: Polyline, second_line: Polyline, epsilon: float) -> tuple[bool, int]:
+    """Sweep reachable cells, keeping only the current and next row of left edges."""
+    first, second = first_line.points, second_line.points
+    first_vectors, second_vectors = first_line.segment_vectors, second_line.segment_vectors
+    epsilon_squared = epsilon * epsilon
+    incoming = list(enumerate(_boundary(first[0], second_line, epsilon_squared)))
+    bottom_wall = _boundary(second[0], first_line, epsilon_squared)
+    last_i, last_j = len(first) - 2, len(second) - 2
+    visited = 0
+    for i, a_vector in enumerate(first_vectors):
+        bottom = next(bottom_wall, None)
+        if not incoming and bottom is None:
+            break
+        a_start, a_end = first[i], first[i + 1]
+        outgoing: list[tuple[int, Range]] = []
+        edges = iter(incoming)
+        next_left = next(edges, None)
+        j = 0
+        while j <= last_j and (bottom is not None or next_left is not None):
+            # Without an edge from below, jump directly to the next cell reachable from the left.
+            left = None
+            if next_left is not None and (bottom is None or j == next_left[0]):
+                j, left = next_left
+                next_left = next(edges, None)
 
-    if j == 0:
-        if i == 0:
-            return free if free[0] == 0.0 else None
-        # On the bottom wall, movement is only rightward, so the row must be free without a gap.
-        previous = bottom[i - 1][0]
-        if previous is not None and previous[1] == 1.0 and free[0] == 0.0:
-            return free
-        return None
+            b_start, b_end = second[j], second[j + 1]
+            # A path from the bottom can reach the whole free right edge. A path from the
+            # left can only reach its forward portion. The top edge is the mirror case.
+            right = _free_interval(a_end, b_start, second_vectors[j], epsilon_squared)
+            top = _free_interval(b_end, a_start, a_vector, epsilon_squared)
+            if bottom is None and left is not None:
+                right = _clip_from(right, left[0])
+            if left is None and bottom is not None:
+                top = _clip_from(top, bottom[0])
+            visited += 1
 
-    # The edge is entered from the cell below, through its left or its bottom edge.
-    if left[i][j - 1] is not None:
-        return free
-    bottom_prev = bottom[i][j - 1]
-    if bottom_prev is not None:
-        return _clip_from(free, bottom_prev[0])
-    return None
+            if i == last_i and j == last_j:
+                return any(edge is not None and edge[1] == 1.0 for edge in (right, top)), visited
+            if right is not None:
+                outgoing.append((j, right))
+            bottom = top
+            j += 1
+        incoming = outgoing
+    return False, visited

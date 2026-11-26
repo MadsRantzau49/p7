@@ -1,5 +1,7 @@
+from collections.abc import Generator, Iterator
+from contextlib import closing, contextmanager
 from datetime import date, datetime, time, timedelta
-from typing import Any
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 from helpers.time_helper import to_utc_iso
@@ -234,17 +236,42 @@ class TrajectoryRepository(Logging):
         If start_time or end_time is given, only parts that leave A between them (in the city's
         local time) are returned. If start_time is after end_time, the window wraps around midnight.
         """
-        self.log_heading()
-        cursor = self.connection.cursor(row_factory=dict_row)
+        with self.stream_subtrajectories(box_a, box_b, start_date, end_date, start_time, end_time) as rows:
+            return list(rows)
 
-        try:
-            area_a = sql.SQL(
-                "ST_MakeEnvelope(%(a_min_lon)s, %(a_min_lat)s, %(a_max_lon)s, %(a_max_lat)s, 4326)"
-            )
-            area_b = sql.SQL(
-                "ST_MakeEnvelope(%(b_min_lon)s, %(b_min_lat)s, %(b_max_lon)s, %(b_max_lat)s, 4326)"
-            )
-            search_window = sql.SQL("""
+    @contextmanager
+    def stream_subtrajectories(
+        self,
+        box_a: BoundingBox,
+        box_b: BoundingBox,
+        start_date: date | None,
+        end_date: date | None,
+        start_time: time | None = None,
+        end_time: time | None = None,
+    ) -> Iterator[Iterator[dict[str, Any]]]:
+        """Stream the same ordered statement without buffering the full result client-side."""
+        self.log_heading()
+        query, values = self._subtrajectory_statement(
+            box_a, box_b, start_date, end_date, start_time, end_time
+        )
+        with self.connection.cursor(row_factory=dict_row) as cursor:
+            # psycopg types stream() as Iterator, but implements it as a generator.
+            stream = cast(Generator[dict[str, Any], None, None], cursor.stream(query, values))
+            with closing(stream):
+                yield stream
+
+    @staticmethod
+    def _subtrajectory_statement(
+        box_a: BoundingBox,
+        box_b: BoundingBox,
+        start_date: date | None,
+        end_date: date | None,
+        start_time: time | None,
+        end_time: time | None,
+    ) -> tuple[sql.Composed, dict[str, float | date | time | None]]:
+        area_a = sql.SQL("ST_MakeEnvelope(%(a_min_lon)s, %(a_min_lat)s, %(a_max_lon)s, %(a_max_lat)s, 4326)")
+        area_b = sql.SQL("ST_MakeEnvelope(%(b_min_lon)s, %(b_min_lat)s, %(b_max_lon)s, %(b_max_lat)s, 4326)")
+        search_window = sql.SQL("""
                 span(
                     COALESCE((%(start_date)s::timestamp AT TIME ZONE 'UTC') - INTERVAL '1 day',
                              '-infinity'::timestamptz),
@@ -253,20 +280,18 @@ class TrajectoryRepository(Logging):
                 )
             """)
 
-            time_filter = sql.SQL("")
-            if start_time is not None or end_time is not None:
-                start_time = start_time or time.min
-                end_time = end_time or time.max
-                exit_a_local_time = "(startTimestamp(piece) AT TIME ZONE time_zone)::time"
-                if start_time <= end_time:
-                    condition = f"{exit_a_local_time} BETWEEN %(start_time)s AND %(end_time)s"
-                else:
-                    condition = (
-                        f"({exit_a_local_time} >= %(start_time)s OR {exit_a_local_time} <= %(end_time)s)"
-                    )
-                time_filter = sql.SQL("AND " + condition)
+        time_filter = sql.SQL("")
+        if start_time is not None or end_time is not None:
+            start_time = start_time or time.min
+            end_time = end_time or time.max
+            exit_a_local_time = "(startTimestamp(piece) AT TIME ZONE time_zone)::time"
+            if start_time <= end_time:
+                condition = f"{exit_a_local_time} BETWEEN %(start_time)s AND %(end_time)s"
+            else:
+                condition = f"({exit_a_local_time} >= %(start_time)s OR {exit_a_local_time} <= %(end_time)s)"
+            time_filter = sql.SQL("AND " + condition)
 
-            query = sql.SQL("""
+        query = sql.SQL("""
             WITH pieces AS (
                 SELECT trips.trajectory_id,
                        trips.trip,
@@ -298,24 +323,17 @@ class TrajectoryRepository(Logging):
             ORDER BY trajectory_id, exit_a_time
             """).format(area_a=area_a, area_b=area_b, search_window=search_window, time_filter=time_filter)
 
-            values = {
-                "a_min_lon": box_a.min_longitude,
-                "a_min_lat": box_a.min_latitude,
-                "a_max_lon": box_a.max_longitude,
-                "a_max_lat": box_a.max_latitude,
-                "b_min_lon": box_b.min_longitude,
-                "b_min_lat": box_b.min_latitude,
-                "b_max_lon": box_b.max_longitude,
-                "b_max_lat": box_b.max_latitude,
-                "start_date": start_date,
-                "end_date": end_date,
-                "start_time": start_time,
-                "end_time": end_time,
-            }
-
-            with self.log_step("Execute SQL and receive results"):
-                cursor.execute(query, values)
-            with self.log_step("Fetch and decode rows"):
-                return cursor.fetchall()
-        finally:
-            cursor.close()
+        return query, {
+            "a_min_lon": box_a.min_longitude,
+            "a_min_lat": box_a.min_latitude,
+            "a_max_lon": box_a.max_longitude,
+            "a_max_lat": box_a.max_latitude,
+            "b_min_lon": box_b.min_longitude,
+            "b_min_lat": box_b.min_latitude,
+            "b_max_lon": box_b.max_longitude,
+            "b_max_lat": box_b.max_latitude,
+            "start_date": start_date,
+            "end_date": end_date,
+            "start_time": start_time,
+            "end_time": end_time,
+        }
