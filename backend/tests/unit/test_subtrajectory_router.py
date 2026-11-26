@@ -100,7 +100,7 @@ def test_get_subtrajectories_passes_time_window(monkeypatch):
 
 
 def test_find_routes_logs_pipeline_timings(monkeypatch, caplog):
-    """Time the real route-finding services using a fake database connection."""
+    """Log timings and workload counts from the real services with a fake database."""
     connection = MagicMock()
     connection.cursor.return_value.fetchall.return_value = [
         {
@@ -115,12 +115,22 @@ def test_find_routes_logs_pipeline_timings(monkeypatch, caplog):
             "points": [],
         }
     ]
+    row = connection.cursor.return_value.fetchall.return_value[0]
+    connection.cursor.return_value.fetchall.return_value = [row, row.copy()]
     monkeypatch.setattr(dependencies, "create_db_connection", lambda: nullcontext(connection))
 
     with caplog.at_level(logging.INFO):
         response = client.get("/api/subtrajectories/get", params=QUERY)
 
     assert response.status_code == 200
+    assert any("rows=2, distinct trajectories=1" in message for message in caplog.messages)
+    assert any(
+        "points per subtrajectory (including boundaries): total=4" in message for message in caplog.messages
+    )
+    assert any("full Fréchet evaluations=1, free-space cells=1" in message for message in caplog.messages)
+    assert any("Representative grid: cell size=100 m" in message for message in caplog.messages)
+    assert any("Clustering output: routes=1" in message for message in caplog.messages)
+    assert f"Response: status=200, bytes={len(response.content)}" in caplog.messages
     loggers = {
         "FindRoutes",
         "DatabaseConnection",
@@ -128,11 +138,15 @@ def test_find_routes_logs_pipeline_timings(monkeypatch, caplog):
         "TrajectoryRepository",
         "ClusteringService",
     }
-    messages = [record.getMessage() for record in caplog.records if record.name in loggers]
-    assert all(
-        message.startswith("=== ") or re.fullmatch(r".+ took \d+\.\d{3} seconds", message)
-        for message in messages
-    )
+    messages = [
+        message
+        for record in caplog.records
+        if record.name in loggers
+        and (
+            (message := record.getMessage()).startswith("=== ")
+            or re.fullmatch(r".+ took \d+\.\d{3} seconds", message)
+        )
+    ]
     messages = [message.split(" took ")[0] for message in messages]
     assert messages == [
         "=== Find routes ===",

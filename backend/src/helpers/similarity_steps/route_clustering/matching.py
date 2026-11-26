@@ -1,4 +1,5 @@
 import math
+from dataclasses import dataclass
 
 from models.similarity import Polyline, ProjectedPoint
 
@@ -7,7 +8,21 @@ from models.similarity import Polyline, ProjectedPoint
 Interval = tuple[float, float] | None
 
 
-def routes_match(first: Polyline, second: Polyline, epsilon: float) -> bool:
+@dataclass
+class MatchingCounts:
+    """Count the workload of anchor comparisons without profiling the inner loop."""
+
+    comparisons: int = 0
+    endpoint_rejections: int = 0
+    successful_matches: int = 0
+    free_space_runs: int = 0
+    free_space_cells: int = 0
+    largest_free_space_cells: int = 0
+
+
+def routes_match(
+    first: Polyline, second: Polyline, epsilon: float, counts: MatchingCounts | None = None
+) -> bool:
     """Return whether the continuous Fréchet distance between two routes is within epsilon.
 
     The Fréchet distance is the shortest leash that lets two walkers follow the routes from
@@ -16,7 +31,11 @@ def routes_match(first: Polyline, second: Polyline, epsilon: float) -> bool:
     further than epsilon apart keeps the routes separate. Reversing a route, or ending somewhere
     else, therefore does not match.
     """
-    return _frechet_within(first.points, second.points, epsilon)
+    matches = _frechet_within(first.points, second.points, epsilon, counts)
+    if counts is not None:
+        counts.comparisons += 1
+        counts.successful_matches += matches
+    return matches
 
 
 def _distance(first: ProjectedPoint, second: ProjectedPoint) -> float:
@@ -63,7 +82,9 @@ def _clip_from(interval: Interval, lowest: float) -> Interval:
     return (max(interval[0], lowest), interval[1])
 
 
-def _frechet_within(first: list[ProjectedPoint], second: list[ProjectedPoint], epsilon: float) -> bool:
+def _frechet_within(
+    first: list[ProjectedPoint], second: list[ProjectedPoint], epsilon: float, counts: MatchingCounts | None
+) -> bool:
     """Decide whether a monotone matching of first and second stays within epsilon throughout.
 
     This fills the Alt-Godau free-space diagram: each cell holds the part of a segment reachable
@@ -76,6 +97,8 @@ def _frechet_within(first: list[ProjectedPoint], second: list[ProjectedPoint], e
 
     # The endpoints are pinned together, so they must already be within epsilon.
     if _distance(first[0], second[0]) > epsilon or _distance(first[-1], second[-1]) > epsilon:
+        if counts is not None:
+            counts.endpoint_rejections += 1
         return False
 
     # A single-point route only matches if every point of the other stays within epsilon.
@@ -83,6 +106,12 @@ def _frechet_within(first: list[ProjectedPoint], second: list[ProjectedPoint], e
         return all(_distance(first[0], point) <= epsilon for point in second)
     if m == 1:
         return all(_distance(point, second[0]) <= epsilon for point in first)
+
+    if counts is not None:
+        cells = (n - 1) * (m - 1)
+        counts.free_space_runs += 1
+        counts.free_space_cells += cells
+        counts.largest_free_space_cells = max(counts.largest_free_space_cells, cells)
 
     # left[i][j]:   reachable range on the vertical line at first-vertex i, over second-segment j.
     # bottom[i][j]: reachable range on the horizontal line at second-vertex j, over first-segment i.

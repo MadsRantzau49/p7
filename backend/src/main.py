@@ -59,7 +59,13 @@ async def log_find_routes_request(request: Request, call_next: RequestResponseEn
     logger = logging.getLogger("FindRoutes")
     log_heading(logger, "Find routes")
     with log_step(logger, "Find routes request"):
-        return await call_next(request)
+        response = await call_next(request)
+    logger.info(
+        "Response: status=%d, bytes=%s",
+        response.status_code,
+        response.headers.get("content-length", "unknown"),
+    )
+    return response
 
 
 if __name__ == "__main__":  # pragma: no cover

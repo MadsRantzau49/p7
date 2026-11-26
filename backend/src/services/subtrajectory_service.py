@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
@@ -7,7 +8,7 @@ from models.date_range import DateRange
 from models.subtrajectory import Subtrajectory
 from models.uniformed_trajectories import UniformedTrajectoryPoint
 
-from services.logging import Logging
+from services.logging import Logging, describe_sizes
 
 
 class SubtrajectoryService(Logging):
@@ -46,9 +47,18 @@ class SubtrajectoryService(Logging):
         rows = self.trajectory_repository.get_subtrajectories(
             box_a, box_b, dates.start_date, dates.end_date, start_time, end_time
         )
+        logger = self.logger
+        if logger.isEnabledFor(logging.INFO):
+            logger.info(
+                "SQL results: rows=%d, distinct trajectories=%d, source point entries=%d (including repeats)",
+                len(rows),
+                len({row["trajectory_id"] for row in rows}),
+                sum(len(row["points"]) for row in rows),
+            )
 
         with self.log_step("Build subtrajectories"):
             subtrajectories = []
+            points_examined = 0
 
             for row in rows:
                 zone = ZoneInfo(row["time_zone"])
@@ -58,6 +68,7 @@ class SubtrajectoryService(Logging):
                 if not dates.contains(exit_a_time.date()):
                     continue
 
+                points_examined += len(row["points"])
                 points = [
                     UniformedTrajectoryPoint(row["exit_a_longitude"], exit_a_time, row["exit_a_latitude"])
                 ]
@@ -88,4 +99,14 @@ class SubtrajectoryService(Logging):
                     )
                 )
 
+        if logger.isEnabledFor(logging.INFO):
+            logger.info(
+                "Extraction: subtrajectories=%d, distinct trajectories=%d, rows excluded by local date=%d, "
+                "source points examined=%d; points per subtrajectory (including boundaries): %s",
+                len(subtrajectories),
+                len({item.trajectory_id for item in subtrajectories}),
+                len(rows) - len(subtrajectories),
+                points_examined,
+                describe_sizes([len(item.points) for item in subtrajectories]),
+            )
         return subtrajectories
