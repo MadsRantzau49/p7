@@ -1,7 +1,7 @@
 CREATE TABLE uniformed_trajectories(
     trajectory_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     dataset_id INT NOT NULL,
-    vehicle_id INT,
+    vehicle_id VARCHAR(100),
     vehicle_type VARCHAR(32) NOT NULL,
     trajectory_date TIMESTAMPTZ,
     city VARCHAR(100) NOT NULL,

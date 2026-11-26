@@ -7,7 +7,7 @@ from database.repositories.trajectory_repository import TrajectoryRepository
 from fastapi import Depends
 from psycopg import Connection
 from services.cleaning_service import CleanService
-from services.similarity_service import SimilarityService
+from services.clustering_service import ClusteringService
 from services.subtrajectory_service import SubtrajectoryService
 
 
@@ -54,6 +54,6 @@ def get_subtrajectory_service(
     )
 
 
-def get_similarity_service() -> SimilarityService:
-    """Provides a similarity service"""
-    return SimilarityService()
+def get_route_clustering_service() -> ClusteringService:
+    """Provides a route clustering service"""
+    return ClusteringService()
