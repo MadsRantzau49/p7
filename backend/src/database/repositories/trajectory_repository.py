@@ -306,7 +306,9 @@ class TrajectoryRepository(Logging):
                   AND eIntersects(trips.trip, {area_a})
                   AND eIntersects(trips.trip, {area_b}))
             SELECT trajectory_id,
-                   points,
+                   interior.longitudes,
+                   interior.latitudes,
+                   interior.timestamps,
                    time_zone,
                    startTimestamp(piece)   AS exit_a_time,
                    endTimestamp(piece)     AS entry_b_time,
@@ -315,6 +317,15 @@ class TrajectoryRepository(Logging):
                    ST_X(endValue(piece))   AS entry_b_longitude,
                    ST_Y(endValue(piece))   AS entry_b_latitude
             FROM pieces
+                     -- Only the points strictly between leaving A and entering B, in their stored order.
+                     CROSS JOIN LATERAL (
+                         SELECT array_agg((point ->> 'longitude')::float8 ORDER BY position) AS longitudes,
+                                array_agg((point ->> 'latitude')::float8 ORDER BY position) AS latitudes,
+                                array_agg((point ->> 'point_timestamp')::timestamptz ORDER BY position)
+                                    AS timestamps
+                         FROM jsonb_array_elements(pieces.points) WITH ORDINALITY AS stored(point, position)
+                         WHERE (point ->> 'point_timestamp')::timestamptz > startTimestamp(piece)
+                           AND (point ->> 'point_timestamp')::timestamptz < endTimestamp(piece)) AS interior
             WHERE startTimestamp(piece) > startTimestamp(trip)
               AND endTimestamp(piece) < endTimestamp(trip)
               AND ST_Distance(startValue(piece), {area_a}) < ST_Distance(startValue(piece), {area_b})

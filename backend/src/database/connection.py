@@ -22,7 +22,8 @@ database_pool = ConnectionPool(
         "options": "-c TimeZone=UTC",
     },
     min_size=1,
-    max_size=5,
+    # One connection per request plus one per parallel date chunk (see SubtrajectoryService).
+    max_size=int(os.getenv("DATABASE_POOL_MAX_SIZE", "10")),
     open=True,
 )
 

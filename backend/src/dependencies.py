@@ -1,5 +1,6 @@
 import logging
-from contextlib import ExitStack
+from collections.abc import Iterator
+from contextlib import ExitStack, contextmanager
 from typing import Annotated
 
 from database.connection import create_db_connection
@@ -53,12 +54,20 @@ def get_cleaning_service(
     )
 
 
+@contextmanager
+def open_pooled_trajectory_repository() -> Iterator[TrajectoryRepository]:
+    """Borrow another pooled connection for one parallel query and return it afterwards."""
+    with create_db_connection() as connection:
+        yield TrajectoryRepository(connection)
+
+
 def get_subtrajectory_service(
     trajectory_repository: Annotated[TrajectoryRepository, Depends(get_trajectory_repository)],
 ) -> SubtrajectoryService:
     """Provides a subtrajectory service and closes the connection afterward"""
     return SubtrajectoryService(
         trajectory_repository=trajectory_repository,
+        open_repository=open_pooled_trajectory_repository,
     )
 
 
