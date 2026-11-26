@@ -108,7 +108,7 @@ export default function RouteMap({ startArea, endArea, pickMode, onPickArea, onC
           <span>Loading subtrajectories...</span>
         </div>
       )}
-      <MapContainer center={DEFAULT_CENTER} zoom={DEFAULT_ZOOM} className="map">
+      <MapContainer center={DEFAULT_CENTER} zoom={DEFAULT_ZOOM} className="map" worldCopyJump={true}>
         <TileLayer
           attribution="&copy; OpenStreetMap contributors"
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
