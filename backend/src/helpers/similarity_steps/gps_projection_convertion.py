@@ -2,7 +2,7 @@ import math
 
 from models.similarity import GPSCoordinate, ProjectedPoint, ProjectedRoute, ProjectedSubtrajectory, Route
 from models.subtrajectory import Subtrajectory
-from pyproj import Transformer
+from pyproj import Proj
 from pyproj.enums import TransformDirection
 
 
@@ -17,7 +17,7 @@ def centre_longitude(points) -> float:
 
 def projection(
     subtrajectories: list[Subtrajectory],
-) -> tuple[list[ProjectedSubtrajectory], Transformer]:
+) -> tuple[list[ProjectedSubtrajectory], Proj]:
     """Project GPS subtrajectories into a shared local coordinate system in metres."""
     if not subtrajectories:
         raise ValueError("Projection requires at least one subtrajectory.")
@@ -36,13 +36,8 @@ def projection(
     centre_lat = sum(point.latitude for point in points) / len(points)
     centre_lon = centre_longitude(points)
 
-    # ah hell nah
-    transformer = Transformer.from_crs(
-        "EPSG:4326",
-        f"+proj=tmerc +lat_0={centre_lat} +lon_0={centre_lon} +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m",
-        always_xy=True,
-    )
-
+    transformer = Proj(proj="tmerc", lat_0=centre_lat, lon_0=centre_lon, datum="WGS84")
+    
     projected_subtrajectories = []
 
     for subtrajectory in subtrajectories:
@@ -67,7 +62,7 @@ def projection(
 
 def inverse_projection(
     routes: list[ProjectedRoute],
-    transformer: Transformer,
+    transformer: Proj,
 ) -> list[Route]:
     """Convert projected route points back to GPS coordinates in degrees."""
     if not routes:
