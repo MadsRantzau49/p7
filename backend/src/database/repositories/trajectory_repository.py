@@ -8,9 +8,10 @@ from models.uniformed_trajectories import UniformedTrajectories, UniformedTrajec
 from psycopg import Connection, sql
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
+from services.logging import Logging
 
 
-class TrajectoryRepository:
+class TrajectoryRepository(Logging):
     def __init__(self, connection: Connection):
         self.connection = connection
 
@@ -233,6 +234,7 @@ class TrajectoryRepository:
         If start_time or end_time is given, only parts that leave A between them (in the city's
         local time) are returned. If start_time is after end_time, the window wraps around midnight.
         """
+        self.log_heading()
         cursor = self.connection.cursor(row_factory=dict_row)
 
         try:
@@ -311,11 +313,9 @@ class TrajectoryRepository:
                 "end_time": end_time,
             }
 
-            cursor.execute(query, values)
-
-            return cursor.fetchall()
-        except Exception as error:
-            print(f"Failed to get subtrajectories: {error}")
-            raise
+            with self.log_step("Execute SQL and receive results"):
+                cursor.execute(query, values)
+            with self.log_step("Fetch and decode rows"):
+                return cursor.fetchall()
         finally:
             cursor.close()

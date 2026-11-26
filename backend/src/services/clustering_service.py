@@ -22,15 +22,11 @@ class ClusteringService(Logging):
         Each route is one representative polyline with the number of distinct original
         trajectories grouped into it. Projecting to metres first makes epsilon a plain distance.
         """
+        self.log_heading()
         if not subtrajectory_list:
             return None
         if any(len(subtrajectory.points) < 2 for subtrajectory in subtrajectory_list):
             raise ValueError("Every subtrajectory must contain at least two points.")
-        self.logger.info(
-            "Starting clustering: %d subtrajectories, epsilon=%.2f",
-            len(subtrajectory_list),
-            epsilon,
-        )
 
         with self.log_step("Clustering total"):
             with self.log_step("Step 1: Projection"):
@@ -41,14 +37,12 @@ class ClusteringService(Logging):
 
             with self.log_step("Step 3: Assign clusters"):
                 clusters = assign_clusters(entries, epsilon)
-                self.logger.info("Formed %d clusters", len(clusters))
 
             with self.log_step("Step 4: Choose representatives"):
                 representatives = choose_representatives(clusters, epsilon)
 
             with self.log_step("Step 5: Build routes"):
                 routes = build_routes(clusters, representatives)
-                self.logger.info("Selected %d routes", len(routes))
 
             with self.log_step("Step 6: Inverse projection"):
                 gps_routes = inverse_projection(routes, transformer)

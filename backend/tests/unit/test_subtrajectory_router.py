@@ -1,6 +1,11 @@
+import logging
+import re
+from contextlib import nullcontext
 from datetime import UTC, date, datetime, time
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
+import dependencies
 import routers.router as router
 from fastapi.testclient import TestClient
 from main import app
@@ -92,6 +97,63 @@ def test_get_subtrajectories_passes_time_window(monkeypatch):
 
     assert response.status_code == 200
     assert received["arguments"][-2:] == (time(22, 0), time(2, 30))
+
+
+def test_find_routes_logs_pipeline_timings(monkeypatch, caplog):
+    """Time the real route-finding services using a fake database connection."""
+    connection = MagicMock()
+    connection.cursor.return_value.fetchall.return_value = [
+        {
+            "trajectory_id": 7,
+            "time_zone": "Europe/Lisbon",
+            "exit_a_time": datetime(2013, 7, 1, 8, 10, tzinfo=UTC),
+            "entry_b_time": datetime(2013, 7, 1, 8, 12, tzinfo=UTC),
+            "exit_a_longitude": -8.612,
+            "exit_a_latitude": 41.15,
+            "entry_b_longitude": -8.596,
+            "entry_b_latitude": 41.15,
+            "points": [],
+        }
+    ]
+    monkeypatch.setattr(dependencies, "create_db_connection", lambda: nullcontext(connection))
+
+    with caplog.at_level(logging.INFO):
+        response = client.get("/api/subtrajectories/get", params=QUERY)
+
+    assert response.status_code == 200
+    loggers = {
+        "FindRoutes",
+        "DatabaseConnection",
+        "SubtrajectoryService",
+        "TrajectoryRepository",
+        "ClusteringService",
+    }
+    messages = [record.getMessage() for record in caplog.records if record.name in loggers]
+    assert all(
+        message.startswith("=== ") or re.fullmatch(r".+ took \d+\.\d{3} seconds", message)
+        for message in messages
+    )
+    messages = [message.split(" took ")[0] for message in messages]
+    assert messages == [
+        "=== Find routes ===",
+        "=== Database connection ===",
+        "Acquire pooled connection",
+        "=== SubtrajectoryService ===",
+        "Validate query",
+        "=== TrajectoryRepository ===",
+        "Execute SQL and receive results",
+        "Fetch and decode rows",
+        "Build subtrajectories",
+        "=== ClusteringService ===",
+        "Step 1: Projection",
+        "Step 2: Build polylines",
+        "Step 3: Assign clusters",
+        "Step 4: Choose representatives",
+        "Step 5: Build routes",
+        "Step 6: Inverse projection",
+        "Clustering total",
+        "Find routes request",
+    ]
 
 
 def test_get_cluster_subtrajectories(monkeypatch):

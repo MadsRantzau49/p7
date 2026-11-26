@@ -5,10 +5,14 @@ services:
     build:
       context: ..
       dockerfile: docker/backend/Dockerfile
+    network_mode: host
     env_file:
       - ../.env
     environment:
-      DATABASE_HOST: host.docker.internal
+      DATABASE_HOST: localhost
+      APP_LOG_DIR: /app/logs
+    volumes:
+      - ../logs:/app/logs
     ports:
       - "8000:8000"
 

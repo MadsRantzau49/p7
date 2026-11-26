@@ -1,3 +1,5 @@
+import logging
+from contextlib import ExitStack
 from typing import Annotated
 
 from database.connection import create_db_connection
@@ -8,14 +10,20 @@ from fastapi import Depends
 from psycopg import Connection
 from services.cleaning_service import CleanService
 from services.clustering_service import ClusteringService
+from services.logging import log_heading, log_step
 from services.subtrajectory_service import SubtrajectoryService
+
+db_logger = logging.getLogger("DatabaseConnection")
 
 
 def get_db_connection():
     """Creates the connection needed for different components.
     Documentation: https://fastapi.tiangolo.com/tutorial/dependencies/dependencies-with-yield/#sub-dependencies-with-yield
     """
-    with create_db_connection() as connection:
+    log_heading(db_logger, "Database connection")
+    with ExitStack() as stack:
+        with log_step(db_logger, "Acquire pooled connection"):
+            connection = stack.enter_context(create_db_connection())
         yield connection
 
 
