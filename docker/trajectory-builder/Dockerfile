@@ -2,9 +2,8 @@ FROM python:3.12-alpine
 
 WORKDIR /app
 
-COPY backend/tests/trajectory_builder/server.py .
-COPY backend/tests/trajectory_builder/ui ./ui
+COPY backend/tests/trajectory_builder ./trajectory_builder
 
 EXPOSE 80
 
-CMD ["python", "server.py"]
+CMD ["python", "-m", "trajectory_builder.server"]

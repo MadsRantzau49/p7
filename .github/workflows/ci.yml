@@ -36,7 +36,9 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: requirements.txt
+          cache-dependency-path: |
+            requirements.txt
+            backend/requirements.txt
 
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
@@ -66,7 +68,7 @@ jobs:
 
       - name: Test with coverage
         run: |
-          pytest --cov=backend/src --cov-report=term-missing
+          pytest -m "not slow and not extra_test" --cov=backend/src --cov-report=term-missing
 
           if ! coverage report --fail-under=100; then
             echo "::warning::Test coverage is below 100%"

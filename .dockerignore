@@ -2,9 +2,14 @@
 .env
 .venv*
 venv
+backend/tests/*
+!backend/tests/trajectory_builder
 **/__pycache__
 .pytest_cache
 .ruff_cache
 .coverage
+logs/
+outputs/
+runs/
 frontend/node_modules
 frontend/dist

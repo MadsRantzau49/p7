@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+psycopg[binary]
+psycopg_pool
+python-dotenv
+pydantic
+pyproj
+shapely
+starlette
+tzdata

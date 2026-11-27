@@ -1,7 +1,15 @@
+import math
 from collections import Counter
+from dataclasses import dataclass
+from operator import itemgetter
 
-from helpers.similarity_steps.route_clustering.geometry import polyline_cells
-from helpers.similarity_steps.route_clustering.matching import routes_match
+from helpers.similarity_steps.route_clustering.geometry import (
+    Cell,
+    cell_index,
+    polyline_cell_visit_bound,
+    polyline_cells,
+)
+from helpers.similarity_steps.route_clustering.matching import MatchingCounts, routes_match
 from models.similarity import (
     Cluster,
     ClusteredSubtrajectory,
@@ -10,19 +18,28 @@ from models.similarity import (
     ProjectedSubtrajectory,
 )
 
+# This limits both traversal work and retained cells, even when every cell is unique.
+MAX_GRID_CELL_VISITS = 6_000_000
+
+
+@dataclass(frozen=True)
+class PopularityGrid:
+    """Distinct cells per input subtrajectory and the number of users of each cell."""
+
+    cell_size: float
+    cells_by_entry: list[set[Cell]]
+    popularity: Counter[Cell]
+
 
 def cluster_routes(subtrajectories: list[ProjectedSubtrajectory], epsilon: float) -> list[ProjectedRoute]:
     """Group whole subtrajectories into routes within epsilon metres of each other.
 
-    This runs the clustering stages in order: prepare the polylines, assign them to clusters,
-    choose each cluster's representative, then assemble the routes. The service runs the same
-    stages one at a time so each is timed and logged on its own; this wrapper keeps the whole
-    pipeline available as one call.
+    Popular routes are considered first as potential representatives. The service runs the
+    same stages individually to log their timings.
     """
     entries = build_polylines(subtrajectories)
-    clusters = assign_clusters(entries, epsilon)
-    representatives = choose_representatives(clusters, epsilon)
-    return build_routes(clusters, representatives)
+    entries = order_by_popularity(entries, build_global_grid(entries, epsilon))
+    return build_routes(assign_clusters(entries, epsilon))
 
 
 def build_polylines(
@@ -42,65 +59,180 @@ def build_polylines(
     return entries
 
 
-def assign_clusters(entries: list[ClusteredSubtrajectory], epsilon: float) -> list[Cluster]:
-    """Place each entry in the first cluster whose anchor it matches, else start a new one."""
-    clusters: list[Cluster] = []
+def build_global_grid(entries: list[ClusteredSubtrajectory], epsilon: float) -> PopularityGrid | None:
+    """Bound popularity grid work independently of the matching tolerance."""
+    if math.isnan(epsilon):
+        raise ValueError("Epsilon must not be NaN.")
+    if epsilon <= 0:
+        return None
+
+    cell_size = _popularity_cell_size(entries, epsilon)
+    if cell_size is None:
+        return None
+    popularity: Counter[Cell] = Counter()
+    cells_by_entry: list[set[Cell]] = []
     for entry in entries:
-        cluster = _matching_cluster(entry.polyline, clusters, epsilon)
-        if cluster is not None:
-            cluster.members.append(entry)
+        cells = polyline_cells(entry.polyline, cell_size)
+        cells_by_entry.append(cells)
+        popularity.update(cells)
+    return PopularityGrid(cell_size, cells_by_entry, popularity)
+
+
+def _grid_fits(entries: list[ClusteredSubtrajectory], cell_size: float) -> bool:
+    visits = 0
+    for entry in entries:
+        visits += polyline_cell_visit_bound(entry.polyline, cell_size)
+        if visits > MAX_GRID_CELL_VISITS:
+            return False
+    return True
+
+
+def _popularity_cell_size(entries: list[ClusteredSubtrajectory], epsilon: float) -> float | None:
+    if _grid_fits(entries, epsilon):
+        return epsilon
+
+    # When epsilon is tiny, start near the distance we can afford to traverse per cell.
+    total_length = sum(entry.polyline.total_length for entry in entries)
+    cell_size = max(2 * epsilon, total_length / MAX_GRID_CELL_VISITS)
+    farthest = max(
+        (max(abs(point.x), abs(point.y)) for entry in entries for point in entry.polyline.points),
+        default=0.0,
+    )
+    while not _grid_fits(entries, cell_size):
+        # Beyond this extent, all finite widths produce the same four cells around the
+        # origin. If the grid still needs too much work, keep input order and match anyway.
+        if cell_size > farthest:
+            return None
+        cell_size *= 2
+    return cell_size
+
+
+def order_by_popularity(
+    entries: list[ClusteredSubtrajectory], grid: PopularityGrid | None
+) -> list[ClusteredSubtrajectory]:
+    """Sort by global overlap, then trajectory ID and the A/B crossing times."""
+    if grid is None:
+        return entries
+
+    def sort_key(item: tuple[ClusteredSubtrajectory, set[Cell]]) -> tuple[int, int, str, str]:
+        entry, cells = item
+        score = sum(grid.popularity[cell] - 1 for cell in cells)
+        member = entry.member
+        return -score, member.trajectory_id, member.exit_a_time.isoformat(), member.entry_b_time.isoformat()
+
+    ranked = sorted(zip(entries, grid.cells_by_entry, strict=True), key=sort_key)
+    return [entry for entry, _ in ranked]
+
+
+def assign_clusters(
+    entries: list[ClusteredSubtrajectory], epsilon: float, counts: MatchingCounts | None = None
+) -> list[Cluster]:
+    """Place each ordered entry with the first representative it matches, or make it one."""
+    clusters: list[Cluster] = []
+    # A matching start is at most epsilon away. Width 2*epsilon leaves room even for
+    # rounding in the matcher's distance calculation: a match cannot be two cells away.
+    cell_size = 2 * epsilon
+    index: dict[Cell, list[tuple[int, _Bounds]]] | None = {} if 0 < cell_size < math.inf else None
+    for entry in entries:
+        line = entry.polyline
+        if index is not None and line.points:
+            start = line.points[0]
+            cell = cell_index(start.x, cell_size), cell_index(start.y, cell_size)
+            bounds = _Bounds.from_polyline(line)
+            cluster = _indexed_match(line, bounds, clusters, index, cell, epsilon, counts)
+            if cluster is None:
+                index.setdefault(cell, []).append((len(clusters), bounds))
         else:
-            clusters.append(Cluster(anchor=entry.polyline, members=[entry]))
+            cluster = next(
+                (
+                    cluster
+                    for cluster in clusters
+                    if routes_match(line, cluster.representative, epsilon, counts)
+                ),
+                None,
+            )
+        if cluster is None:
+            clusters.append(Cluster(representative=line, members=[entry.member]))
+        else:
+            cluster.members.append(entry.member)
 
     return clusters
 
 
-def choose_representatives(clusters: list[Cluster], epsilon: float) -> list[Polyline]:
-    """Pick each cluster's representative by grid-cell overlap, one per cluster in order."""
-    return [_representative(cluster, epsilon) for cluster in clusters]
-
-
-def build_routes(clusters: list[Cluster], representatives: list[Polyline]) -> list[ProjectedRoute]:
-    """Assemble each cluster into a route with its representative, distinct count and members."""
+def build_routes(clusters: list[Cluster]) -> list[ProjectedRoute]:
+    """Return each cluster's permanent representative, distinct trajectory count, and members."""
     routes: list[ProjectedRoute] = []
-    for cluster, representative in zip(clusters, representatives, strict=True):
-        members = [entry.member for entry in cluster.members]
-        count = len({member.trajectory_id for member in members})
-        routes.append(ProjectedRoute(points=representative.points, count=count, members=members))
+    for cluster in clusters:
+        count = len({member.trajectory_id for member in cluster.members})
+        routes.append(
+            ProjectedRoute(points=cluster.representative.points, count=count, members=cluster.members)
+        )
 
     return routes
 
 
-def _matching_cluster(polyline: Polyline, clusters: list[Cluster], epsilon: float) -> Cluster | None:
-    """Return the first cluster whose anchor matches the polyline, or None."""
-    for cluster in clusters:
-        if routes_match(polyline, cluster.anchor, epsilon):
-            return cluster
+@dataclass(frozen=True, slots=True)
+class _Bounds:
+    min_x: float
+    max_x: float
+    min_y: float
+    max_y: float
+
+    @classmethod
+    def from_polyline(cls, line: Polyline) -> "_Bounds":
+        first = line.points[0]
+        min_x = max_x = first.x
+        min_y = max_y = first.y
+        for point in line.points:
+            x, y = point.x, point.y
+            if x < min_x:
+                min_x = x
+            elif x > max_x:
+                max_x = x
+            if y < min_y:
+                min_y = y
+            elif y > max_y:
+                max_y = y
+        return cls(min_x, max_x, min_y, max_y)
+
+    def differs_by_more_than(self, other: "_Bounds", epsilon: float) -> bool:
+        # If the routes match, every extreme point must have a counterpart on the
+        # other curve at most epsilon away. A curve's extrema occur at its vertices.
+        return (
+            abs(self.min_x - other.min_x) > epsilon
+            or abs(self.max_x - other.max_x) > epsilon
+            or abs(self.min_y - other.min_y) > epsilon
+            or abs(self.max_y - other.max_y) > epsilon
+        )
+
+
+def _indexed_match(
+    line: Polyline,
+    bounds: _Bounds,
+    clusters: list[Cluster],
+    index: dict[Cell, list[tuple[int, _Bounds]]],
+    cell: Cell,
+    epsilon: float,
+    counts: MatchingCounts | None,
+) -> Cluster | None:
+    """Try the nearby representatives in their original creation order."""
+    x, y = cell
+    candidates = [
+        candidate
+        for column in range(x - 1, x + 2)
+        for row in range(y - 1, y + 2)
+        for candidate in index.get((column, row), ())
+    ]
+    candidates.sort(key=itemgetter(0))
+    for considered, (i, representative_bounds) in enumerate(candidates, start=1):
+        if bounds.differs_by_more_than(representative_bounds, epsilon):
+            if counts is not None:
+                counts.bounds_rejections += 1
+            continue
+        if routes_match(line, clusters[i].representative, epsilon, counts):
+            if counts is not None:
+                counts.endpoint_bucket_skips += i + 1 - considered
+            return clusters[i]
+    if counts is not None:
+        counts.endpoint_bucket_skips += len(clusters) - len(candidates)
     return None
-
-
-def _representative(cluster: Cluster, epsilon: float) -> Polyline:
-    """Return the member polyline that shares the most grid cells with the other members.
-
-    Each cell is weighted by how many members pass through it, and a member scores the sum of
-    the weights of its cells, so the most typical path wins. Ties go to the lowest trajectory
-    id, which keeps the choice reproducible for NF6.
-    """
-    if epsilon <= 0:
-        return cluster.members[0].polyline
-
-    member_cells = [polyline_cells(entry.polyline, epsilon) for entry in cluster.members]
-    popularity: Counter[tuple[int, int]] = Counter()
-    for cells in member_cells:
-        popularity.update(cells)
-
-    best_index = 0
-    best_key: tuple[int, int] | None = None
-    for index, (entry, cells) in enumerate(zip(cluster.members, member_cells, strict=True)):
-        score = sum(popularity[cell] for cell in cells)
-        key = (score, -entry.member.trajectory_id)
-        if best_key is None or key > best_key:
-            best_key = key
-            best_index = index
-
-    return cluster.members[best_index].polyline
