@@ -36,7 +36,7 @@ def projection(
     centre_lat = sum(point.latitude for point in points) / len(points)
     centre_lon = centre_longitude(points)
 
-    transformer = Proj(proj="tmerc", lat_0=centre_lat, lon_0=centre_lon, datum="WGS84")
+    transformer = Proj(proj="tmerc", lat_0=centre_lat, lon_0=centre_lon)
     
     projected_subtrajectories = []
 
