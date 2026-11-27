@@ -45,7 +45,7 @@ class ClusteringService(Logging):
 
             with self.log_step("Step 4: Choose representatives"):
                 representatives = choose_representatives(clusters, epsilon)
-                 
+
             with self.log_step("Step 5: Build routes"):
                 routes = build_routes(clusters, representatives)
                 self.logger.info("Selected %d routes", len(routes))
