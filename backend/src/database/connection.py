@@ -12,7 +12,7 @@ load_dotenv()
 # IMPORTANT
 # Use the connection in a with block: "with create_db_connection() as connection:".
 # Do not call connection.close(), that closes the connection and the pool loses it.
-database_pool = ConnectionPool(
+database_pool: ConnectionPool[Connection] = ConnectionPool(
     kwargs={
         "host": os.getenv("DATABASE_HOST"),
         "port": os.getenv("DATABASE_PORT"),
@@ -20,9 +20,11 @@ database_pool = ConnectionPool(
         "user": os.getenv("DATABASE_USER"),
         "password": os.getenv("DATABASE_PASSWORD"),
         "options": "-c TimeZone=UTC",
+        "connect_timeout": 2,
     },
     min_size=1,
     max_size=5,
+    timeout=5,
     open=True,
 )
 

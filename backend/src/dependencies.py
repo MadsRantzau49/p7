@@ -1,14 +1,16 @@
 from typing import Annotated
 
-from database.connection import create_db_connection
+from database.connection import create_db_connection, database_pool
 from database.database_actions import DatabaseActions
 from database.repositories.dataset_repository import DatasetRepository
 from database.repositories.trajectory_repository import TrajectoryRepository
+from database.repositories.health_repository import HealthRepository
 from fastapi import Depends
 from psycopg import Connection
 from services.cleaning_service import CleanService
 from services.clustering_service import ClusteringService
 from services.subtrajectory_service import SubtrajectoryService
+from services.health_service import HealthService
 
 
 def get_db_connection():
@@ -57,3 +59,13 @@ def get_subtrajectory_service(
 def get_route_clustering_service() -> ClusteringService:
     """Provides a route clustering service"""
     return ClusteringService()
+
+def get_health_repository() -> HealthRepository:
+    """Provides a health repository that borrows its own connection with a short timeout"""
+    return HealthRepository(pool=database_pool)
+
+def get_health_service(
+    health_repository: Annotated[HealthRepository, Depends(get_health_repository)],
+) -> HealthService:
+    """Provides a health service"""
+    return HealthService(health_repository=health_repository)
