@@ -37,7 +37,7 @@ def projection(
     centre_lon = centre_longitude(points)
 
     transformer = Proj(proj="tmerc", lat_0=centre_lat, lon_0=centre_lon)
-    
+
     projected_subtrajectories = []
 
     for subtrajectory in subtrajectories:
