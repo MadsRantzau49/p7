@@ -1,10 +1,14 @@
 [tool.pytest.ini_options]
-addopts = "-q"
+addopts = ["-q", "-rs", "-m", "not slow and not extra_test"]
 pythonpath = [
     "backend/src",
     "backend/tests",
 ]
 testpaths = ["backend/tests"]
+markers = [
+    "slow: standard offline clustering benchmarks (up to 100,000 subpaths)",
+    "extra_test: opt-in million-scale clustering benchmarks (1M, 10M, 100M)",
+]
 
 [tool.ruff]
 line-length = 110

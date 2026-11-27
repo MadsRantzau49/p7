@@ -1,19 +1,8 @@
-fastapi
-uvicorn
-psycopg[binary]
-psycopg_pool
-python-dotenv
-pytest
-ruff
-pydantic
-python-multipart
-haversine
-pyright 
-vulture
-pytest-cov
-shapely
+-r backend/requirements.txt
+
 httpx2
-starlette
-anyio
-tzdata
-pyproj
+pytest
+pytest-cov
+pyright
+ruff
+vulture

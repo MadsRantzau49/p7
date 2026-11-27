@@ -149,4 +149,6 @@ outputs/
 runs/
 docs/rendered/*
 backend/tests/data/pathlets.json
-backend/tests/data/large_trajectories/*.csv*
+/backend/tests/data/large_trajectories/*
+!/backend/tests/data/large_trajectories/.gitkeep
+/backend/tests/data/trajectories/.bench-*.tmp
