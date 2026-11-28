@@ -112,7 +112,9 @@ def test_find_routes_logs_pipeline_timings(monkeypatch, caplog):
         "exit_a_latitude": 41.15,
         "entry_b_longitude": -8.596,
         "entry_b_latitude": 41.15,
-        "points": [],
+        "longitudes": [],
+        "latitudes": [],
+        "point_timestamps": [],
     }
     cursor = connection.cursor.return_value.__enter__.return_value
 

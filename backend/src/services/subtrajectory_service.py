@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, time
+from datetime import time
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -13,24 +13,21 @@ from services.logging import Logging, describe_sizes
 
 
 def build_subtrajectory(row: dict[str, Any], dates: DateRange, subtrajectory_id: int) -> Subtrajectory | None:
-    """Convert one query row to an A→B piece, keeping only its interior points."""
+    """Convert one query row to an A→B piece: the exit, the interior points and the entry, in local time."""
     zone = ZoneInfo(row["time_zone"])
     exit_a_time = row["exit_a_time"].astimezone(zone)
     entry_b_time = row["entry_b_time"].astimezone(zone)
     if not dates.contains(exit_a_time.date()):
         return None
 
+    # The query returns only the points strictly between the exit and the entry.
     points = [UniformedTrajectoryPoint(row["exit_a_longitude"], exit_a_time, row["exit_a_latitude"])]
-    for point in row["points"]:
-        point_timestamp = datetime.fromisoformat(point["point_timestamp"]).astimezone(zone)
-        if exit_a_time < point_timestamp < entry_b_time:
-            points.append(
-                UniformedTrajectoryPoint(
-                    longitude=point["longitude"],
-                    latitude=point["latitude"],
-                    point_timestamp=point_timestamp,
-                )
-            )
+    points.extend(
+        UniformedTrajectoryPoint(longitude, point_timestamp.astimezone(zone), latitude)
+        for longitude, latitude, point_timestamp in zip(
+            row["longitudes"], row["latitudes"], row["point_timestamps"], strict=True
+        )
+    )
     points.append(UniformedTrajectoryPoint(row["entry_b_longitude"], entry_b_time, row["entry_b_latitude"]))
     return Subtrajectory(subtrajectory_id, row["trajectory_id"], exit_a_time, entry_b_time, points)
 
@@ -82,11 +79,11 @@ class SubtrajectoryService(Logging):
                 for row_count, row in enumerate(rows, start=1):
                     if log_stats:
                         source_ids.add(row["trajectory_id"])
-                        source_points += len(row["points"])
+                        source_points += len(row["longitudes"])
                     piece = build_subtrajectory(row, dates, len(subtrajectories) + 1)
                     if piece is not None:
                         subtrajectories.append(piece)
-                        points_examined += len(row["points"])
+                        points_examined += len(row["longitudes"])
                     if row_count == 1:
                         logger.info("Received first A-to-B query row")
                     elif row_count % 10_000 == 0:
@@ -94,14 +91,14 @@ class SubtrajectoryService(Logging):
 
         if log_stats:
             logger.info(
-                "SQL results: rows=%d, distinct trajectories=%d, source point entries=%d (including repeats)",
+                "SQL results: rows=%d, distinct trajectories=%d, interior points=%d",
                 row_count,
                 len(source_ids),
                 source_points,
             )
             logger.info(
                 "Extraction: subtrajectories=%d, distinct trajectories=%d, rows excluded by local date=%d, "
-                "source points examined=%d; points per subtrajectory (including boundaries): %s",
+                "interior points kept=%d; points per subtrajectory (including boundaries): %s",
                 len(subtrajectories),
                 len({item.trajectory_id for item in subtrajectories}),
                 row_count - len(subtrajectories),

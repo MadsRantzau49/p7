@@ -115,7 +115,9 @@ def test_get_subtrajectories_against_configured_database():
             assert abs(found["entry_b_time"] - (start + timedelta(seconds=132))) < timedelta(milliseconds=1)
             assert found["exit_a_longitude"] == pytest.approx(-8.612)
             assert found["entry_b_longitude"] == pytest.approx(-8.598)
-            assert len(found["points"]) == 4
+            assert found["longitudes"] == pytest.approx([-8.61, -8.60])
+            assert found["latitudes"] == pytest.approx([41.15, 41.15])
+            assert found["point_timestamps"] == [start + timedelta(minutes=1), start + timedelta(minutes=2)]
             assert found["time_zone"] == "Europe/Lisbon"
 
             assert subtrajectories(date(2013, 6, 20), date(2013, 6, 20)) == []

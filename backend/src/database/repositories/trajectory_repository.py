@@ -229,6 +229,9 @@ class TrajectoryRepository(Logging):
     ) -> list[dict[str, Any]]:
         """Fetch every part of a trip that leaves box A and then enters box B.
 
+        Each row holds the exit and entry points and times, and the trip's points strictly between
+        them as parallel arrays: longitudes, latitudes and point_timestamps (UTC).
+
         The search window is one day wider on each side than the date range, because the dates
         are local to each city. The service keeps only the ones that leave A inside the date range.
         Missing date bounds are unbounded.
@@ -254,7 +257,8 @@ class TrajectoryRepository(Logging):
         query, values = self._subtrajectory_statement(
             box_a, box_b, start_date, end_date, start_time, end_time
         )
-        with self.connection.cursor(row_factory=dict_row) as cursor:
+        # Binary transfer: the point arrays are much faster to load than their text form.
+        with self.connection.cursor(row_factory=dict_row, binary=True) as cursor:
             # psycopg types stream() as Iterator, but implements it as a generator.
             stream = cast(Generator[dict[str, Any], None, None], cursor.stream(query, values))
             with closing(stream):
@@ -291,6 +295,12 @@ class TrajectoryRepository(Logging):
                 condition = f"({exit_a_local_time} >= %(start_time)s OR {exit_a_local_time} <= %(end_time)s)"
             time_filter = sql.SQL("AND " + condition)
 
+        # Performance notes:
+        # - No eIntersects(trip, A/B) filter: the piece filters below already require that the piece
+        #   starts on A's border and ends on B's, which implies both intersections. Leaving it out
+        #   also lets the planner choose a parallel bitmap scan.
+        # - Only the points strictly between the exit and the entry are sent, as plain arrays
+        #   (read with a binary cursor), instead of every trajectory's full JSON points.
         query = sql.SQL("""
             WITH pieces AS (
                 SELECT trips.trajectory_id,
@@ -302,19 +312,30 @@ class TrajectoryRepository(Logging):
                          JOIN uniformed_trajectories AS uniformed USING (trajectory_id)
                          JOIN cities ON cities.name = uniformed.city
                 WHERE trips.trip && stbox({area_a}, {search_window})
-                  AND trips.trip && stbox({area_b}, {search_window})
-                  AND eIntersects(trips.trip, {area_a})
-                  AND eIntersects(trips.trip, {area_b}))
+                  AND trips.trip && stbox({area_b}, {search_window}))
             SELECT trajectory_id,
-                   points,
                    time_zone,
                    startTimestamp(piece)   AS exit_a_time,
                    endTimestamp(piece)     AS entry_b_time,
                    ST_X(startValue(piece)) AS exit_a_longitude,
                    ST_Y(startValue(piece)) AS exit_a_latitude,
                    ST_X(endValue(piece))   AS entry_b_longitude,
-                   ST_Y(endValue(piece))   AS entry_b_latitude
+                   ST_Y(endValue(piece))   AS entry_b_latitude,
+                   inner_points.longitudes,
+                   inner_points.latitudes,
+                   inner_points.point_timestamps
             FROM pieces
+                     CROSS JOIN LATERAL (
+                SELECT COALESCE(array_agg((point ->> 'longitude')::float8 ORDER BY position),
+                                '{{}}') AS longitudes,
+                       COALESCE(array_agg((point ->> 'latitude')::float8 ORDER BY position),
+                                '{{}}') AS latitudes,
+                       COALESCE(array_agg((point ->> 'point_timestamp')::timestamptz ORDER BY position),
+                                '{{}}') AS point_timestamps
+                FROM jsonb_array_elements(pieces.points) WITH ORDINALITY AS elements(point, position)
+                WHERE (point ->> 'point_timestamp')::timestamptz > startTimestamp(piece)
+                  AND (point ->> 'point_timestamp')::timestamptz < endTimestamp(piece)
+                ) AS inner_points
             WHERE startTimestamp(piece) > startTimestamp(trip)
               AND endTimestamp(piece) < endTimestamp(trip)
               AND ST_Distance(startValue(piece), {area_a}) < ST_Distance(startValue(piece), {area_b})

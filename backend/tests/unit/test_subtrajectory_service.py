@@ -23,11 +23,12 @@ def make_row():
         "exit_a_latitude": 41.15,
         "entry_b_longitude": -8.598,
         "entry_b_latitude": 41.15,
-        "points": [
-            {"longitude": -8.62, "latitude": 41.15, "point_timestamp": "2013-07-01T08:10:00+00:00"},
-            {"longitude": -8.61, "latitude": 41.15, "point_timestamp": "2013-07-01T08:11:00+00:00"},
-            {"longitude": -8.60, "latitude": 41.15, "point_timestamp": "2013-07-01T08:12:00+00:00"},
-            {"longitude": -8.59, "latitude": 41.15, "point_timestamp": "2013-07-01T08:13:00+00:00"},
+        # Only the points strictly between the exit and the entry, as the query returns them.
+        "longitudes": [-8.61, -8.60],
+        "latitudes": [41.15, 41.15],
+        "point_timestamps": [
+            datetime(2013, 7, 1, 8, 11, tzinfo=UTC),
+            datetime(2013, 7, 1, 8, 12, tzinfo=UTC),
         ],
         "time_zone": "Europe/Lisbon",
     }
