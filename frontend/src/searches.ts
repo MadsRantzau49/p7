@@ -40,15 +40,19 @@ function describeRange(from: string, to: string, format: (value: string) => stri
   return null
 }
 
-export function searchLabel(search: SearchResult): string {
-  const { fromDate, toDate, fromHour, toHour } = search.query
-  const parts = [
-    describeRange(fromDate, toDate, formatDate),
-    describeRange(fromHour, toHour, (time) => time),
-  ].filter((part): part is string => part !== null)
-  if (parts.length === 0) return 'No constraints'
-  const label = parts.join(' · ')
-  return label.charAt(0).toUpperCase() + label.slice(1)
+export type Constraint = {
+  label: string
+  value: string
+}
+
+// The settings a search was run with, shown under its title when comparing searches.
+export function searchConstraints(search: SearchResult): Constraint[] {
+  const { fromDate, toDate, fromHour, toHour, epsilon } = search.query
+  return [
+    { label: 'Dates', value: describeRange(fromDate, toDate, formatDate) ?? 'All dates' },
+    { label: 'Daily hours', value: describeRange(fromHour, toHour, (time) => time) ?? 'All day' },
+    { label: 'Grouping distance', value: `${epsilon} m` },
+  ]
 }
 
 export function meetsMinimum(route: Route, minSubtrajectories: number): boolean {

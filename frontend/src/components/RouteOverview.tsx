@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react'
 import type { ClusterSubtrajectory } from '../types'
 import { routeColor, searchColor } from '../colors'
-import { filterRoutes, meetsMinimum, routeKey, sameRoute, searchLabel, totalSubtrajectories, type RouteRef, type SearchResult } from '../searches'
+import { filterRoutes, meetsMinimum, routeKey, sameRoute, searchConstraints, totalSubtrajectories, type RouteRef, type SearchResult } from '../searches'
 
 type Props = {
   searches: SearchResult[]
@@ -86,7 +86,7 @@ export default function RouteOverview({
       </button>
       <div className="min-filter">
         <span className="min-filter-label">
-          Min. subtrajectories per route
+          Minimum subtrajectories in each route
           <input
             type="number"
             className="min-filter-number"
@@ -156,9 +156,17 @@ export default function RouteOverview({
                   ▸
                 </span>
                 <span className="swatch" style={{ backgroundColor: searchColor(position) }} />
-                <span className="search-name">{searchLabel(search)}</span>
+                <span className="search-name">Search {position + 1}</span>
+                <span className="search-constraints">
+                  {searchConstraints(search).map(({ label, value }) => (
+                    <Fragment key={label}>
+                      <span className="constraint-label">{label}</span>
+                      <span className="constraint-value">{value}</span>
+                    </Fragment>
+                  ))}
+                </span>
                 <span className="search-summary">
-                  {filterRoutes(search.routes, minSubtrajectories).length} routes · {totalSubtrajectories(filterRoutes(search.routes, minSubtrajectories))} subtrajectories · {search.query.epsilon} m grouping
+                  {filterRoutes(search.routes, minSubtrajectories).length} routes · {totalSubtrajectories(filterRoutes(search.routes, minSubtrajectories))} subtrajectories
                 </span>
               </button>
 

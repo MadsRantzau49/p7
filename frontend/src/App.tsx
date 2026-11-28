@@ -271,7 +271,7 @@ export default function App() {
               <p className="help-text">
                 {compareMode
                   ? 'Change the search settings and click "Find routes" to add a search beside the current ones.'
-                  : 'Keep these results and add another search to compare with.'}
+                  : 'Keep the current searches and add another search to compare with.'}
               </p>
             </div>
           )}

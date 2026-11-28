@@ -1,4 +1,3 @@
-/* Basic reset so the app can fill the whole window. */
 * {
   box-sizing: border-box;
 }
@@ -16,7 +15,6 @@ body {
   background: #f4f6f8;
 }
 
-/* Overall page layout: a header on top, then panel + map below. */
 .app {
   display: flex;
   flex-direction: column;
@@ -39,10 +37,9 @@ body {
   display: flex;
   gap: 16px;
   padding: 16px;
-  min-height: 0; /* lets the map area shrink correctly */
+  min-height: 0; 
 }
 
-/* Left column holds the search panel and the route list. */
 .left-column {
   display: flex;
   flex-direction: column;
@@ -50,10 +47,9 @@ body {
   width: 340px;
   flex-shrink: 0;
   overflow-y: auto;
-  overflow-x: hidden; /* never scroll sideways under the search/compare panels */
+  overflow-x: hidden;
 }
 
-/* Right column holds the route list, on the other side of the map from the search panel. */
 .right-column {
   display: flex;
   flex-direction: column;
@@ -85,7 +81,6 @@ body {
   color: #52606d;
 }
 
-/* The two "select area" buttons. */
 .pick-button {
   width: 100%;
   padding: 10px;
@@ -120,7 +115,6 @@ body {
   color: #7b8794;
 }
 
-/* Date and time inputs sit side by side. */
 .field-row {
   display: flex;
   gap: 8px;
@@ -130,7 +124,7 @@ body {
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-width: 0; /* let the label shrink below the input's intrinsic width */
+  min-width: 0;
   gap: 4px;
   font-size: 12px;
   color: #52606d;
@@ -157,7 +151,6 @@ body {
   color: #7b8794;
 }
 
-/* Similarity level blocks (Low / Mid / High). */
 .slider-label {
   display: block;
   font-size: 14px;
@@ -211,7 +204,6 @@ body {
   border-radius: 8px;
 }
 
-/* Find routes button. */
 .find-button {
   width: 100%;
   padding: 12px;
@@ -243,7 +235,6 @@ body {
   font-size: 13px;
 }
 
-/* Loading spinner shown inside the Find routes button. */
 .spinner {
   width: 16px;
   height: 16px;
@@ -259,14 +250,12 @@ body {
   }
 }
 
-/* Bigger spinner for the map's search overlay. */
 .spinner-large {
   width: 28px;
   height: 28px;
   border-width: 3px;
 }
 
-/* Side columns while a search runs: dimmed, and made inert in the markup. */
 .left-column.busy,
 .right-column.busy {
   opacity: 0.6;
@@ -299,13 +288,11 @@ body {
   color: #1f2933;
 }
 
-/* Dark spinner variant for light backgrounds (e.g. over the map). */
 .spinner-dark {
   border-color: rgba(31, 41, 51, 0.25);
   border-top-color: #1f2933;
 }
 
-/* Centered loading badge shown over the map while a cluster's subtrajectories load. */
 .map-loading {
   position: absolute;
   top: 50%;
@@ -323,22 +310,27 @@ body {
   color: #1f2933;
 }
 
-/* Compare button, shown under the search panel after the first search. */
 .compare-panel {
   background: #fff;
   border: 1px solid #e0e4e8;
-  border-radius: 12px;
-  padding: 12px;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.compare-panel .help-text {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.3;
 }
 
 .compare-button {
   width: 100%;
-  padding: 8px;
+  padding: 5px;
   border: 1px solid #2f6fd1;
-  border-radius: 8px;
+  border-radius: 6px;
   background: #fff;
   color: #2f6fd1;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -352,7 +344,6 @@ body {
   color: #fff;
 }
 
-/* One collapsible entry per search in the route list. */
 .search-list {
   list-style: none;
   margin: 0;
@@ -408,7 +399,6 @@ body {
   font-weight: 600;
 }
 
-/* Sits on its own line under the name, lined up with the text after the chevron. */
 .search-summary {
   flex-basis: 100%;
   padding-left: 20px;
@@ -416,11 +406,30 @@ body {
   font-size: 12px;
 }
 
+/* The constraints a search was run with, listed under its "Search N" title. */
+.search-constraints {
+  flex-basis: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  row-gap: 1px;
+  margin: 2px 0;
+  padding-left: 20px;
+  font-size: 12px;
+}
+
+.constraint-label {
+  color: #7b8794;
+}
+
+.constraint-value {
+  color: #1f2933;
+}
+
 .search-empty {
   margin: 4px 8px 8px;
 }
 
-/* Route list (the overview). */
 .clear-button {
   display: block;
   width: 100%;
@@ -551,7 +560,6 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* The trips of the opened cluster, listed under its row. */
 .member-list-item {
   list-style: none;
 }
@@ -595,7 +603,6 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* The map fills the rest of the width, inside a rounded card like the sketch. */
 .map-card {
   position: relative;
   flex: 1;
@@ -645,6 +652,11 @@ body {
   cursor: pointer;
 }
 
+/* Grey background map; routes and markers keep their colours. */
+.map .leaflet-tile-pane {
+  filter: grayscale(100%);
+}
+
 .map-message button:hover {
   background: #2558a8;
 }
@@ -659,42 +671,20 @@ body {
   color: #1f2933;
 }
 
-/* phone width */
-@media (max-width: 800px) {
-  .app-body {
-    flex-direction: column;
-  }
-
-  .left-column {
-    width: 100%;
-  }
-
-  .right-column {
-    width: 100%;
-  }
-
-  .map-card {
-    min-height: 400px;
-  }
-}
-
-/* Backend health status shown above the search panel: a coloured dot and a short text. */
 .health-banner {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  border-radius: 12px;
-  background: rgba(31, 41, 51, 0.05);
-  font-size: 14px;
+  gap: 4px;
+  padding: 0;
+  font-size: 10px;
   font-weight: 500;
   color: #52606d;
   flex-shrink: 0;
 }
 
 .health-dot {
-  width: 12px;
-  height: 12px;
+  width: 6px;
+  height: 6px;
   flex-shrink: 0;
   border-radius: 50%;
   background: #9aa5b1;
@@ -718,11 +708,10 @@ body {
   cursor: pointer;
 }
 
-/* The search controls under the banner; dimmed while the backend is unavailable. */
 .left-column-controls {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
 }
 
 .left-column-controls.disabled {
