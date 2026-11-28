@@ -12,6 +12,7 @@ type Props = {
   endArea: Area | null
   pickMode: PickMode
   setPickMode: (mode: PickMode) => void
+  areasLocked: boolean
 
   fromDate: string
   setFromDate: (value: string) => void
@@ -39,7 +40,7 @@ type Props = {
 
 // Show the two corners of a selected area.
 function formatArea(area: Area): string {
-  return `${area.min_latitude.toFixed(4)}, ${area.min_longitude.toFixed(4)} — ${area.max_latitude.toFixed(4)}, ${area.max_longitude.toFixed(4)}`
+  return `${area.min_latitude.toFixed(4)}, ${area.min_longitude.toFixed(4)} - ${area.max_latitude.toFixed(4)}, ${area.max_longitude.toFixed(4)}`
 }
 
 export default function SearchPanel({
@@ -47,6 +48,7 @@ export default function SearchPanel({
   endArea,
   pickMode,
   setPickMode,
+  areasLocked,
   fromDate,
   setFromDate,
   toDate,
@@ -77,9 +79,10 @@ export default function SearchPanel({
           type="button"
           className={pickMode === 'start' ? 'pick-button active' : 'pick-button'}
           aria-pressed={pickMode === 'start'}
+          disabled={areasLocked}
           onClick={() => setPickMode(pickMode === 'start' ? null : 'start')}
         >
-          {startArea ? 'Starting area selected — change' : 'Select starting area on map'}
+          {startArea ? 'Starting area selected (Select to change)' : 'Select starting area on map'}
         </button>
         {startArea && <p className="coords">{formatArea(startArea)}</p>}
 
@@ -87,11 +90,15 @@ export default function SearchPanel({
           type="button"
           className={pickMode === 'end' ? 'pick-button active' : 'pick-button'}
           aria-pressed={pickMode === 'end'}
+          disabled={areasLocked}
           onClick={() => setPickMode(pickMode === 'end' ? null : 'end')}
         >
-          {endArea ? 'Destination selected — change' : 'Select destination area on map'}
+          {endArea ? 'Destination selected (Select to change)' : 'Select destination area on map'}
         </button>
         {endArea && <p className="coords">{formatArea(endArea)}</p>}
+        {areasLocked && (
+          <p className="help-text">The areas are locked while comparing, so every search uses the same start and destination.</p>
+        )}
       </section>
 
       {/* 2. When */}
@@ -124,14 +131,14 @@ export default function SearchPanel({
           </label>
         </div>
         <p className="help-text">
-          Optional. Only routes leaving the start area in this window are shown. If From is later
+          Only routes leaving the start area in this window are shown. If From is later
           than To, the window wraps past midnight (e.g. 22:00–02:00).
         </p>
       </section>
 
-      {/* 3. Route preferences */}
+      {/* 3. Grouping distance */}
       <section className="panel-section">
-        <h3>3. Route preferences</h3>
+        <h3>3. Grouping distance</h3>
         <div className="level-group">
           {SIMILARITY_LEVELS.map((level) => (
             <button

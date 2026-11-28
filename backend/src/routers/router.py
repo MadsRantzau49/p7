@@ -1,8 +1,8 @@
 from datetime import time
 from typing import Annotated
 
-from dependencies import get_route_clustering_service, get_subtrajectory_service
-from fastapi import APIRouter, Depends, HTTPException, Query
+from dependencies import get_health_service, get_route_clustering_service, get_subtrajectory_service
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from models.bounding_box import BoundingBox
 from models.date_range import DateRange
 from models.similarity import (
@@ -12,6 +12,7 @@ from models.similarity import (
     Route,
 )
 from services.clustering_service import ClusteringService
+from services.health_service import HealthService
 from services.subtrajectory_service import SubtrajectoryService
 
 router = APIRouter(prefix="/api/subtrajectories")
@@ -50,7 +51,12 @@ def get_subtrajectories(
             start_time,
             end_time,
         )
+
         routes = route_clustering_service.find_routes(subtrajectory_list, epsilon)
+
+        if not routes:
+            raise HTTPException(status_code=404, detail="No routes found for the given parameters.")
+
         return routes
 
     except ValueError as error:
@@ -102,3 +108,12 @@ def get_cluster_subtrajectories(
         for subtrajectory in subtrajectories
         if (subtrajectory.trajectory_id, subtrajectory.exit_a_time, subtrajectory.entry_b_time) in wanted
     ]
+
+
+@router.get("/health", response_model=dict[str, str])
+def check_health(response: Response, health_service: Annotated[HealthService, Depends(get_health_service)]):
+    """A simple endpoint to check if the service is running."""
+    result = health_service.check_health()
+    if result["status"] != "healthy":
+        response.status_code = 503
+    return result

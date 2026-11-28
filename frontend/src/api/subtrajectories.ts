@@ -7,12 +7,11 @@ export type FindRoutesParams = {
   end: Area
   fromDate: string
   toDate: string
-  fromHour: string // "" = no time filter
-  toHour: string // "" = no time filter
+  fromHour: string
+  toHour: string
   epsilon: number
 }
 
-// Map the two picked areas onto the a_/b_ bounding-box query the backend expects.
 function areaParams(params: FindRoutesParams) {
   return {
     a_longitude: params.start.min_longitude,
@@ -26,9 +25,9 @@ function areaParams(params: FindRoutesParams) {
   }
 }
 
-// routes between the two picked areas.
+// the backend will return a list of routes, each with its subtrajectories and their timestamps.
 export async function findRoutes(params: FindRoutesParams): Promise<Route[]> {
-  const response = await apiClient.get<Route[]>('/api/subtrajectories/get', {
+  const response = await apiClient.get<Route[]>('subtrajectories/get', {
     params: {
       ...dateQueryParams(params.fromDate, params.toDate),
       ...areaParams(params),
@@ -40,12 +39,12 @@ export async function findRoutes(params: FindRoutesParams): Promise<Route[]> {
   return response.data
 }
 
-// the individual subtrajectories grouped into one cluster, fetched when it is opened.
+// the backend will return a list of subtrajectories, each with its timestamps.
 export async function fetchClusterSubtrajectories(
   params: FindRoutesParams,
   members: ClusterMember[],
 ): Promise<ClusterSubtrajectory[]> {
-  const response = await apiClient.post<ClusterSubtrajectory[]>('/api/subtrajectories/cluster', {
+  const response = await apiClient.post<ClusterSubtrajectory[]>('subtrajectories/cluster', {
     ...dateQueryParams(params.fromDate, params.toDate),
     ...areaParams(params),
     start_time: params.fromHour || undefined,
