@@ -33,10 +33,25 @@ function formatDate(value: string): string {
   })
 }
 
-function describeRange(from: string, to: string, format: (value: string) => string): string | null {
-  if (from && to) return from === to ? format(from) : `${format(from)} – ${format(to)}`
-  if (from) return `from ${format(from)}`
-  if (to) return `until ${format(to)}`
+function describeRange(
+  from: string,
+  to: string,
+  format: (value: string) => string,
+): string | null {
+  if (from && to) {
+    return from === to
+      ? format(from)
+      : `${format(from)} – ${format(to)}`
+  }
+
+  if (from) {
+    return `from ${format(from)}`
+  }
+
+  if (to) {
+    return `until ${format(to)}`
+  }
+
   return null
 }
 
