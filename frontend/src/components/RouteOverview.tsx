@@ -265,7 +265,7 @@ function SearchRoutes({
                   <p className="member-loading">No trips to show.</p>
                 ) : (
                   <ul className="member-list">
-                    {memberPaths.map((member, memberIndex) => (
+                    {memberPaths.map((_member, memberIndex) => (
                       <li
                         key={memberIndex}
                         className={hoveredMember === memberIndex ? 'member-row active' : 'member-row'}

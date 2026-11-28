@@ -11,7 +11,7 @@ const MESSAGES: Record<HealthStatus, string> = {
   unhealthy: 'No connection, searching is disabled',
 }
 
-export default function HealthBanner({ status, onRetry }: Props) {
+export default function HealthBanner({ status }: Props) {
   return (
     <div className={`health-banner ${status}`} role="status" aria-live="polite">
       <span className="health-dot" aria-hidden="true" />
