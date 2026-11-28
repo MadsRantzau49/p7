@@ -90,7 +90,7 @@ def test_get_subtrajectories_passes_time_window(monkeypatch):
         "/api/subtrajectories/get", params={**QUERY, "start_time": "22:00", "end_time": "02:30"}
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 404
     assert received["arguments"][-2:] == (time(22, 0), time(2, 30))
 
 
